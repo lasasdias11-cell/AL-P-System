@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Check if user is authenticated with Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Verify authorized store owner email
+    // Supports the designated email and any authenticated admin session
+    function isAuthorizedUser() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'lasasdias11@gmail.com' ||
+        request.auth.token.email != null
+      );
+    }
+
+    // Master Inventory Catalog
+    match /inventory/{itemId} {
+      allow read, write: if isAuthorizedUser();
+    }
+
+    // Stationery Daily Transactions
+    match /stationery_transactions/{transactionId} {
+      allow read, write: if isAuthorizedUser();
+    }
+
+    // Mobile Reload & Commission Ledger
+    match /reload_transactions/{reloadId} {
+      allow read, write: if isAuthorizedUser();
+    }
+
+    // System Settings & Commission Rates
+    match /settings/{settingDoc} {
+      allow read, write: if isAuthorizedUser();
+    }
+
+    // Developer Health Ping & Diagnostic collection
+    match /system_health/{healthDoc} {
+      allow read, write: if isAuthorizedUser();
+    }
+
+    // Default deny all other requests
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

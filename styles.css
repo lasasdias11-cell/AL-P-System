@@ -1,0 +1,292 @@
+/* ==========================================================================
+   SRI LANKAN RETAIL & STATIONERY TRANSACTION LOG SYSTEM - THEME ENGINE & STYLES
+   ========================================================================== */
+
+/* Root Theme Definitions: 4 Switchable Color Palettes */
+
+/* Theme 1: Modern Slate (Default Dark Mode) */
+:root, [data-theme="modern-slate"] {
+  --bg-app: #0b1120;
+  --bg-surface: #1e293b;
+  --bg-surface-elevated: #334155;
+  --bg-surface-subtle: #0f172a;
+  --border-color: #334155;
+  --border-focus: #38bdf8;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --accent: #38bdf8;
+  --accent-hover: #0284c7;
+  --accent-light: rgba(56, 189, 248, 0.12);
+  --success: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.15);
+  --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.15);
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.15);
+  --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  --header-bg: rgba(15, 23, 42, 0.88);
+}
+
+/* Theme 2: Emerald Store (Light / Fresh Green Accent) */
+[data-theme="emerald-store"] {
+  --bg-app: #f0fdf4;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #f7fee7;
+  --bg-surface-subtle: #dcfce7;
+  --border-color: #bbf7d0;
+  --border-focus: #059669;
+  --text-main: #064e3b;
+  --text-muted: #166534;
+  --text-dim: #4ade80;
+  --accent: #059669;
+  --accent-hover: #047857;
+  --accent-light: rgba(5, 150, 105, 0.12);
+  --success: #059669;
+  --success-bg: rgba(5, 150, 105, 0.15);
+  --warning: #d97706;
+  --warning-bg: rgba(217, 119, 6, 0.15);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.15);
+  --card-shadow: 0 10px 25px -5px rgba(6, 78, 59, 0.08), 0 8px 10px -6px rgba(6, 78, 59, 0.05);
+  --header-bg: rgba(240, 253, 244, 0.92);
+}
+
+/* Theme 3: Sapphire Blue (Professional Dark) */
+[data-theme="sapphire-blue"] {
+  --bg-app: #060d1f;
+  --bg-surface: #0f1c3f;
+  --bg-surface-elevated: #1a2e63;
+  --bg-surface-subtle: #091229;
+  --border-color: #233b7b;
+  --border-focus: #3b82f6;
+  --text-main: #f0f6ff;
+  --text-muted: #93c5fd;
+  --text-dim: #60a5fa;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-light: rgba(59, 130, 246, 0.15);
+  --success: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.15);
+  --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.15);
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.15);
+  --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  --header-bg: rgba(9, 18, 41, 0.90);
+}
+
+/* Theme 4: Warm Amber (Light / Gold Accent) */
+[data-theme="warm-amber"] {
+  --bg-app: #fffbeb;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #fef3c7;
+  --bg-surface-subtle: #fde68a;
+  --border-color: #fcd34d;
+  --border-focus: #d97706;
+  --text-main: #451a03;
+  --text-muted: #78350f;
+  --text-dim: #b45309;
+  --accent: #d97706;
+  --accent-hover: #b45309;
+  --accent-light: rgba(217, 119, 6, 0.12);
+  --success: #059669;
+  --success-bg: rgba(5, 150, 105, 0.15);
+  --warning: #b45309;
+  --warning-bg: rgba(180, 83, 9, 0.15);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.15);
+  --card-shadow: 0 10px 25px -5px rgba(69, 26, 3, 0.08), 0 8px 10px -6px rgba(69, 26, 3, 0.05);
+  --header-bg: rgba(255, 251, 235, 0.92);
+}
+
+/* Base Resets & Global Application Styles */
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  transition: background-color 0.25s ease, color 0.25s ease;
+  overflow-x: hidden;
+}
+
+/* Prevent auto-zooming on mobile iOS devices when focusing inputs */
+input, select, textarea, button {
+  font-size: 16px;
+  touch-action: manipulation;
+}
+
+/* Dynamic Classes using Theme Variables */
+.theme-bg-app { background-color: var(--bg-app); }
+.theme-bg-surface { background-color: var(--bg-surface); }
+.theme-bg-elevated { background-color: var(--bg-surface-elevated); }
+.theme-bg-subtle { background-color: var(--bg-surface-subtle); }
+.theme-border { border-color: var(--border-color); }
+.theme-text-main { color: var(--text-main); }
+.theme-text-muted { color: var(--text-muted); }
+.theme-text-dim { color: var(--text-dim); }
+.theme-accent { color: var(--accent); }
+.theme-bg-accent { background-color: var(--accent); }
+.theme-bg-accent-light { background-color: var(--accent-light); }
+.theme-shadow { box-shadow: var(--card-shadow); }
+.theme-header {
+  background-color: var(--header-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Currency Styling */
+.currency-lkr {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}
+
+/* Header Live Pulse Dot */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+.pulse-dot {
+  animation: pulseDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Autocomplete Suggestion Dropdown */
+.autocomplete-container {
+  position: relative;
+}
+
+.autocomplete-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 50;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.autocomplete-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid var(--border-color);
+}
+.autocomplete-item:last-child {
+  border-bottom: none;
+}
+.autocomplete-item:hover, .autocomplete-item.active {
+  background-color: var(--accent-light);
+}
+
+/* Operator Badges */
+.badge-airtel {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+.badge-dialog {
+  background-color: #ea580c;
+  color: #ffffff;
+}
+.badge-mobitel {
+  background-color: #0284c7;
+  color: #ffffff;
+}
+.badge-hutch {
+  background-color: #f59e0b;
+  color: #ffffff;
+}
+
+/* Mobile Touch Optimization & Floating Elements */
+.tap-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Modal Transition */
+.modal-backdrop {
+  background-color: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.modal-enter {
+  opacity: 0;
+  transform: scale(0.96) translateY(10px);
+}
+.modal-enter-active {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+
+/* Bottom Safe Area for Mobile Notch/Nav */
+.safe-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* Developer Console Output Formatting */
+.dev-console-log {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+/* Clean Form Controls */
+.form-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.625rem;
+  background-color: var(--bg-surface-subtle);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+/* Print Optimization */
+@media print {
+  header, nav, .no-print, button, .modal-backdrop {
+    display: none !important;
+  }
+  body, .theme-bg-app, .theme-bg-surface {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}
