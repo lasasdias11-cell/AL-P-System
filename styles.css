@@ -1,5 +1,6 @@
 /* ==========================================================================
-   SRI LANKAN RETAIL & STATIONERY TRANSACTION LOG SYSTEM - THEME ENGINE & STYLES
+   AL COMMUNICATION - PROFESSIONAL POS & TRANSACTION LOG SYSTEM
+   Enterprise-Grade Styling, Dynamic Theme Engine & Responsive Layout
    ========================================================================== */
 
 /* Root Theme Definitions: 4 Switchable Color Palettes */
@@ -25,7 +26,7 @@
   --danger: #ef4444;
   --danger-bg: rgba(239, 68, 68, 0.15);
   --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
-  --header-bg: rgba(15, 23, 42, 0.88);
+  --header-bg: rgba(15, 23, 42, 0.90);
 }
 
 /* Theme 2: Emerald Store (Light / Fresh Green Accent) */
@@ -49,7 +50,7 @@
   --danger: #dc2626;
   --danger-bg: rgba(220, 38, 38, 0.15);
   --card-shadow: 0 10px 25px -5px rgba(6, 78, 59, 0.08), 0 8px 10px -6px rgba(6, 78, 59, 0.05);
-  --header-bg: rgba(240, 253, 244, 0.92);
+  --header-bg: rgba(240, 253, 244, 0.94);
 }
 
 /* Theme 3: Sapphire Blue (Professional Dark) */
@@ -73,7 +74,7 @@
   --danger: #ef4444;
   --danger-bg: rgba(239, 68, 68, 0.15);
   --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
-  --header-bg: rgba(9, 18, 41, 0.90);
+  --header-bg: rgba(9, 18, 41, 0.92);
 }
 
 /* Theme 4: Warm Amber (Light / Gold Accent) */
@@ -97,7 +98,7 @@
   --danger: #dc2626;
   --danger-bg: rgba(220, 38, 38, 0.15);
   --card-shadow: 0 10px 25px -5px rgba(69, 26, 3, 0.08), 0 8px 10px -6px rgba(69, 26, 3, 0.05);
-  --header-bg: rgba(255, 251, 235, 0.92);
+  --header-bg: rgba(255, 251, 235, 0.94);
 }
 
 /* Base Resets & Global Application Styles */
@@ -223,6 +224,23 @@ input, select, textarea, button {
   color: #ffffff;
 }
 
+/* Stock Status Badges */
+.badge-stock-in {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.badge-stock-low {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.badge-stock-out {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
 /* Mobile Touch Optimization & Floating Elements */
 .tap-target {
   min-height: 44px;
@@ -230,6 +248,41 @@ input, select, textarea, button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Quantity Stepper Control */
+.quantity-stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-surface-subtle);
+  border-radius: 0.625rem;
+  overflow: hidden;
+}
+.quantity-stepper button {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  color: var(--text-main);
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.quantity-stepper button:hover {
+  background-color: var(--accent-light);
+  color: var(--accent);
+}
+.quantity-stepper input {
+  text-align: center;
+  border: none;
+  background: transparent;
+  width: 60px;
+  font-weight: 700;
+  color: var(--text-main);
+  outline: none;
 }
 
 /* Modal Transition */
@@ -275,6 +328,44 @@ input, select, textarea, button {
 .form-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+/* Inline SVG Icon Helpers */
+.icon-svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+.icon-svg-sm {
+  width: 1rem;
+  height: 1rem;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+.icon-svg-lg {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
 }
 
 /* Print Optimization */

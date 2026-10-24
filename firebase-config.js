@@ -1,5 +1,5 @@
 // Firebase SDK v11 Modular Configuration
-// Sri Lankan Retail & Stationery Transaction Log System
+// AL Communication - Sri Lankan Retail & Mobile Reload System
 // Target Project: al-p1-fb432 | Auth Domain: al-p1-fb432.firebaseapp.com
 
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
@@ -30,7 +30,9 @@ import {
   onSnapshot, 
   serverTimestamp,
   enableNetwork,
-  disableNetwork
+  disableNetwork,
+  increment,
+  runTransaction
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
 // Retrieve saved API Key if custom, or default to configured environment key
@@ -104,5 +106,7 @@ export {
   onSnapshot,
   serverTimestamp,
   enableNetwork,
-  disableNetwork
+  disableNetwork,
+  increment,
+  runTransaction
 };

@@ -1,6 +1,7 @@
 // =============================================================================
-// SRI LANKAN RETAIL & STATIONERY TRANSACTION LOG SYSTEM - APP CORE LOGIC
-// Target: GitHub Pages SPA | Firebase Cloud Firestore v11 | Auth Guard
+// AL COMMUNICATION - SYSTEM LOGIC CORE (V1.0)
+// Professional Retail Stationery & Mobile Reload POS System
+// GitHub Pages SPA | Firebase Cloud Firestore v11 | Auth Guard
 // Project ID: al-p1-fb432 | Primary Currency: LKR (Rs. 0.00 exact precision)
 // =============================================================================
 
@@ -32,21 +33,19 @@ import {
   where,
   orderBy,
   onSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  increment
 } from './firebase-config.js';
 
 // =============================================================================
-// 1. APPLICATION STATE & CONSTANTS
+// 1. APPLICATION STATE & SAMPLE DATA (V1.0 RESTRUCTURED)
 // =============================================================================
 
 const APP_STATE = {
   currentUser: null,
   activeTheme: 'modern-slate',
   activeView: 'dashboard',
-  currentStationeryDate: '',
-  currentReloadDate: '',
-  activeReloadOperator: 'MOBITEL',
-  activeReloadFilter: 'ALL',
+  currentDate: '',
   commissionRates: {
     AIRTEL: 6.80,
     DIALOG: 3.80,
@@ -54,53 +53,66 @@ const APP_STATE = {
     HUTCH: 5.00
   },
   inventoryCatalog: [],
-  stationeryTransactions: [],
-  reloadTransactions: [],
   selectedCatalogItem: null,
+  activeReloadOperator: 'MOBITEL',
+  
+  // Real-time feeds for today
+  todayStationeryTransactions: [],
+  todayReloadTransactions: [],
+
+  // Master Logs Filter State
+  logCategoryFilter: 'ALL', // 'ALL' | 'STATIONERY' | 'RELOAD'
+  logDateMode: 'TODAY',     // 'TODAY' | 'YESTERDAY' | 'THIS_MONTH' | 'RANGE'
+  logDateFrom: '',
+  logDateTo: '',
+  masterStationeryRecords: [],
+  masterReloadRecords: [],
+
+  // Stock View Filter
+  stockFilter: 'ALL', // 'ALL' | 'LOW' | 'OUT'
+
+  // Analytics Month (YYYY-MM)
+  analyticsMonth: '',
+
   unsubscribers: {
     commissions: null,
     inventory: null,
-    stationery: null,
-    reloads: null
+    todayStationery: null,
+    todayReloads: null,
+    masterStationery: null,
+    masterReloads: null
   },
   devLogs: []
 };
 
-// Default sample stationery items for Sri Lankan retail shop
+// Standard Sri Lankan Stationery Catalog - Strictly Selling Price & Initial Stock
 const SAMPLE_SRI_LANKAN_CATALOG = [
-  { code: 'ST-001', name: 'Atlas CR Book 80 Pages (Single Rule)', costPrice: 160.00, sellingPrice: 200.00 },
-  { code: 'ST-002', name: 'Atlas CR Book 120 Pages (Single Rule)', costPrice: 230.00, sellingPrice: 280.00 },
-  { code: 'ST-003', name: 'Atlas CR Book 160 Pages (Single Rule)', costPrice: 300.00, sellingPrice: 370.00 },
-  { code: 'ST-004', name: 'CR Book 80 Pages (Square Rule)', costPrice: 160.00, sellingPrice: 200.00 },
-  { code: 'ST-005', name: 'Atlas Chooty Pen Blue (0.5mm)', costPrice: 22.00, sellingPrice: 30.00 },
-  { code: 'ST-006', name: 'Atlas Chooty Pen Black (0.5mm)', costPrice: 22.00, sellingPrice: 30.00 },
-  { code: 'ST-007', name: 'Atlas Chooty Pen Red (0.5mm)', costPrice: 22.00, sellingPrice: 30.00 },
-  { code: 'ST-008', name: 'Nataraj 2B Pencil Pack (10s)', costPrice: 210.00, sellingPrice: 260.00 },
-  { code: 'ST-009', name: 'A4 Photocopy Paper 80gsm (Pack 500)', costPrice: 1350.00, sellingPrice: 1600.00 },
-  { code: 'ST-010', name: 'A4 Photocopy Single Page (B/W)', costPrice: 3.50, sellingPrice: 10.00 },
-  { code: 'ST-011', name: 'A4 Colour Print Single Page', costPrice: 15.00, sellingPrice: 40.00 },
-  { code: 'ST-012', name: 'Bristol Board Sheet (White/Colours)', costPrice: 40.00, sellingPrice: 60.00 },
-  { code: 'ST-013', name: 'Atlas Colour Pastels (12 Shades)', costPrice: 180.00, sellingPrice: 230.00 },
-  { code: 'ST-014', name: 'Clear Display File Folder (A4)', costPrice: 120.00, sellingPrice: 170.00 },
-  { code: 'ST-015', name: 'UHU / Atlas Glue Stick 15g', costPrice: 110.00, sellingPrice: 150.00 }
+  { code: 'ST-001', name: 'Atlas CR Book 80 Pages (Single Rule)', sellingPrice: 200.00, stockQuantity: 50 },
+  { code: 'ST-002', name: 'Atlas CR Book 120 Pages (Single Rule)', sellingPrice: 280.00, stockQuantity: 40 },
+  { code: 'ST-003', name: 'Atlas CR Book 160 Pages (Single Rule)', sellingPrice: 370.00, stockQuantity: 35 },
+  { code: 'ST-004', name: 'CR Book 80 Pages (Square Rule)', sellingPrice: 200.00, stockQuantity: 45 },
+  { code: 'ST-005', name: 'Atlas Chooty Pen Blue (0.5mm)', sellingPrice: 30.00, stockQuantity: 200 },
+  { code: 'ST-006', name: 'Atlas Chooty Pen Black (0.5mm)', sellingPrice: 30.00, stockQuantity: 150 },
+  { code: 'ST-007', name: 'Atlas Chooty Pen Red (0.5mm)', sellingPrice: 30.00, stockQuantity: 100 },
+  { code: 'ST-008', name: 'Nataraj 2B Pencil Pack (10s)', sellingPrice: 260.00, stockQuantity: 30 },
+  { code: 'ST-009', name: 'A4 Photocopy Paper 80gsm (Pack 500)', sellingPrice: 1600.00, stockQuantity: 20 },
+  { code: 'ST-010', name: 'A4 Photocopy Single Page (B/W)', sellingPrice: 10.00, stockQuantity: 1000 },
+  { code: 'ST-011', name: 'A4 Colour Print Single Page', sellingPrice: 40.00, stockQuantity: 500 },
+  { code: 'ST-012', name: 'Bristol Board Sheet (White/Colours)', sellingPrice: 60.00, stockQuantity: 80 },
+  { code: 'ST-013', name: 'Atlas Colour Pastels (12 Shades)', sellingPrice: 230.00, stockQuantity: 25 },
+  { code: 'ST-014', name: 'Clear Display File Folder (A4)', sellingPrice: 170.00, stockQuantity: 40 },
+  { code: 'ST-015', name: 'UHU / Atlas Glue Stick 15g', sellingPrice: 150.00, stockQuantity: 30 }
 ];
 
 // =============================================================================
 // 2. MATHEMATICAL & FORMATTING UTILITIES (Exact Cent Precision)
 // =============================================================================
 
-/**
- * Standard rounding to 2 decimal places per specification:
- * Math.round((amount + Number.EPSILON) * 100) / 100
- */
 export function roundCurrency(amount) {
   const num = Number(amount) || 0;
   return Math.round((num + Number.EPSILON) * 100) / 100;
 }
 
-/**
- * Formats a number to Sri Lankan Rupee currency string: "Rs. 1,250.00"
- */
 export function formatLKR(amount) {
   const rounded = roundCurrency(amount);
   return 'Rs. ' + rounded.toLocaleString('en-LK', {
@@ -109,13 +121,9 @@ export function formatLKR(amount) {
   });
 }
 
-/**
- * Returns Sri Lankan local date string formatted as YYYY-MM-DD
- */
 export function getTodayDateString() {
   const now = new Date();
-  // Using Asia/Colombo timezone offset (UTC+5:30)
-  const tzOffset = 5.5 * 60; // in minutes
+  const tzOffset = 5.5 * 60; // Asia/Colombo UTC+5:30
   const localTime = new Date(now.getTime() + (tzOffset + now.getTimezoneOffset()) * 60000);
   const year = localTime.getFullYear();
   const month = String(localTime.getMonth() + 1).padStart(2, '0');
@@ -123,9 +131,17 @@ export function getTodayDateString() {
   return `${year}-${month}-${day}`;
 }
 
-/**
- * Returns formatted 24hr time string: HH:MM:SS
- */
+export function getYesterdayDateString() {
+  const now = new Date();
+  const tzOffset = 5.5 * 60;
+  const localTime = new Date(now.getTime() + (tzOffset + now.getTimezoneOffset()) * 60000);
+  localTime.setDate(localTime.getDate() - 1);
+  const year = localTime.getFullYear();
+  const month = String(localTime.getMonth() + 1).padStart(2, '0');
+  const day = String(localTime.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function getCurrentTimeString() {
   const now = new Date();
   const tzOffset = 5.5 * 60;
@@ -134,7 +150,7 @@ export function getCurrentTimeString() {
 }
 
 // =============================================================================
-// 3. LOGGING & DIAGNOSTICS HELPER
+// 3. LOGGING & TOAST ALERTS (Zero Emoji Enterprise Style)
 // =============================================================================
 
 function logDebug(message, type = 'INFO') {
@@ -156,7 +172,6 @@ function logDebug(message, type = 'INFO') {
   console.log(entry);
 }
 
-// Toast Alert System
 export function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
   if (!container) return;
@@ -168,24 +183,27 @@ export function showToast(message, type = 'info') {
     info: 'theme-bg-surface theme-text-main theme-border'
   };
 
-  toast.className = `px-4 py-3 rounded-xl shadow-xl text-xs sm:text-sm font-semibold border pointer-events-auto flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 ${colors[type] || colors.info}`;
+  toast.className = `px-4 py-3 rounded-xl shadow-xl text-xs sm:text-sm font-semibold border pointer-events-auto flex items-center gap-2 transform transition-all duration-200 translate-y-2 opacity-0 ${colors[type] || colors.info}`;
   
-  let icon = 'ℹ️';
-  if (type === 'success') icon = '✅';
-  if (type === 'error') icon = '⚠️';
+  let iconSvg = '';
+  if (type === 'success') {
+    iconSvg = '<svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+  } else if (type === 'error') {
+    iconSvg = '<svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+  } else {
+    iconSvg = '<svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
+  }
 
-  toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  toast.innerHTML = `<span>${iconSvg}</span><span>${message}</span>`;
   container.appendChild(toast);
 
-  // Trigger animation
   requestAnimationFrame(() => {
     toast.classList.remove('translate-y-2', 'opacity-0');
   });
 
-  // Remove toast after 3.5s
   setTimeout(() => {
     toast.classList.add('opacity-0', 'translate-y-2');
-    setTimeout(() => toast.remove(), 300);
+    setTimeout(() => toast.remove(), 250);
   }, 3500);
 }
 
@@ -201,7 +219,6 @@ export function setTheme(themeName) {
   APP_STATE.activeTheme = themeName;
   localStorage.setItem('al_theme', themeName);
 
-  // Update theme meta color for mobile browser navbars
   const metaTheme = document.querySelector('meta[name="theme-color"]');
   if (metaTheme) {
     const themeColors = {
@@ -213,7 +230,6 @@ export function setTheme(themeName) {
     metaTheme.setAttribute('content', themeColors[themeName] || '#0b1120');
   }
 
-  // Update active border in settings theme cards
   document.querySelectorAll('.theme-choice-card').forEach(card => {
     const choice = card.getAttribute('data-theme-choice');
     if (choice === themeName) {
@@ -240,7 +256,7 @@ function initTheme() {
 }
 
 // =============================================================================
-// 5. LIVE LKR DIGITAL CLOCK & NETWORK STATUS
+// 5. LIVE LKR CLOCK & NETWORK STATUS
 // =============================================================================
 
 function startLiveClock() {
@@ -249,7 +265,6 @@ function startLiveClock() {
 
   function update() {
     const now = new Date();
-    // Sri Lanka Time UTC+5:30
     const tzOffset = 5.5 * 60;
     const lkTime = new Date(now.getTime() + (tzOffset + now.getTimezoneOffset()) * 60000);
     
@@ -272,7 +287,7 @@ function initNetworkMonitor() {
   function updateStatus(isOnline) {
     if (isOnline) {
       if (syncBadge) {
-        syncBadge.className = 'hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        syncBadge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
         syncText.textContent = 'Cloud Live';
       }
       if (mobileSyncBadge) {
@@ -281,13 +296,13 @@ function initNetworkMonitor() {
       logDebug('Network online: Sync active', 'SUCCESS');
     } else {
       if (syncBadge) {
-        syncBadge.className = 'hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20';
+        syncBadge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20';
         syncText.textContent = 'Offline Cache';
       }
       if (mobileSyncBadge) {
         mobileSyncBadge.className = 'sm:hidden flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20';
       }
-      logDebug('Network offline: Working locally', 'WARN');
+      logDebug('Network offline: Using local cache', 'WARN');
     }
   }
 
@@ -321,7 +336,7 @@ function setupAuth() {
     });
   }
 
-  // Handle Custom Firebase API Key input
+  // Handle Custom Firebase API Key
   const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
   const customApiKeyInput = document.getElementById('customApiKeyInput');
   const savedKey = localStorage.getItem('al_firebase_api_key');
@@ -344,9 +359,8 @@ function setupAuth() {
     onAuthStateChanged(auth, (user) => {
       if (user) {
         APP_STATE.currentUser = user;
-        logDebug(`User authenticated: ${user.email} (UID: ${user.uid})`, 'SUCCESS');
+        logDebug(`Authenticated as: ${user.email}`, 'SUCCESS');
         
-        // Show App Shell, Hide Login
         loginScreen.classList.add('hidden');
         appShell.classList.remove('hidden');
 
@@ -358,20 +372,14 @@ function setupAuth() {
         APP_STATE.currentUser = null;
         logDebug('No active session. Presenting Login Screen.');
 
-        // Lock UI Behind Login Screen
         appShell.classList.add('hidden');
         loginScreen.classList.remove('hidden');
 
-        // Detach Firestore listeners to conserve memory and maintain security
         detachAllListeners();
       }
     });
   } else {
-    logDebug('Firebase Auth not initialized. Check API configuration.', 'ERROR');
-    if (loginAlert) {
-      loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-amber-500/10 text-amber-300 border border-amber-500/20 block';
-      loginAlert.innerHTML = `⚠️ <strong>Notice:</strong> Please configure your Firebase Web API Key for project <code>al-p1-fb432</code> in the drawer below.`;
-    }
+    logDebug('Firebase Auth not initialized. Verify API key.', 'ERROR');
   }
 
   // Login Form Submission
@@ -386,45 +394,40 @@ function setupAuth() {
 
       if (!auth) {
         loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-red-500/10 text-red-400 border border-red-500/20 block';
-        loginAlert.textContent = 'Firebase is not initialized. Please paste your Firebase Web API Key below.';
+        loginAlert.textContent = 'Firebase is not initialized. Please configure your Web API Key below.';
         return;
       }
 
-      // Show Spinner
       loginBtnSpinner.classList.remove('hidden');
       loginBtnText.textContent = 'Verifying Credentials...';
 
       try {
         await signInWithEmailAndPassword(auth, email, password);
-        showToast(`Welcome back, ${email}`, 'success');
+        showToast(`Signed in: ${email}`, 'success');
       } catch (error) {
-        logDebug(`Authentication failed: ${error.code} - ${error.message}`, 'ERROR');
+        logDebug(`Authentication failed: ${error.code}`, 'ERROR');
         loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-red-500/10 text-red-400 border border-red-500/20 block';
         
         let errorMsg = 'Failed to sign in. Please verify your email and password.';
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
-          errorMsg = 'Invalid email or password. Please try again.';
+          errorMsg = 'Invalid email or password.';
         } else if (error.code === 'auth/user-not-found') {
-          errorMsg = 'No registered user found with this email.';
+          errorMsg = 'No user record found for this email address.';
         } else if (error.code === 'auth/too-many-requests') {
-          errorMsg = 'Access blocked temporarily due to multiple failed attempts. Try again later or reset password.';
-        } else if (error.code === 'auth/network-request-failed') {
-          errorMsg = 'Network error. Please check your internet connection.';
-        } else if (error.code === 'auth/invalid-api-key') {
-          errorMsg = 'Invalid Firebase API Key. Please provide your Web API Key in the box below.';
+          errorMsg = 'Account temporarily blocked due to repeated failures. Try again later or reset password.';
         }
-        loginAlert.innerHTML = `⚠️ ${errorMsg}`;
+        loginAlert.textContent = errorMsg;
       } finally {
         loginBtnSpinner.classList.add('hidden');
-        loginBtnText.textContent = 'Sign In to Store Ledger';
+        loginBtnText.textContent = 'Sign In to Counter Ledger';
       }
     });
   }
 
-  // Sign Out Button
+  // Sign Out
   if (signOutBtn) {
     signOutBtn.addEventListener('click', async () => {
-      if (confirm('Are you sure you want to sign out of the Store Ledger?')) {
+      if (confirm('Are you sure you want to sign out of the AL Communication counter?')) {
         try {
           await signOut(auth);
           closeSettingsModal();
@@ -436,7 +439,7 @@ function setupAuth() {
     });
   }
 
-  // Forgot Password Modal Flow
+  // Password Reset Flow
   const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
   const passwordResetModal = document.getElementById('passwordResetModal');
   const cancelResetBtn = document.getElementById('cancelResetBtn');
@@ -466,7 +469,7 @@ function setupAuth() {
     });
   }
 
-  // Account Security Updates inside Settings
+  // Account Security inside Settings
   setupAccountSecurity();
 }
 
@@ -501,17 +504,17 @@ function setupAccountSecurity() {
       const confirmPass = document.getElementById('confirmPasswordInput').value;
 
       if (newPass !== confirmPass) {
-        showToast('New passwords do not match!', 'error');
+        showToast('New passwords do not match', 'error');
         return;
       }
       if (newPass.length < 6) {
-        showToast('Password must be at least 6 characters.', 'error');
+        showToast('Password must be at least 6 characters', 'error');
         return;
       }
 
       try {
         await updatePassword(auth.currentUser, newPass);
-        showToast('Password successfully changed!', 'success');
+        showToast('Password successfully updated', 'success');
         updatePasswordForm.reset();
       } catch (err) {
         if (err.code === 'auth/requires-recent-login') {
@@ -525,14 +528,14 @@ function setupAccountSecurity() {
 }
 
 async function promptReauthAndRetry(actionCallback) {
-  const currentPassword = prompt('Firebase Security Notice: Please re-enter your CURRENT password to authorize this sensitive change:');
+  const currentPassword = prompt('Security Verification: Please re-enter your current password to authorize this update:');
   if (!currentPassword) return;
 
   try {
     const cred = EmailAuthProvider.credential(auth.currentUser.email, currentPassword);
     await reauthenticateWithCredential(auth.currentUser, cred);
     await actionCallback();
-    showToast('Credential verified and change applied!', 'success');
+    showToast('Credentials verified and update applied', 'success');
   } catch (err) {
     showToast(`Verification failed: ${err.message}`, 'error');
   }
@@ -542,13 +545,12 @@ async function promptReauthAndRetry(actionCallback) {
 // 7. NAVIGATION & VIEW SWITCHING
 // =============================================================================
 
-function switchView(viewName) {
-  const views = ['dashboard', 'stationery', 'reloads'];
+export function switchView(viewName) {
+  const views = ['dashboard', 'stationery', 'reloads', 'stock', 'logs'];
   if (!views.includes(viewName)) viewName = 'dashboard';
 
   APP_STATE.activeView = viewName;
 
-  // Toggle Section Views
   document.querySelectorAll('.app-view').forEach(viewEl => {
     viewEl.classList.add('hidden');
   });
@@ -556,7 +558,7 @@ function switchView(viewName) {
   const targetView = document.getElementById(`view${viewName.charAt(0).toUpperCase() + viewName.slice(1)}`);
   if (targetView) targetView.classList.remove('hidden');
 
-  // Update Desktop Tab Buttons
+  // Desktop Header Nav buttons
   document.querySelectorAll('.nav-tab-btn').forEach(btn => {
     if (btn.getAttribute('data-view') === viewName) {
       btn.className = 'nav-tab-btn active px-3.5 py-1.5 rounded-lg theme-bg-accent text-white transition';
@@ -565,7 +567,7 @@ function switchView(viewName) {
     }
   });
 
-  // Update Mobile Bottom Nav Buttons
+  // Mobile Bottom Nav buttons
   document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
     if (btn.getAttribute('data-view') === viewName) {
       btn.className = 'mobile-nav-btn active flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-accent';
@@ -574,40 +576,53 @@ function switchView(viewName) {
     }
   });
 
-  // Scroll to top
+  // View specific triggers
+  if (viewName === 'stock') {
+    renderStockTable();
+  } else if (viewName === 'logs') {
+    applyMasterLogFilters();
+  }
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  logDebug(`Navigated to view: ${viewName}`);
+  logDebug(`Switched view to: ${viewName}`);
 }
 
 function initNavigation() {
-  // Desktop Nav Buttons
   document.querySelectorAll('.nav-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
   });
 
-  // Mobile Bottom Nav Buttons
   document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
     btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
   });
 
-  // Header Brand Home Button
   const headerHomeBtn = document.getElementById('headerHomeBtn');
   if (headerHomeBtn) {
     headerHomeBtn.addEventListener('click', () => switchView('dashboard'));
   }
 
-  // Dashboard Large Operational Cards
-  const dashStationeryCard = document.getElementById('dashStationeryCard');
-  if (dashStationeryCard) {
-    dashStationeryCard.addEventListener('click', () => switchView('stationery'));
+  // Dashboard Operational Shortcut Tiles
+  const dashTileStationery = document.getElementById('dashTileStationery');
+  if (dashTileStationery) {
+    dashTileStationery.addEventListener('click', () => switchView('stationery'));
   }
 
-  const dashReloadCard = document.getElementById('dashReloadCard');
-  if (dashReloadCard) {
-    dashReloadCard.addEventListener('click', () => switchView('reloads'));
+  const dashTileReloads = document.getElementById('dashTileReloads');
+  if (dashTileReloads) {
+    dashTileReloads.addEventListener('click', () => switchView('reloads'));
   }
 
-  // Settings Modal Open / Close
+  const dashTileStock = document.getElementById('dashTileStock');
+  if (dashTileStock) {
+    dashTileStock.addEventListener('click', () => switchView('stock'));
+  }
+
+  const dashTileLogs = document.getElementById('dashTileLogs');
+  if (dashTileLogs) {
+    dashTileLogs.addEventListener('click', () => switchView('logs'));
+  }
+
+  // Settings Modal Controls
   const openSettingsBtn = document.getElementById('openSettingsBtn');
   const mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
   const closeSettingsBtn = document.getElementById('closeSettingsBtn');
@@ -616,10 +631,9 @@ function initNavigation() {
   if (mobileSettingsBtn) mobileSettingsBtn.addEventListener('click', openSettingsModal);
   if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettingsModal);
 
-  // Quick Open Catalog from POS Bar
-  const openAddCatalogItemBtn = document.getElementById('openAddCatalogItemBtn');
-  if (openAddCatalogItemBtn) {
-    openAddCatalogItemBtn.addEventListener('click', () => {
+  const stockOpenCatalogSettingsBtn = document.getElementById('stockOpenCatalogSettingsBtn');
+  if (stockOpenCatalogSettingsBtn) {
+    stockOpenCatalogSettingsBtn.addEventListener('click', () => {
       openSettingsModal();
       switchSettingsTab('catalog');
     });
@@ -630,7 +644,6 @@ function initNavigation() {
     tabBtn.addEventListener('click', () => switchSettingsTab(tabBtn.getAttribute('data-settings-tab')));
   });
 
-  // Settings backdrop click to close
   const settingsModal = document.getElementById('settingsModal');
   if (settingsModal) {
     settingsModal.addEventListener('click', (e) => {
@@ -656,14 +669,12 @@ function switchSettingsTab(tabName) {
   const tabs = ['catalog', 'rates', 'security', 'themes', 'developer'];
   if (!tabs.includes(tabName)) tabName = 'catalog';
 
-  // Toggle Panels
   document.querySelectorAll('.settings-panel').forEach(panel => {
     panel.classList.add('hidden');
   });
   const targetPanel = document.getElementById(`settingsPanel${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`);
   if (targetPanel) targetPanel.classList.remove('hidden');
 
-  // Toggle Button styles
   document.querySelectorAll('.settings-tab-btn').forEach(btn => {
     if (btn.getAttribute('data-settings-tab') === tabName) {
       btn.className = 'settings-tab-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-accent text-white transition whitespace-nowrap';
@@ -674,7 +685,7 @@ function switchSettingsTab(tabName) {
 }
 
 // =============================================================================
-// 8. FIRESTORE REAL-TIME LISTENERS
+// 8. FIRESTORE REAL-TIME LISTENERS & DATA SYNC
 // =============================================================================
 
 function detachAllListeners() {
@@ -690,30 +701,38 @@ function initRealtimeListeners() {
   detachAllListeners();
 
   const today = getTodayDateString();
-  APP_STATE.currentStationeryDate = today;
-  APP_STATE.currentReloadDate = today;
+  APP_STATE.currentDate = today;
 
-  // Set date pickers to today
-  const statDateInput = document.getElementById('stationeryDateInput');
-  if (statDateInput) statDateInput.value = today;
+  // Set default analytics month to current (YYYY-MM)
+  const currentMonth = today.substring(0, 7);
+  APP_STATE.analyticsMonth = currentMonth;
+  const monthPicker = document.getElementById('analyticsMonthPicker');
+  if (monthPicker) monthPicker.value = currentMonth;
 
-  const reloadDateInput = document.getElementById('reloadDateInput');
-  if (reloadDateInput) reloadDateInput.value = today;
+  // Set default log dates
+  APP_STATE.logDateFrom = today;
+  APP_STATE.logDateTo = today;
+  const logFrom = document.getElementById('logDateFrom');
+  const logTo = document.getElementById('logDateTo');
+  if (logFrom) logFrom.value = today;
+  if (logTo) logTo.value = today;
 
   // 1. Commission Rates Listener
   listenToCommissions();
 
-  // 2. Inventory Catalog Listener
+  // 2. Master Inventory Catalog Listener
   listenToInventory();
 
-  // 3. Stationery Transactions Listener (Current selected date)
-  listenToStationery(APP_STATE.currentStationeryDate);
+  // 3. Today's Stationery Feed Listener
+  listenToTodayStationery(today);
 
-  // 4. Reload Transactions Listener (Current selected date)
-  listenToReloads(APP_STATE.currentReloadDate);
+  // 4. Today's Reload Feed Listener
+  listenToTodayReloads(today);
+
+  // 5. Master Stationery & Reload Collections for Logs and Analytics
+  listenToMasterLogs();
 }
 
-// Listener: Commissions
 function listenToCommissions() {
   if (!db) return;
   const commissionsDocRef = doc(db, 'settings', 'commissions');
@@ -729,8 +748,6 @@ function listenToCommissions() {
       };
       logDebug('Commission rates synced from Firestore', 'SUCCESS');
     } else {
-      // First-time setup: write defaults to Firestore
-      logDebug('Writing initial commission rates to Firestore...');
       setDoc(commissionsDocRef, {
         airtel: 6.80,
         dialog: 3.80,
@@ -745,7 +762,6 @@ function listenToCommissions() {
   });
 }
 
-// Listener: Inventory Catalog
 function listenToInventory() {
   if (!db) return;
   const invColRef = collection(db, 'inventory');
@@ -753,156 +769,155 @@ function listenToInventory() {
   APP_STATE.unsubscribers.inventory = onSnapshot(invColRef, (snap) => {
     const items = [];
     snap.forEach(docSnap => {
-      items.push({ id: docSnap.id, ...docSnap.data() });
+      const data = docSnap.data();
+      items.push({
+        id: docSnap.id,
+        code: data.code || '',
+        name: data.name || '',
+        sellingPrice: Number(data.sellingPrice || 0),
+        stockQuantity: Number(data.stockQuantity || 0)
+      });
     });
 
-    // Sort alphabetically by Code / Name
     items.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
     APP_STATE.inventoryCatalog = items;
 
-    renderInventoryTable();
-    logDebug(`Inventory catalog updated: ${items.length} items`);
+    // Refresh stock previews, stock table, catalog table, and dashboard KPIs
+    updateStockPreviews();
+    renderStockTable();
+    renderCatalogTable();
+    updateDashboardCatalogKPIs();
+    logDebug(`Inventory catalog synced: ${items.length} items`);
   }, (err) => {
     logDebug(`Inventory listener error: ${err.message}`, 'ERROR');
   });
 }
 
-// Listener: Stationery Transactions
-function listenToStationery(dateStr) {
+function listenToTodayStationery(todayDate) {
   if (!db) return;
-  if (typeof APP_STATE.unsubscribers.stationery === 'function') {
-    APP_STATE.unsubscribers.stationery();
-  }
-
   const statColRef = collection(db, 'stationery_transactions');
-  const q = query(statColRef, where('date', '==', dateStr));
+  const q = query(statColRef, where('date', '==', todayDate));
 
-  APP_STATE.unsubscribers.stationery = onSnapshot(q, (snap) => {
+  APP_STATE.unsubscribers.todayStationery = onSnapshot(q, (snap) => {
     const list = [];
     snap.forEach(docSnap => {
       list.push({ id: docSnap.id, ...docSnap.data() });
     });
 
-    // Sort chronologically by time descending (newest on top)
     list.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
-    APP_STATE.stationeryTransactions = list;
+    APP_STATE.todayStationeryTransactions = list;
 
-    renderStationeryTable();
-    updateStationerySummary();
-    updateDashboardKPIs();
-    logDebug(`Stationery transactions loaded for ${dateStr}: ${list.length} rows`);
+    updateStationeryConsolidatedSummary();
+    updateDashboardFinancialKPIs();
   }, (err) => {
-    logDebug(`Stationery listener error: ${err.message}`, 'ERROR');
+    logDebug(`Today stationery listener error: ${err.message}`, 'ERROR');
   });
 }
 
-// Listener: Reload Transactions
-function listenToReloads(dateStr) {
+function listenToTodayReloads(todayDate) {
   if (!db) return;
-  if (typeof APP_STATE.unsubscribers.reloads === 'function') {
-    APP_STATE.unsubscribers.reloads();
-  }
-
   const reloadColRef = collection(db, 'reload_transactions');
-  const q = query(reloadColRef, where('date', '==', dateStr));
+  const q = query(reloadColRef, where('date', '==', todayDate));
 
-  APP_STATE.unsubscribers.reloads = onSnapshot(q, (snap) => {
+  APP_STATE.unsubscribers.todayReloads = onSnapshot(q, (snap) => {
     const list = [];
     snap.forEach(docSnap => {
       list.push({ id: docSnap.id, ...docSnap.data() });
     });
 
-    // Sort chronologically by time descending
     list.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
-    APP_STATE.reloadTransactions = list;
+    APP_STATE.todayReloadTransactions = list;
 
-    renderReloadTable();
-    updateReloadSummary();
-    updateDashboardKPIs();
-    logDebug(`Reload transactions loaded for ${dateStr}: ${list.length} rows`);
+    updateReloadConsolidatedSummary();
+    updateDashboardFinancialKPIs();
   }, (err) => {
-    logDebug(`Reload listener error: ${err.message}`, 'ERROR');
+    logDebug(`Today reloads listener error: ${err.message}`, 'ERROR');
+  });
+}
+
+function listenToMasterLogs() {
+  if (!db) return;
+
+  // Listen to all stationery transactions
+  const statColRef = collection(db, 'stationery_transactions');
+  APP_STATE.unsubscribers.masterStationery = onSnapshot(statColRef, (snap) => {
+    const list = [];
+    snap.forEach(docSnap => {
+      list.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    APP_STATE.masterStationeryRecords = list;
+    applyMasterLogFilters();
+    calculateFinancialAnalytics();
+  });
+
+  // Listen to all reload transactions
+  const reloadColRef = collection(db, 'reload_transactions');
+  APP_STATE.unsubscribers.masterReloads = onSnapshot(reloadColRef, (snap) => {
+    const list = [];
+    snap.forEach(docSnap => {
+      list.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    APP_STATE.masterReloadRecords = list;
+    applyMasterLogFilters();
+    calculateFinancialAnalytics();
   });
 }
 
 // =============================================================================
-// 9. MODULE 2: STATIONERY TRANSACTION LEDGER LOGIC
+// 9. MODULE 2: STATIONERY ENTRY & QUANTITY ADDER
 // =============================================================================
 
 function setupStationeryModule() {
-  const statDateInput = document.getElementById('stationeryDateInput');
-  const statTodayBtn = document.getElementById('stationeryTodayBtn');
-  const statPrevDayBtn = document.getElementById('stationeryPrevDayBtn');
-  const statNextDayBtn = document.getElementById('stationeryNextDayBtn');
-
-  // Date Change Handlers
-  if (statDateInput) {
-    statDateInput.addEventListener('change', () => {
-      APP_STATE.currentStationeryDate = statDateInput.value;
-      listenToStationery(APP_STATE.currentStationeryDate);
-    });
-  }
-
-  if (statTodayBtn) {
-    statTodayBtn.addEventListener('click', () => {
-      const today = getTodayDateString();
-      if (statDateInput) statDateInput.value = today;
-      APP_STATE.currentStationeryDate = today;
-      listenToStationery(today);
-    });
-  }
-
-  if (statPrevDayBtn) {
-    statPrevDayBtn.addEventListener('click', () => {
-      const d = new Date(APP_STATE.currentStationeryDate);
-      d.setDate(d.getDate() - 1);
-      const prev = d.toISOString().split('T')[0];
-      if (statDateInput) statDateInput.value = prev;
-      APP_STATE.currentStationeryDate = prev;
-      listenToStationery(prev);
-    });
-  }
-
-  if (statNextDayBtn) {
-    statNextDayBtn.addEventListener('click', () => {
-      const d = new Date(APP_STATE.currentStationeryDate);
-      d.setDate(d.getDate() + 1);
-      const next = d.toISOString().split('T')[0];
-      if (statDateInput) statDateInput.value = next;
-      APP_STATE.currentStationeryDate = next;
-      listenToStationery(next);
-    });
-  }
-
-  // POS Autocomplete Type-Ahead Search Input
   const posItemInput = document.getElementById('posItemInput');
   const posAutocompleteList = document.getElementById('posAutocompleteList');
-  const posCostPrice = document.getElementById('posCostPrice');
   const posSellingPrice = document.getElementById('posSellingPrice');
-  const posProfitPreview = document.getElementById('posProfitPreview');
-  const posMarginPreview = document.getElementById('posMarginPreview');
+  const posQuantity = document.getElementById('posQuantity');
+  const posTotalAmountPreview = document.getElementById('posTotalAmountPreview');
+  const posStockStatusBadge = document.getElementById('posStockStatusBadge');
   const posItemBadge = document.getElementById('posItemBadge');
   const stationeryEntryForm = document.getElementById('stationeryEntryForm');
+  const posQtyDecBtn = document.getElementById('posQtyDecBtn');
+  const posQtyIncBtn = document.getElementById('posQtyIncBtn');
 
-  function calculatePosPreview() {
-    const cost = Number(posCostPrice.value) || 0;
-    const sell = Number(posSellingPrice.value) || 0;
-    const profit = roundCurrency(sell - cost);
-
-    posProfitPreview.textContent = formatLKR(profit);
-    if (profit < 0) {
-      posProfitPreview.className = 'text-base font-bold text-red-400 currency-lkr';
-    } else {
-      posProfitPreview.className = 'text-base font-bold text-emerald-400 currency-lkr';
-    }
-
-    const margin = sell > 0 ? ((profit / sell) * 100).toFixed(1) : '0';
-    posMarginPreview.textContent = `${margin}% Margin`;
+  // Quantity Stepper Handlers
+  if (posQtyDecBtn && posQuantity) {
+    posQtyDecBtn.addEventListener('click', () => {
+      const current = Math.max(1, (parseInt(posQuantity.value, 10) || 1) - 1);
+      posQuantity.value = current;
+      calculatePosTotal();
+    });
   }
 
-  if (posCostPrice) posCostPrice.addEventListener('input', calculatePosPreview);
-  if (posSellingPrice) posSellingPrice.addEventListener('input', calculatePosPreview);
-  // Autocomplete Filtering with Keyboard Navigation
+  if (posQtyIncBtn && posQuantity) {
+    posQtyIncBtn.addEventListener('click', () => {
+      const current = (parseInt(posQuantity.value, 10) || 1) + 1;
+      posQuantity.value = current;
+      calculatePosTotal();
+    });
+  }
+
+  // Quick Quantity Pills (1, 2, 5, 10)
+  document.querySelectorAll('[data-qty-pill]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const qty = parseInt(btn.getAttribute('data-qty-pill'), 10) || 1;
+      if (posQuantity) {
+        posQuantity.value = qty;
+        calculatePosTotal();
+      }
+    });
+  });
+
+  function calculatePosTotal() {
+    const price = Number(posSellingPrice.value) || 0;
+    const qty = Math.max(1, parseInt(posQuantity.value, 10) || 1);
+    const total = roundCurrency(price * qty);
+    if (posTotalAmountPreview) posTotalAmountPreview.textContent = formatLKR(total);
+  }
+
+  if (posSellingPrice) posSellingPrice.addEventListener('input', calculatePosTotal);
+  if (posQuantity) posQuantity.addEventListener('input', calculatePosTotal);
+
+  // Autocomplete Filtering with Full Keyboard Navigation
   let highlightedIndex = -1;
   let currentMatches = [];
 
@@ -920,7 +935,6 @@ function setupStationeryModule() {
 
   function selectCatalogItem(item) {
     posItemInput.value = item.name;
-    posCostPrice.value = Number(item.costPrice).toFixed(2);
     posSellingPrice.value = Number(item.sellingPrice).toFixed(2);
     APP_STATE.selectedCatalogItem = item;
 
@@ -929,24 +943,42 @@ function setupStationeryModule() {
       posItemBadge.classList.remove('hidden');
     }
 
+    renderPosStockBadge(item.stockQuantity);
     posAutocompleteList.classList.add('hidden');
-    calculatePosPreview();
-    posSellingPrice.focus();
+    calculatePosTotal();
+  }
+
+  function renderPosStockBadge(stockQty) {
+    if (!posStockStatusBadge) return;
+    posStockStatusBadge.classList.remove('hidden');
+
+    if (stockQty > 5) {
+      posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-in';
+      posStockStatusBadge.textContent = `In Stock: ${stockQty} units`;
+    } else if (stockQty > 0) {
+      posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-low';
+      posStockStatusBadge.textContent = `Low Stock: ${stockQty} units`;
+    } else {
+      posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-out';
+      posStockStatusBadge.textContent = `Out of Stock (0 units)`;
+    }
   }
 
   if (posItemInput && posAutocompleteList) {
     posItemInput.addEventListener('input', () => {
       const queryStr = posItemInput.value.trim().toLowerCase();
       highlightedIndex = -1;
+
       if (!queryStr) {
         posAutocompleteList.classList.add('hidden');
         posAutocompleteList.innerHTML = '';
         currentMatches = [];
         if (posItemBadge) posItemBadge.classList.add('hidden');
+        if (posStockStatusBadge) posStockStatusBadge.classList.add('hidden');
+        APP_STATE.selectedCatalogItem = null;
         return;
       }
 
-      // Filter catalog by Code or Name
       currentMatches = APP_STATE.inventoryCatalog.filter(item => {
         const cMatch = (item.code || '').toLowerCase().includes(queryStr);
         const nMatch = (item.name || '').toLowerCase().includes(queryStr);
@@ -956,10 +988,15 @@ function setupStationeryModule() {
       if (currentMatches.length === 0) {
         posAutocompleteList.innerHTML = `
           <div class="p-3 text-xs theme-text-dim text-center">
-            No matching inventory item found. Custom item entry will be logged.
+            No matching inventory item found. Custom sale entry.
           </div>
         `;
         posAutocompleteList.classList.remove('hidden');
+        if (posStockStatusBadge) {
+          posStockStatusBadge.className = 'text-xs font-semibold px-2 py-0.5 rounded-full theme-bg-subtle theme-text-dim';
+          posStockStatusBadge.textContent = 'Custom Item';
+          posStockStatusBadge.classList.remove('hidden');
+        }
         return;
       }
 
@@ -967,47 +1004,88 @@ function setupStationeryModule() {
       currentMatches.forEach((item, index) => {
         const itemRow = document.createElement('div');
         itemRow.className = 'autocomplete-item flex items-center justify-between gap-2';
+
+        let stockPill = item.stockQuantity > 5 
+          ? `<span class="badge-stock-in px-1.5 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} in stock</span>`
+          : (item.stockQuantity > 0 
+              ? `<span class="badge-stock-low px-1.5 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} left</span>`
+              : `<span class="badge-stock-out px-1.5 py-0.5 rounded text-[10px] font-bold">Out of stock</span>`);
+
         itemRow.innerHTML = `
           <div>
             <div class="font-bold text-xs theme-text-main">${item.name}</div>
-            <div class="text-[11px] font-mono theme-text-muted">Code: <span class="text-sky-400">${item.code}</span></div>
+            <div class="text-[11px] font-mono theme-text-muted">Code: <span class="text-sky-400 font-bold">${item.code}</span></div>
           </div>
-          <div class="text-right">
+          <div class="text-right flex flex-col items-end gap-1">
             <div class="text-xs font-mono font-bold text-emerald-400">${formatLKR(item.sellingPrice)}</div>
-            <div class="text-[10px] font-mono theme-text-dim">Cost: ${formatLKR(item.costPrice)}</div>
+            ${stockPill}
           </div>
         `;
 
-        itemRow.addEventListener('click', () => selectCatalogItem(item));
+        itemRow.addEventListener('click', () => {
+          selectCatalogItem(item);
+          posSellingPrice.focus();
+        });
         posAutocompleteList.appendChild(itemRow);
       });
 
       posAutocompleteList.classList.remove('hidden');
     });
 
-    // Keyboard navigation (ArrowDown, ArrowUp, Enter, Escape)
+    // Enter-Key Auto-Add Bug Fix & Keyboard Stepping
     posItemInput.addEventListener('keydown', (e) => {
-      if (posAutocompleteList.classList.contains('hidden') || currentMatches.length === 0) return;
-
       if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        highlightedIndex = (highlightedIndex + 1) % currentMatches.length;
-        updateAutocompleteHighlight();
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        highlightedIndex = (highlightedIndex - 1 + currentMatches.length) % currentMatches.length;
-        updateAutocompleteHighlight();
-      } else if (e.key === 'Enter') {
-        if (highlightedIndex >= 0 && highlightedIndex < currentMatches.length) {
+        if (!posAutocompleteList.classList.contains('hidden') && currentMatches.length > 0) {
           e.preventDefault();
+          highlightedIndex = (highlightedIndex + 1) % currentMatches.length;
+          updateAutocompleteHighlight();
+        }
+      } else if (e.key === 'ArrowUp') {
+        if (!posAutocompleteList.classList.contains('hidden') && currentMatches.length > 0) {
+          e.preventDefault();
+          highlightedIndex = (highlightedIndex - 1 + currentMatches.length) % currentMatches.length;
+          updateAutocompleteHighlight();
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        
+        // 1. If dropdown is open and an item is highlighted, select it
+        if (!posAutocompleteList.classList.contains('hidden') && highlightedIndex >= 0 && currentMatches[highlightedIndex]) {
           selectCatalogItem(currentMatches[highlightedIndex]);
+          posAutocompleteList.classList.add('hidden');
+          return;
+        }
+
+        // 2. Check if the typed string exactly matches an item code or name
+        const inputVal = posItemInput.value.trim().toLowerCase();
+        const exactMatch = APP_STATE.inventoryCatalog.find(i => 
+          (i.code || '').toLowerCase() === inputVal || 
+          (i.name || '').toLowerCase() === inputVal
+        );
+
+        if (exactMatch && (!APP_STATE.selectedCatalogItem || APP_STATE.selectedCatalogItem.code !== exactMatch.code)) {
+          selectCatalogItem(exactMatch);
+          posAutocompleteList.classList.add('hidden');
+          return;
+        }
+
+        // 3. If first match exists in autocomplete list, auto-select it
+        if (!APP_STATE.selectedCatalogItem && currentMatches.length > 0) {
+          selectCatalogItem(currentMatches[0]);
+          posAutocompleteList.classList.add('hidden');
+          return;
+        }
+
+        // 4. If an item is already selected or form is ready, submit directly!
+        if (posItemInput.value.trim() && Number(posSellingPrice.value) > 0) {
+          posAutocompleteList.classList.add('hidden');
+          stationeryEntryForm.dispatchEvent(new Event('submit', { cancelable: true }));
         }
       } else if (e.key === 'Escape') {
         posAutocompleteList.classList.add('hidden');
       }
     });
 
-    // Close autocomplete on click outside
     document.addEventListener('click', (e) => {
       if (!posItemInput.contains(e.target) && !posAutocompleteList.contains(e.target)) {
         posAutocompleteList.classList.add('hidden');
@@ -1015,71 +1093,1257 @@ function setupStationeryModule() {
     });
   }
 
-  // Setup Edit Stationery Modal handlers
-  setupEditStationeryModal();
-
-  // Add Stationery Sale Submission
+  // Stationery Sale Submission & Real-Time Stock Deduction
   if (stationeryEntryForm) {
     stationeryEntryForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const itemName = posItemInput.value.trim();
-      const costPrice = roundCurrency(posCostPrice.value);
       const sellingPrice = roundCurrency(posSellingPrice.value);
-      const profit = roundCurrency(sellingPrice - costPrice);
-      const itemCode = APP_STATE.selectedCatalogItem ? APP_STATE.selectedCatalogItem.code : 'CUSTOM';
+      const quantity = Math.max(1, parseInt(posQuantity.value, 10) || 1);
+      const totalAmount = roundCurrency(sellingPrice * quantity);
+      const matchedItem = APP_STATE.selectedCatalogItem;
+      const itemCode = matchedItem ? matchedItem.code : 'CUSTOM';
 
       if (!itemName) {
         showToast('Please specify an item name or code', 'error');
         return;
       }
+      if (sellingPrice <= 0) {
+        showToast('Please enter a valid selling price', 'error');
+        return;
+      }
+
+      // Check stock level if matched to catalog item
+      if (matchedItem && matchedItem.stockQuantity < quantity) {
+        if (!confirm(`Warning: Only ${matchedItem.stockQuantity} units available in stock for "${matchedItem.name}". Proceed with logging sale of ${quantity} units?`)) {
+          return;
+        }
+      }
 
       const transactionPayload = {
-        date: APP_STATE.currentStationeryDate,
+        date: getTodayDateString(),
         time: getCurrentTimeString(),
         itemCode: itemCode,
         itemName: itemName,
-        costPrice: costPrice,
+        quantity: quantity,
         sellingPrice: sellingPrice,
-        profit: profit,
+        totalAmount: totalAmount,
         timestamp: serverTimestamp()
       };
 
       try {
+        // 1. Add Stationery Transaction Record to Firestore
         await addDoc(collection(db, 'stationery_transactions'), transactionPayload);
-        showToast(`Logged sale: ${itemName} (${formatLKR(sellingPrice)})`, 'success');
+
+        // 2. Automatically Deduct Sold Quantity from Inventory in Firestore
+        if (matchedItem && matchedItem.id) {
+          const itemDocRef = doc(db, 'inventory', matchedItem.id);
+          await updateDoc(itemDocRef, {
+            stockQuantity: increment(-quantity),
+            updatedAt: serverTimestamp()
+          });
+          const remainingStock = Math.max(0, matchedItem.stockQuantity - quantity);
+          showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) • Stock: ${remainingStock}`, 'success');
+        } else {
+          showToast(`Logged custom sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)})`, 'success');
+        }
 
         // Reset Entry Form
         stationeryEntryForm.reset();
         APP_STATE.selectedCatalogItem = null;
         if (posItemBadge) posItemBadge.classList.add('hidden');
-        posProfitPreview.textContent = 'Rs. 0.00';
-        posMarginPreview.textContent = '0% Margin';
+        if (posStockStatusBadge) posStockStatusBadge.classList.add('hidden');
+        if (posQuantity) posQuantity.value = '1';
+        if (posTotalAmountPreview) posTotalAmountPreview.textContent = 'Rs. 0.00';
         posItemInput.focus();
       } catch (err) {
-        logDebug(`Error adding stationery transaction: ${err.message}`, 'ERROR');
+        logDebug(`Error recording stationery sale: ${err.message}`, 'ERROR');
         showToast(`Failed to log sale: ${err.message}`, 'error');
       }
     });
   }
+
+  // Setup Edit Stationery Transaction Modal
+  setupEditStationeryModal();
 }
+
+function updateStockPreviews() {
+  if (APP_STATE.selectedCatalogItem) {
+    const updated = APP_STATE.inventoryCatalog.find(i => i.id === APP_STATE.selectedCatalogItem.id);
+    if (updated) {
+      APP_STATE.selectedCatalogItem = updated;
+      const posStockStatusBadge = document.getElementById('posStockStatusBadge');
+      if (posStockStatusBadge) {
+        if (updated.stockQuantity > 5) {
+          posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-in';
+          posStockStatusBadge.textContent = `In Stock: ${updated.stockQuantity} units`;
+        } else if (updated.stockQuantity > 0) {
+          posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-low';
+          posStockStatusBadge.textContent = `Low Stock: ${updated.stockQuantity} units`;
+        } else {
+          posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-out';
+          posStockStatusBadge.textContent = `Out of Stock (0 units)`;
+        }
+      }
+    }
+  }
+}
+
+function updateStationeryConsolidatedSummary() {
+  let totalSales = 0;
+  let totalUnits = 0;
+  const count = APP_STATE.todayStationeryTransactions.length;
+
+  APP_STATE.todayStationeryTransactions.forEach(t => {
+    totalSales += Number(t.totalAmount || t.sellingPrice || 0);
+    totalUnits += Number(t.quantity || 1);
+  });
+
+  const statTodayTotalSales = document.getElementById('statTodayTotalSales');
+  const statTodayUnitsSold = document.getElementById('statTodayUnitsSold');
+  const statTodayTxCount = document.getElementById('statTodayTxCount');
+  const statRecentFeed = document.getElementById('statRecentFeed');
+
+  if (statTodayTotalSales) statTodayTotalSales.textContent = formatLKR(roundCurrency(totalSales));
+  if (statTodayUnitsSold) statTodayUnitsSold.textContent = totalUnits.toLocaleString();
+  if (statTodayTxCount) statTodayTxCount.textContent = count.toLocaleString();
+
+  // Render Recent 5 Sales Feed
+  if (statRecentFeed) {
+    if (count === 0) {
+      statRecentFeed.innerHTML = `
+        <div class="p-3 text-xs text-center theme-text-dim rounded-xl border theme-border">
+          No stationery sales recorded yet today.
+        </div>
+      `;
+      return;
+    }
+
+    statRecentFeed.innerHTML = '';
+    APP_STATE.todayStationeryTransactions.slice(0, 5).forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'p-2.5 rounded-xl theme-bg-subtle border theme-border flex items-center justify-between text-xs';
+      row.innerHTML = `
+        <div>
+          <div class="font-bold theme-text-main">${item.itemName}</div>
+          <div class="text-[11px] theme-text-dim font-mono">${item.time || '--:--'} • Code: ${item.itemCode || 'ST'} • Qty: ${item.quantity || 1}</div>
+        </div>
+        <div class="font-mono font-bold text-emerald-400">
+          ${formatLKR(item.totalAmount || item.sellingPrice)}
+        </div>
+      `;
+      statRecentFeed.appendChild(row);
+    });
+  }
+}
+
+// =============================================================================
+// 10. MODULE 3: MOBILE RELOADS
+// =============================================================================
+
+function setupReloadModule() {
+  const reloadEntryForm = document.getElementById('reloadEntryForm');
+  const reloadAmountInput = document.getElementById('reloadAmountInput');
+  const reloadCommissionPreview = document.getElementById('reloadCommissionPreview');
+  const reloadActiveRatePreview = document.getElementById('reloadActiveRatePreview');
+
+  // Operator Select Buttons
+  document.querySelectorAll('[data-select-op]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const op = btn.getAttribute('data-select-op');
+      APP_STATE.activeReloadOperator = op;
+
+      document.querySelectorAll('[data-select-op]').forEach(b => {
+        b.classList.remove('ring-2', 'ring-sky-400', 'theme-bg-elevated');
+      });
+      btn.classList.add('ring-2', 'ring-sky-400', 'theme-bg-elevated');
+
+      updateReloadRatePreview();
+    });
+  });
+
+  // Preset Buttons (50, 100, 200, 500, 1000, 2000)
+  document.querySelectorAll('[data-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.getAttribute('data-preset');
+      if (reloadAmountInput) {
+        reloadAmountInput.value = val;
+        updateReloadRatePreview();
+        reloadAmountInput.focus();
+      }
+    });
+  });
+
+  function updateReloadRatePreview() {
+    const op = APP_STATE.activeReloadOperator;
+    const rate = Number(APP_STATE.commissionRates[op]) || 0;
+    const amount = Number(reloadAmountInput.value) || 0;
+    const earned = roundCurrency((amount * rate) / 100);
+
+    if (reloadActiveRatePreview) reloadActiveRatePreview.textContent = `${rate.toFixed(2)}%`;
+    if (reloadCommissionPreview) reloadCommissionPreview.textContent = formatLKR(earned);
+  }
+
+  if (reloadAmountInput) {
+    reloadAmountInput.addEventListener('input', updateReloadRatePreview);
+  }
+
+  // Submit Reload
+  if (reloadEntryForm) {
+    reloadEntryForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const amount = roundCurrency(reloadAmountInput.value);
+      if (amount <= 0) {
+        showToast('Please enter a valid reload amount', 'error');
+        return;
+      }
+
+      const op = APP_STATE.activeReloadOperator;
+      const rate = Number(APP_STATE.commissionRates[op]) || 0;
+      const commissionAmount = roundCurrency((amount * rate) / 100);
+
+      const reloadPayload = {
+        date: getTodayDateString(),
+        time: getCurrentTimeString(),
+        operator: op,
+        amount: amount,
+        commissionRate: rate,
+        commissionAmount: commissionAmount,
+        timestamp: serverTimestamp()
+      };
+
+      try {
+        await addDoc(collection(db, 'reload_transactions'), reloadPayload);
+        showToast(`Recorded ${op} Reload: ${formatLKR(amount)} (Commission: ${formatLKR(commissionAmount)})`, 'success');
+
+        reloadAmountInput.value = '';
+        updateReloadRatePreview();
+        reloadAmountInput.focus();
+      } catch (err) {
+        logDebug(`Error recording reload: ${err.message}`, 'ERROR');
+        showToast(`Failed to record reload: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  updateReloadRatePreview();
+}
+
+function updateReloadConsolidatedSummary() {
+  let totalVolume = 0;
+  let totalCommission = 0;
+  const opTotals = { AIRTEL: 0, DIALOG: 0, MOBITEL: 0, HUTCH: 0 };
+
+  APP_STATE.todayReloadTransactions.forEach(r => {
+    const amt = Number(r.amount || 0);
+    const comm = Number(r.commissionAmount || 0);
+    totalVolume += amt;
+    totalCommission += comm;
+
+    if (opTotals[r.operator] !== undefined) {
+      opTotals[r.operator] += amt;
+    }
+  });
+
+  const reloadTodayVolume = document.getElementById('reloadTodayVolume');
+  const reloadTodayCommission = document.getElementById('reloadTodayCommission');
+  const reloadTodayAirtel = document.getElementById('reloadTodayAirtel');
+  const reloadTodayDialog = document.getElementById('reloadTodayDialog');
+  const reloadTodayMobitel = document.getElementById('reloadTodayMobitel');
+  const reloadTodayHutch = document.getElementById('reloadTodayHutch');
+
+  if (reloadTodayVolume) reloadTodayVolume.textContent = formatLKR(roundCurrency(totalVolume));
+  if (reloadTodayCommission) reloadTodayCommission.textContent = formatLKR(roundCurrency(totalCommission));
+  if (reloadTodayAirtel) reloadTodayAirtel.textContent = formatLKR(roundCurrency(opTotals.AIRTEL));
+  if (reloadTodayDialog) reloadTodayDialog.textContent = formatLKR(roundCurrency(opTotals.DIALOG));
+  if (reloadTodayMobitel) reloadTodayMobitel.textContent = formatLKR(roundCurrency(opTotals.MOBITEL));
+  if (reloadTodayHutch) reloadTodayHutch.textContent = formatLKR(roundCurrency(opTotals.HUTCH));
+}
+
+// =============================================================================
+// 11. MODULE 4: STOCK INVENTORY LEVELS VIEW
+// =============================================================================
+
+function setupStockModule() {
+  const stockSearchInput = document.getElementById('stockSearchInput');
+  if (stockSearchInput) {
+    stockSearchInput.addEventListener('input', renderStockTable);
+  }
+
+  document.querySelectorAll('.stock-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const filter = btn.getAttribute('data-stock-filter');
+      APP_STATE.stockFilter = filter;
+
+      document.querySelectorAll('.stock-filter-btn').forEach(b => {
+        b.classList.remove('active', 'theme-bg-subtle');
+      });
+      btn.classList.add('active', 'theme-bg-subtle');
+
+      renderStockTable();
+    });
+  });
+}
+
+function renderStockTable() {
+  const tbody = document.getElementById('stockTableBody');
+  const searchInput = document.getElementById('stockSearchInput');
+  const queryStr = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  let filtered = APP_STATE.inventoryCatalog.filter(item => {
+    if (!queryStr) return true;
+    return (item.code || '').toLowerCase().includes(queryStr) ||
+           (item.name || '').toLowerCase().includes(queryStr);
+  });
+
+  // Apply Stock level filter
+  if (APP_STATE.stockFilter === 'LOW') {
+    filtered = filtered.filter(i => i.stockQuantity > 0 && i.stockQuantity <= 5);
+  } else if (APP_STATE.stockFilter === 'OUT') {
+    filtered = filtered.filter(i => i.stockQuantity <= 0);
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="py-8 text-center theme-text-dim">
+          No stock items matching current filter.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  filtered.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:theme-bg-subtle transition';
+
+    let statusBadge = '';
+    if (item.stockQuantity > 5) {
+      statusBadge = '<span class="badge-stock-in px-2.5 py-0.5 rounded-full font-bold">In Stock</span>';
+    } else if (item.stockQuantity > 0) {
+      statusBadge = '<span class="badge-stock-low px-2.5 py-0.5 rounded-full font-bold">Low Stock</span>';
+    } else {
+      statusBadge = '<span class="badge-stock-out px-2.5 py-0.5 rounded-full font-bold">Out of Stock</span>';
+    }
+
+    tr.innerHTML = `
+      <td class="py-3 px-3 sm:px-4 font-mono font-bold text-sky-400 whitespace-nowrap">${item.code}</td>
+      <td class="py-3 px-3 sm:px-4 font-medium theme-text-main">${item.name}</td>
+      <td class="py-3 px-3 sm:px-4 text-right font-mono font-bold theme-text-main">${formatLKR(item.sellingPrice)}</td>
+      <td class="py-3 px-3 sm:px-4 text-center font-mono font-bold text-sm ${item.stockQuantity <= 5 ? 'text-amber-400' : 'theme-text-main'}">
+        ${item.stockQuantity}
+      </td>
+      <td class="py-3 px-3 sm:px-4 text-center">${statusBadge}</td>
+      <td class="py-3 px-3 sm:px-4 text-center whitespace-nowrap space-x-1">
+        <button type="button" data-stock-add="5" data-item-id="${item.id}" class="px-2 py-1 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-mono font-bold text-xs" title="Add 5 units">+5</button>
+        <button type="button" data-stock-add="10" data-item-id="${item.id}" class="px-2 py-1 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-mono font-bold text-xs" title="Add 10 units">+10</button>
+        <button type="button" data-stock-custom="${item.id}" class="px-2 py-1 rounded theme-bg-subtle border theme-border hover:theme-bg-elevated text-xs font-semibold" title="Custom Restock">Custom</button>
+      </td>
+    `;
+
+    // Quick restock handlers
+    tr.querySelectorAll('[data-stock-add]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const addAmount = parseInt(btn.getAttribute('data-stock-add'), 10);
+        await quickRestockItem(item.id, item.name, addAmount);
+      });
+    });
+
+    const customBtn = tr.querySelector(`[data-stock-custom="${item.id}"]`);
+    if (customBtn) {
+      customBtn.addEventListener('click', async () => {
+        const input = prompt(`Enter quantity to add to stock for "${item.name}":`, '20');
+        if (input !== null) {
+          const qty = parseInt(input, 10);
+          if (!isNaN(qty) && qty > 0) {
+            await quickRestockItem(item.id, item.name, qty);
+          } else {
+            showToast('Invalid quantity entered', 'error');
+          }
+        }
+      });
+    }
+
+    tbody.appendChild(tr);
+  });
+}
+
+async function quickRestockItem(itemId, itemName, quantityToAdd) {
+  try {
+    await updateDoc(doc(db, 'inventory', itemId), {
+      stockQuantity: increment(quantityToAdd),
+      updatedAt: serverTimestamp()
+    });
+    showToast(`Restocked ${itemName} (+${quantityToAdd} units)`, 'success');
+  } catch (err) {
+    showToast(`Restock error: ${err.message}`, 'error');
+  }
+}
+
+// =============================================================================
+// 12. MODULE 5: UNIFIED MASTER LOGS & PROFESSIONAL PDF GENERATION
+// =============================================================================
+
+function setupMasterLogsModule() {
+  const logCatButtons = document.querySelectorAll('.log-cat-btn');
+  const logFilterTodayBtn = document.getElementById('logFilterTodayBtn');
+  const logFilterYesterdayBtn = document.getElementById('logFilterYesterdayBtn');
+  const logFilterThisMonthBtn = document.getElementById('logFilterThisMonthBtn');
+  const applyLogDateRangeBtn = document.getElementById('applyLogDateRangeBtn');
+  const downloadPdfReportBtn = document.getElementById('downloadPdfReportBtn');
+
+  // Category Filter
+  logCatButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cat = btn.getAttribute('data-log-cat');
+      APP_STATE.logCategoryFilter = cat;
+
+      logCatButtons.forEach(b => {
+        b.className = 'log-cat-btn px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text-main';
+      });
+      btn.className = 'log-cat-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-accent text-white';
+
+      applyMasterLogFilters();
+    });
+  });
+
+  // Quick Date Buttons
+  if (logFilterTodayBtn) {
+    logFilterTodayBtn.addEventListener('click', () => {
+      const today = getTodayDateString();
+      APP_STATE.logDateMode = 'TODAY';
+      APP_STATE.logDateFrom = today;
+      APP_STATE.logDateTo = today;
+      document.getElementById('logDateFrom').value = today;
+      document.getElementById('logDateTo').value = today;
+      applyMasterLogFilters();
+    });
+  }
+
+  if (logFilterYesterdayBtn) {
+    logFilterYesterdayBtn.addEventListener('click', () => {
+      const yesterday = getYesterdayDateString();
+      APP_STATE.logDateMode = 'YESTERDAY';
+      APP_STATE.logDateFrom = yesterday;
+      APP_STATE.logDateTo = yesterday;
+      document.getElementById('logDateFrom').value = yesterday;
+      document.getElementById('logDateTo').value = yesterday;
+      applyMasterLogFilters();
+    });
+  }
+
+  if (logFilterThisMonthBtn) {
+    logFilterThisMonthBtn.addEventListener('click', () => {
+      const today = getTodayDateString();
+      const firstDay = today.substring(0, 8) + '01';
+      APP_STATE.logDateMode = 'THIS_MONTH';
+      APP_STATE.logDateFrom = firstDay;
+      APP_STATE.logDateTo = today;
+      document.getElementById('logDateFrom').value = firstDay;
+      document.getElementById('logDateTo').value = today;
+      applyMasterLogFilters();
+    });
+  }
+
+  // Apply Range Button
+  if (applyLogDateRangeBtn) {
+    applyLogDateRangeBtn.addEventListener('click', () => {
+      const from = document.getElementById('logDateFrom').value;
+      const to = document.getElementById('logDateTo').value;
+
+      if (!from || !to) {
+        showToast('Please select both From and To dates', 'error');
+        return;
+      }
+      if (from > to) {
+        showToast('From Date cannot be later than To Date', 'error');
+        return;
+      }
+
+      APP_STATE.logDateMode = 'RANGE';
+      APP_STATE.logDateFrom = from;
+      APP_STATE.logDateTo = to;
+      applyMasterLogFilters();
+    });
+  }
+
+  // Download PDF Report
+  if (downloadPdfReportBtn) {
+    downloadPdfReportBtn.addEventListener('click', generateProfessionalPdfReport);
+  }
+}
+
+function applyMasterLogFilters() {
+  const fromDate = APP_STATE.logDateFrom || getTodayDateString();
+  const toDate = APP_STATE.logDateTo || fromDate;
+
+  // Filter stationery
+  let filteredStationery = APP_STATE.masterStationeryRecords.filter(t => {
+    return (t.date >= fromDate && t.date <= toDate);
+  });
+
+  // Filter reloads
+  let filteredReloads = APP_STATE.masterReloadRecords.filter(r => {
+    return (r.date >= fromDate && r.date <= toDate);
+  });
+
+  // Calculate filtered totals
+  let statSales = 0;
+  let unitsSold = 0;
+  filteredStationery.forEach(s => {
+    statSales += Number(s.totalAmount || s.sellingPrice || 0);
+    unitsSold += Number(s.quantity || 1);
+  });
+
+  let reloadVol = 0;
+  let reloadComm = 0;
+  filteredReloads.forEach(r => {
+    reloadVol += Number(r.amount || 0);
+    reloadComm += Number(r.commissionAmount || 0);
+  });
+
+  const totalPeriodRevenue = roundCurrency(statSales + reloadComm);
+
+  // Update Summary KPI Bar
+  const sStatSales = document.getElementById('logSummaryStatSales');
+  const sUnitsSold = document.getElementById('logSummaryUnitsSold');
+  const sReloadVol = document.getElementById('logSummaryReloadVol');
+  const sReloadComm = document.getElementById('logSummaryReloadComm');
+  const sTotalRevenue = document.getElementById('logSummaryTotalRevenue');
+  const filterLabel = document.getElementById('masterLogFilterLabel');
+
+  if (sStatSales) sStatSales.textContent = formatLKR(roundCurrency(statSales));
+  if (sUnitsSold) sUnitsSold.textContent = unitsSold.toLocaleString();
+  if (sReloadVol) sReloadVol.textContent = formatLKR(roundCurrency(reloadVol));
+  if (sReloadComm) sReloadComm.textContent = formatLKR(roundCurrency(reloadComm));
+  if (sTotalRevenue) sTotalRevenue.textContent = formatLKR(totalPeriodRevenue);
+
+  if (filterLabel) {
+    filterLabel.textContent = fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`;
+  }
+
+  // Combine records chronologically
+  let combinedRows = [];
+
+  if (APP_STATE.logCategoryFilter === 'ALL' || APP_STATE.logCategoryFilter === 'STATIONERY') {
+    filteredStationery.forEach(s => {
+      combinedRows.push({
+        id: s.id,
+        category: 'STATIONERY',
+        date: s.date || '',
+        time: s.time || '',
+        identifier: s.itemCode || 'ST',
+        title: s.itemName || '',
+        qtyOrRate: `${s.quantity || 1} units`,
+        amount: Number(s.totalAmount || s.sellingPrice || 0),
+        earnings: Number(s.totalAmount || s.sellingPrice || 0),
+        rawRecord: s
+      });
+    });
+  }
+
+  if (APP_STATE.logCategoryFilter === 'ALL' || APP_STATE.logCategoryFilter === 'RELOAD') {
+    filteredReloads.forEach(r => {
+      combinedRows.push({
+        id: r.id,
+        category: 'RELOAD',
+        date: r.date || '',
+        time: r.time || '',
+        identifier: r.operator || 'RELOAD',
+        title: `${r.operator} Mobile Top-Up`,
+        qtyOrRate: `${Number(r.commissionRate || 0).toFixed(2)}%`,
+        amount: Number(r.amount || 0),
+        earnings: Number(r.commissionAmount || 0),
+        rawRecord: r
+      });
+    });
+  }
+
+  // Sort by Date descending, then Time descending
+  combinedRows.sort((a, b) => {
+    if (a.date !== b.date) return (b.date || '').localeCompare(a.date || '');
+    return (b.time || '').localeCompare(a.time || '');
+  });
+
+  const countBadge = document.getElementById('masterLogCountBadge');
+  if (countBadge) countBadge.textContent = `${combinedRows.length} Records`;
+
+  renderMasterLogTable(combinedRows);
+}
+
+function renderMasterLogTable(records) {
+  const tbody = document.getElementById('masterLogTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (records.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="py-12 text-center theme-text-dim">
+          No records found for the selected date range and category.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  records.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:theme-bg-subtle transition';
+
+    let typePill = row.category === 'STATIONERY'
+      ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">Stationery</span>'
+      : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Reload</span>';
+
+    tr.innerHTML = `
+      <td class="py-3 px-3 sm:px-4 font-mono text-xs whitespace-nowrap">
+        <span class="theme-text-main font-semibold">${row.date}</span>
+        <span class="theme-text-dim ml-1 font-normal">${row.time}</span>
+      </td>
+      <td class="py-3 px-3 sm:px-4 whitespace-nowrap">${typePill}</td>
+      <td class="py-3 px-3 sm:px-4 font-mono text-xs font-bold text-sky-400 whitespace-nowrap">${row.identifier}</td>
+      <td class="py-3 px-3 sm:px-4 font-medium theme-text-main">${row.title}</td>
+      <td class="py-3 px-3 sm:px-4 text-center font-mono text-xs theme-text-muted">${row.qtyOrRate}</td>
+      <td class="py-3 px-3 sm:px-4 text-right font-mono text-xs font-bold theme-text-main">${formatLKR(row.amount)}</td>
+      <td class="py-3 px-3 sm:px-4 text-right font-mono text-xs font-bold text-emerald-400">${formatLKR(row.earnings)}</td>
+      <td class="py-3 px-3 sm:px-4 text-center whitespace-nowrap space-x-1">
+        ${row.category === 'STATIONERY' 
+          ? `<button type="button" data-edit-log="${row.id}" class="p-1 text-sky-400 hover:text-sky-300 transition" title="Edit Record">
+              <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+             </button>`
+          : ''}
+        <button type="button" data-delete-log="${row.id}" data-cat="${row.category}" class="p-1 text-red-400 hover:text-red-300 transition" title="Delete Record">
+          <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </td>
+    `;
+
+    // Edit button
+    const editBtn = tr.querySelector(`[data-edit-log="${row.id}"]`);
+    if (editBtn) {
+      editBtn.addEventListener('click', () => openEditStationeryModal(row.rawRecord));
+    }
+
+    // Delete button
+    const delBtn = tr.querySelector(`[data-delete-log="${row.id}"]`);
+    if (delBtn) {
+      delBtn.addEventListener('click', () => deleteTransactionRecord(row.id, row.category, row.title));
+    }
+
+    tbody.appendChild(tr);
+  });
+}
+
+async function deleteTransactionRecord(id, category, title) {
+  if (!confirm(`Permanently delete ${category.toLowerCase()} record "${title}"?`)) return;
+
+  const collectionName = category === 'STATIONERY' ? 'stationery_transactions' : 'reload_transactions';
+  try {
+    await deleteDoc(doc(db, collectionName, id));
+    showToast(`Deleted ${title}`, 'info');
+  } catch (err) {
+    showToast(`Delete failed: ${err.message}`, 'error');
+  }
+}
+
+// =============================================================================
+// PROFESSIONAL PDF REPORT EXPORT ENGINE (jsPDF + AutoTable)
+// =============================================================================
+
+function generateProfessionalPdfReport() {
+  if (typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF === 'undefined') {
+    showToast('PDF generator library is loading, please try again in a moment.', 'error');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const pdfDoc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const fromDate = APP_STATE.logDateFrom || getTodayDateString();
+  const toDate = APP_STATE.logDateTo || fromDate;
+  const dateRangeStr = fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`;
+
+  // Filter records
+  const stationeryList = APP_STATE.masterStationeryRecords
+    .filter(s => s.date >= fromDate && s.date <= toDate)
+    .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+
+  const reloadList = APP_STATE.masterReloadRecords
+    .filter(r => r.date >= fromDate && r.date <= toDate)
+    .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+
+  // Compute Totals
+  let totalStatSales = 0;
+  let totalUnitsSold = 0;
+  stationeryList.forEach(s => {
+    totalStatSales += Number(s.totalAmount || s.sellingPrice || 0);
+    totalUnitsSold += Number(s.quantity || 1);
+  });
+
+  let totalReloadVolume = 0;
+  let totalReloadCommission = 0;
+  const opBreakdown = { AIRTEL: { vol: 0, comm: 0 }, DIALOG: { vol: 0, comm: 0 }, MOBITEL: { vol: 0, comm: 0 }, HUTCH: { vol: 0, comm: 0 } };
+
+  reloadList.forEach(r => {
+    const amt = Number(r.amount || 0);
+    const comm = Number(r.commissionAmount || 0);
+    totalReloadVolume += amt;
+    totalReloadCommission += comm;
+
+    if (opBreakdown[r.operator]) {
+      opBreakdown[r.operator].vol += amt;
+      opBreakdown[r.operator].comm += comm;
+    }
+  });
+
+  const totalStoreRevenue = roundCurrency(totalStatSales + totalReloadCommission);
+
+  // 1. PDF Header Banner
+  pdfDoc.setFillColor(15, 23, 42); // Navy Slate
+  pdfDoc.rect(0, 0, 210, 35, 'F');
+
+  pdfDoc.setTextColor(255, 255, 255);
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(20);
+  pdfDoc.text('AL Communication', 14, 15);
+
+  pdfDoc.setFont('helvetica', 'normal');
+  pdfDoc.setFontSize(9);
+  pdfDoc.setTextColor(203, 213, 225);
+  pdfDoc.text('Retail Stationery & Mobile Reload Hub • Cloud Ledger al-p1-fb432', 14, 21);
+  pdfDoc.text(`Statement Period: ${dateRangeStr} | Generated: ${new Date().toLocaleString()}`, 14, 27);
+
+  // 2. Executive Financial Summary Cards (Draw Box)
+  pdfDoc.setFillColor(248, 250, 252);
+  pdfDoc.setDrawColor(226, 232, 240);
+  pdfDoc.roundedRect(14, 40, 182, 26, 3, 3, 'FD');
+
+  pdfDoc.setTextColor(15, 23, 42);
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(10);
+  pdfDoc.text('FINANCIAL STATEMENT SUMMARY', 18, 46);
+
+  pdfDoc.setFont('helvetica', 'normal');
+  pdfDoc.setFontSize(8.5);
+  pdfDoc.setTextColor(71, 85, 105);
+  pdfDoc.text(`Stationery Sales: ${formatLKR(totalStatSales)} (${totalUnitsSold} items)`, 18, 53);
+  pdfDoc.text(`Reload Volume: ${formatLKR(totalReloadVolume)}`, 18, 59);
+
+  pdfDoc.text(`Earned Reload Commission: ${formatLKR(totalReloadCommission)}`, 105, 53);
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setTextColor(5, 150, 105); // Emerald Green
+  pdfDoc.text(`Total Period Revenue: ${formatLKR(totalStoreRevenue)}`, 105, 59);
+
+  let currentY = 72;
+
+  // 3. Stationery Sales Table
+  if (stationeryList.length > 0) {
+    pdfDoc.setTextColor(15, 23, 42);
+    pdfDoc.setFont('helvetica', 'bold');
+    pdfDoc.setFontSize(11);
+    pdfDoc.text(`1. Stationery Sales Breakdown (${stationeryList.length} Transactions)`, 14, currentY);
+
+    const statRows = stationeryList.map(s => [
+      s.date,
+      s.time,
+      s.itemCode || 'ST',
+      s.itemName,
+      String(s.quantity || 1),
+      formatLKR(s.sellingPrice),
+      formatLKR(s.totalAmount || s.sellingPrice)
+    ]);
+
+    pdfDoc.autoTable({
+      startY: currentY + 3,
+      head: [['Date', 'Time', 'Code', 'Product / Item Name', 'Qty', 'Unit Price', 'Total Amount']],
+      body: statRows,
+      theme: 'grid',
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
+      columnStyles: {
+        4: { halign: 'center' },
+        5: { halign: 'right' },
+        6: { halign: 'right', fontStyle: 'bold' }
+      },
+      margin: { left: 14, right: 14 }
+    });
+
+    currentY = pdfDoc.lastAutoTable.finalY + 12;
+  }
+
+  // 4. Mobile Reload Table
+  if (reloadList.length > 0) {
+    if (currentY > 240) {
+      pdfDoc.addPage();
+      currentY = 20;
+    }
+
+    pdfDoc.setTextColor(15, 23, 42);
+    pdfDoc.setFont('helvetica', 'bold');
+    pdfDoc.setFontSize(11);
+    pdfDoc.text(`2. Mobile Reload Log (${reloadList.length} Top-Ups)`, 14, currentY);
+
+    const reloadRows = reloadList.map(r => [
+      r.date,
+      r.time,
+      r.operator,
+      formatLKR(r.amount),
+      `${Number(r.commissionRate || 0).toFixed(2)}%`,
+      formatLKR(r.commissionAmount)
+    ]);
+
+    pdfDoc.autoTable({
+      startY: currentY + 3,
+      head: [['Date', 'Time', 'Operator Network', 'Reload Amount', 'Commission Rate', 'Earned Commission']],
+      body: reloadRows,
+      theme: 'grid',
+      headStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
+      columnStyles: {
+        3: { halign: 'right' },
+        4: { halign: 'center' },
+        5: { halign: 'right', fontStyle: 'bold' }
+      },
+      margin: { left: 14, right: 14 }
+    });
+
+    currentY = pdfDoc.lastAutoTable.finalY + 10;
+
+    // Operator Breakdown Table
+    if (currentY > 245) {
+      pdfDoc.addPage();
+      currentY = 20;
+    }
+
+    const opRows = [
+      ['Airtel', `${APP_STATE.commissionRates.AIRTEL.toFixed(2)}%`, formatLKR(opBreakdown.AIRTEL.vol), formatLKR(opBreakdown.AIRTEL.comm)],
+      ['Dialog', `${APP_STATE.commissionRates.DIALOG.toFixed(2)}%`, formatLKR(opBreakdown.DIALOG.vol), formatLKR(opBreakdown.DIALOG.comm)],
+      ['Mobitel', `${APP_STATE.commissionRates.MOBITEL.toFixed(2)}%`, formatLKR(opBreakdown.MOBITEL.vol), formatLKR(opBreakdown.MOBITEL.comm)],
+      ['Hutch', `${APP_STATE.commissionRates.HUTCH.toFixed(2)}%`, formatLKR(opBreakdown.HUTCH.vol), formatLKR(opBreakdown.HUTCH.comm)]
+    ];
+
+    pdfDoc.autoTable({
+      startY: currentY,
+      head: [['Network Operator', 'Applied Rate', 'Total Reload Volume', 'Total Earned Commission']],
+      body: opRows,
+      theme: 'striped',
+      headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        1: { halign: 'center' },
+        2: { halign: 'right' },
+        3: { halign: 'right', fontStyle: 'bold' }
+      },
+      margin: { left: 14, right: 14 }
+    });
+  }
+
+  // 5. Page Numbering Footer
+  const pageCount = pdfDoc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    pdfDoc.setPage(i);
+    pdfDoc.setFont('helvetica', 'normal');
+    pdfDoc.setFontSize(8);
+    pdfDoc.setTextColor(148, 163, 184);
+    pdfDoc.text(`AL Communication POS System • Page ${i} of ${pageCount}`, 14, 290);
+  }
+
+  // Save PDF
+  const filename = `AL_Communication_Report_${dateRangeStr.replace(/\s+/g, '_')}.pdf`;
+  pdfDoc.save(filename);
+  showToast(`Downloaded statement: ${filename}`, 'success');
+}
+
+// =============================================================================
+// 13. STORE FINANCIAL ANALYTICS (MONTHLY & YEARLY)
+// =============================================================================
+
+function setupAnalyticsModule() {
+  const monthPicker = document.getElementById('analyticsMonthPicker');
+  const refreshBtn = document.getElementById('refreshAnalyticsBtn');
+
+  if (monthPicker) {
+    monthPicker.addEventListener('change', () => {
+      APP_STATE.analyticsMonth = monthPicker.value;
+      calculateFinancialAnalytics();
+    });
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', calculateFinancialAnalytics);
+  }
+}
+
+function calculateFinancialAnalytics() {
+  const selectedMonth = APP_STATE.analyticsMonth || getTodayDateString().substring(0, 7);
+  const selectedYear = selectedMonth.substring(0, 4);
+
+  // 1. Monthly Computations
+  let mStatSales = 0;
+  let mReloadVol = 0;
+  let mReloadComm = 0;
+
+  APP_STATE.masterStationeryRecords.forEach(s => {
+    if ((s.date || '').startsWith(selectedMonth)) {
+      mStatSales += Number(s.totalAmount || s.sellingPrice || 0);
+    }
+  });
+
+  APP_STATE.masterReloadRecords.forEach(r => {
+    if ((r.date || '').startsWith(selectedMonth)) {
+      mReloadVol += Number(r.amount || 0);
+      mReloadComm += Number(r.commissionAmount || 0);
+    }
+  });
+
+  const mCombined = roundCurrency(mStatSales + mReloadComm);
+
+  // 2. Yearly Computations (YTD)
+  let yStatSales = 0;
+  let yReloadVol = 0;
+  let yReloadComm = 0;
+
+  APP_STATE.masterStationeryRecords.forEach(s => {
+    if ((s.date || '').startsWith(selectedYear)) {
+      yStatSales += Number(s.totalAmount || s.sellingPrice || 0);
+    }
+  });
+
+  APP_STATE.masterReloadRecords.forEach(r => {
+    if ((r.date || '').startsWith(selectedYear)) {
+      yReloadVol += Number(r.amount || 0);
+      yReloadComm += Number(r.commissionAmount || 0);
+    }
+  });
+
+  const yCombined = roundCurrency(yStatSales + yReloadComm);
+
+  // Update DOM Elements
+  const aMonthLabel = document.getElementById('analyticsMonthLabel');
+  const aYearLabel = document.getElementById('analyticsYearLabel');
+  const aMStat = document.getElementById('analyticsMonthlyStationery');
+  const aMReload = document.getElementById('analyticsMonthlyReload');
+  const aMComm = document.getElementById('analyticsMonthlyCommission');
+  const aMCombined = document.getElementById('analyticsMonthlyCombined');
+
+  const aYStat = document.getElementById('analyticsYearlyStationery');
+  const aYReload = document.getElementById('analyticsYearlyReload');
+  const aYComm = document.getElementById('analyticsYearlyCommission');
+  const aYCombined = document.getElementById('analyticsYearlyCombined');
+
+  if (aMonthLabel) aMonthLabel.textContent = selectedMonth;
+  if (aYearLabel) aYearLabel.textContent = selectedYear;
+
+  if (aMStat) aMStat.textContent = formatLKR(roundCurrency(mStatSales));
+  if (aMReload) aMReload.textContent = formatLKR(roundCurrency(mReloadVol));
+  if (aMComm) aMComm.textContent = formatLKR(roundCurrency(mReloadComm));
+  if (aMCombined) aMCombined.textContent = formatLKR(mCombined);
+
+  if (aYStat) aYStat.textContent = formatLKR(roundCurrency(yStatSales));
+  if (aYReload) aYReload.textContent = formatLKR(roundCurrency(yReloadVol));
+  if (aYComm) aYComm.textContent = formatLKR(roundCurrency(yReloadComm));
+  if (aYCombined) aYCombined.textContent = formatLKR(yCombined);
+}
+
+// =============================================================================
+// 14. DASHBOARD FINANCIAL OVERVIEW & KPIS
+// =============================================================================
+
+function updateDashboardFinancialKPIs() {
+  let statSales = 0;
+  let statItems = 0;
+  APP_STATE.todayStationeryTransactions.forEach(s => {
+    statSales += Number(s.totalAmount || s.sellingPrice || 0);
+    statItems += Number(s.quantity || 1);
+  });
+
+  let reloadVol = 0;
+  let reloadComm = 0;
+  APP_STATE.todayReloadTransactions.forEach(r => {
+    reloadVol += Number(r.amount || 0);
+    reloadComm += Number(r.commissionAmount || 0);
+  });
+
+  const combinedRevenue = roundCurrency(statSales + reloadComm);
+
+  const dSales = document.getElementById('dashStationerySales');
+  const dItems = document.getElementById('dashStationeryItemsSold');
+  const dVol = document.getElementById('dashReloadVolume');
+  const dCount = document.getElementById('dashReloadCount');
+  const dComm = document.getElementById('dashReloadCommission');
+  const dRevenue = document.getElementById('dashTodayCombinedRevenue');
+
+  if (dSales) dSales.textContent = formatLKR(roundCurrency(statSales));
+  if (dItems) dItems.textContent = statItems.toLocaleString();
+  if (dVol) dVol.textContent = formatLKR(roundCurrency(reloadVol));
+  if (dCount) dCount.textContent = APP_STATE.todayReloadTransactions.length.toLocaleString();
+  if (dComm) dComm.textContent = formatLKR(roundCurrency(reloadComm));
+  if (dRevenue) dRevenue.textContent = formatLKR(combinedRevenue);
+}
+
+function updateDashboardCatalogKPIs() {
+  const dCount = document.getElementById('dashCatalogCount');
+  const dLow = document.getElementById('dashLowStockCount');
+
+  if (dCount) dCount.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
+
+  const lowCount = APP_STATE.inventoryCatalog.filter(i => i.stockQuantity <= 5).length;
+  if (dLow) dLow.textContent = lowCount.toLocaleString();
+}
+
+function updateCommissionUI() {
+  const rates = APP_STATE.commissionRates;
+
+  const fAirtel = document.getElementById('formRateAirtel');
+  const fDialog = document.getElementById('formRateDialog');
+  const fMobitel = document.getElementById('formRateMobitel');
+  const fHutch = document.getElementById('formRateHutch');
+
+  if (fAirtel) fAirtel.textContent = `${rates.AIRTEL.toFixed(2)}%`;
+  if (fDialog) fDialog.textContent = `${rates.DIALOG.toFixed(2)}%`;
+  if (fMobitel) fMobitel.textContent = `${rates.MOBITEL.toFixed(2)}%`;
+  if (fHutch) fHutch.textContent = `${rates.HUTCH.toFixed(2)}%`;
+
+  const inAirtel = document.getElementById('rateAirtelInput');
+  const inDialog = document.getElementById('rateDialogInput');
+  const inMobitel = document.getElementById('rateMobitelInput');
+  const inHutch = document.getElementById('rateHutchInput');
+
+  if (inAirtel) inAirtel.value = rates.AIRTEL.toFixed(2);
+  if (inDialog) inDialog.value = rates.DIALOG.toFixed(2);
+  if (inMobitel) inMobitel.value = rates.MOBITEL.toFixed(2);
+  if (inHutch) inHutch.value = rates.HUTCH.toFixed(2);
+}
+
+// =============================================================================
+// 15. MASTER INVENTORY CATALOG & SETTINGS (V1.0 RESTRUCTURED)
+// =============================================================================
+
+function setupCatalogAndSettings() {
+  const catalogItemForm = document.getElementById('catalogItemForm');
+  const catalogDocId = document.getElementById('catalogDocId');
+  const catalogCode = document.getElementById('catalogCode');
+  const catalogName = document.getElementById('catalogName');
+  const catalogSellingPrice = document.getElementById('catalogSellingPrice');
+  const catalogStockQuantity = document.getElementById('catalogStockQuantity');
+  const catalogSaveBtn = document.getElementById('catalogSaveBtn');
+  const catalogFormTitle = document.getElementById('catalogFormTitle');
+  const catalogResetFormBtn = document.getElementById('catalogResetFormBtn');
+  const seedCatalogBtn = document.getElementById('seedCatalogBtn');
+  const catalogSearchInput = document.getElementById('catalogSearchInput');
+  const commissionsForm = document.getElementById('commissionsForm');
+
+  function resetCatalogForm() {
+    catalogItemForm.reset();
+    catalogDocId.value = '';
+    catalogStockQuantity.value = '50';
+    catalogFormTitle.textContent = 'Add New Catalog Item';
+    catalogSaveBtn.textContent = 'Save Item to Catalog';
+    catalogResetFormBtn.classList.add('hidden');
+  }
+
+  if (catalogResetFormBtn) catalogResetFormBtn.addEventListener('click', resetCatalogForm);
+
+  if (catalogItemForm) {
+    catalogItemForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const code = catalogCode.value.trim().toUpperCase();
+      const name = catalogName.value.trim();
+      const sell = roundCurrency(catalogSellingPrice.value);
+      const stock = parseInt(catalogStockQuantity.value, 10) || 0;
+      const docId = catalogDocId.value;
+
+      if (!code || !name) {
+        showToast('Please provide an Item Code and Name', 'error');
+        return;
+      }
+      if (sell <= 0) {
+        showToast('Please specify a valid selling price', 'error');
+        return;
+      }
+
+      const itemPayload = {
+        code,
+        name,
+        sellingPrice: sell,
+        stockQuantity: stock,
+        updatedAt: serverTimestamp()
+      };
+
+      try {
+        if (docId) {
+          await updateDoc(doc(db, 'inventory', docId), itemPayload);
+          showToast(`Updated: ${name}`, 'success');
+        } else {
+          await addDoc(collection(db, 'inventory'), itemPayload);
+          showToast(`Added ${name} to Master Catalog`, 'success');
+        }
+        resetCatalogForm();
+      } catch (err) {
+        showToast(`Catalog error: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  if (catalogSearchInput) {
+    catalogSearchInput.addEventListener('input', renderCatalogTable);
+  }
+
+  // Seed sample stationery catalog with stock
+  if (seedCatalogBtn) {
+    seedCatalogBtn.addEventListener('click', async () => {
+      if (!confirm('Populate standard Sri Lankan stationery catalog with stock levels?')) return;
+      try {
+        let addedCount = 0;
+        for (const item of SAMPLE_SRI_LANKAN_CATALOG) {
+          const exists = APP_STATE.inventoryCatalog.some(c => c.code === item.code);
+          if (!exists) {
+            await addDoc(collection(db, 'inventory'), {
+              ...item,
+              updatedAt: serverTimestamp()
+            });
+            addedCount++;
+          }
+        }
+        showToast(`Seeded ${addedCount} standard stationery products`, 'success');
+      } catch (err) {
+        showToast(`Seeding error: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  // Save Commission Rates
+  if (commissionsForm) {
+    commissionsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const airtel = roundCurrency(document.getElementById('rateAirtelInput').value);
+      const dialog = roundCurrency(document.getElementById('rateDialogInput').value);
+      const mobitel = roundCurrency(document.getElementById('rateMobitelInput').value);
+      const hutch = roundCurrency(document.getElementById('rateHutchInput').value);
+
+      try {
+        await setDoc(doc(db, 'settings', 'commissions'), {
+          airtel,
+          dialog,
+          mobitel,
+          hutch,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        showToast('Commission rates updated across all modules', 'success');
+      } catch (err) {
+        showToast(`Failed to save rates: ${err.message}`, 'error');
+      }
+    });
+  }
+}
+
+function renderCatalogTable() {
+  const tbody = document.getElementById('catalogTableBody');
+  const searchInput = document.getElementById('catalogSearchInput');
+  const queryStr = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const filtered = APP_STATE.inventoryCatalog.filter(item => {
+    if (!queryStr) return true;
+    return (item.code || '').toLowerCase().includes(queryStr) ||
+           (item.name || '').toLowerCase().includes(queryStr);
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="py-6 text-center theme-text-dim">
+          No inventory items match "${queryStr}".
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  filtered.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:theme-bg-subtle transition';
+    tr.innerHTML = `
+      <td class="py-2.5 px-3 font-mono font-bold text-sky-400 whitespace-nowrap">${item.code}</td>
+      <td class="py-2.5 px-3 font-medium theme-text-main">${item.name}</td>
+      <td class="py-2.5 px-3 text-right font-mono font-bold theme-text-main">${formatLKR(item.sellingPrice)}</td>
+      <td class="py-2.5 px-3 text-center font-mono font-bold text-xs ${item.stockQuantity <= 5 ? 'text-amber-400' : 'theme-text-main'}">
+        ${item.stockQuantity}
+      </td>
+      <td class="py-2.5 px-3 text-center whitespace-nowrap space-x-1">
+        <button type="button" data-edit-item="${item.id}" class="p-1 text-sky-400 hover:text-sky-300" title="Edit Item">
+          <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+        </button>
+        <button type="button" data-delete-item="${item.id}" class="p-1 text-red-400 hover:text-red-300" title="Delete Item">
+          <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </td>
+    `;
+
+    const editBtn = tr.querySelector(`[data-edit-item="${item.id}"]`);
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        document.getElementById('catalogDocId').value = item.id;
+        document.getElementById('catalogCode').value = item.code;
+        document.getElementById('catalogName').value = item.name;
+        document.getElementById('catalogSellingPrice').value = Number(item.sellingPrice).toFixed(2);
+        document.getElementById('catalogStockQuantity').value = item.stockQuantity;
+        document.getElementById('catalogFormTitle').textContent = `Edit Item: ${item.name}`;
+        document.getElementById('catalogSaveBtn').textContent = 'Update Catalog Item';
+        document.getElementById('catalogResetFormBtn').classList.remove('hidden');
+        document.getElementById('catalogCode').focus();
+      });
+    }
+
+    const delBtn = tr.querySelector(`[data-delete-item="${item.id}"]`);
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        if (!confirm(`Delete product "${item.name}" from master inventory?`)) return;
+        try {
+          await deleteDoc(doc(db, 'inventory', item.id));
+          showToast(`Deleted ${item.name}`, 'info');
+        } catch (err) {
+          showToast(`Failed to delete: ${err.message}`, 'error');
+        }
+      });
+    }
+
+    tbody.appendChild(tr);
+  });
+}
+
+// =============================================================================
+// 16. EDIT STATIONERY TRANSACTION MODAL
+// =============================================================================
 
 function setupEditStationeryModal() {
   const modal = document.getElementById('editStationeryModal');
   const form = document.getElementById('editStationeryForm');
   const closeBtn = document.getElementById('closeEditStatModalBtn');
   const cancelBtn = document.getElementById('cancelEditStatBtn');
-  const editCost = document.getElementById('editStatCost');
   const editSelling = document.getElementById('editStatSelling');
-  const editProfit = document.getElementById('editStatProfitPreview');
+  const editQty = document.getElementById('editStatQty');
+  const editTotalPreview = document.getElementById('editStatTotalPreview');
 
-  function updateEditProfit() {
-    const cost = Number(editCost.value) || 0;
-    const sell = Number(editSelling.value) || 0;
-    editProfit.textContent = formatLKR(roundCurrency(sell - cost));
+  function calculateEditTotal() {
+    const price = Number(editSelling.value) || 0;
+    const qty = parseInt(editQty.value, 10) || 1;
+    editTotalPreview.textContent = formatLKR(roundCurrency(price * qty));
   }
 
-  if (editCost) editCost.addEventListener('input', updateEditProfit);
-  if (editSelling) editSelling.addEventListener('input', updateEditProfit);
+  if (editSelling) editSelling.addEventListener('input', calculateEditTotal);
+  if (editQty) editQty.addEventListener('input', calculateEditTotal);
 
   function closeModal() {
     if (modal) modal.classList.add('hidden');
@@ -1099,19 +2363,20 @@ function setupEditStationeryModal() {
       const id = document.getElementById('editStatDocId').value;
       const name = document.getElementById('editStatName').value.trim();
       const code = document.getElementById('editStatCode').value.trim() || 'ST';
-      const cost = roundCurrency(editCost.value);
       const sell = roundCurrency(editSelling.value);
-      const profit = roundCurrency(sell - cost);
+      const qty = parseInt(editQty.value, 10) || 1;
+      const total = roundCurrency(sell * qty);
 
       try {
         await updateDoc(doc(db, 'stationery_transactions', id), {
           itemName: name,
           itemCode: code,
-          costPrice: cost,
           sellingPrice: sell,
-          profit: profit
+          quantity: qty,
+          totalAmount: total,
+          updatedAt: serverTimestamp()
         });
-        showToast(`Updated entry: ${name}`, 'success');
+        showToast(`Updated record: ${name}`, 'success');
         closeModal();
       } catch (err) {
         showToast(`Update error: ${err.message}`, 'error');
@@ -1127,655 +2392,23 @@ function openEditStationeryModal(item) {
   document.getElementById('editStatDocId').value = item.id;
   document.getElementById('editStatName').value = item.itemName || '';
   document.getElementById('editStatCode').value = item.itemCode || '';
-  document.getElementById('editStatCost').value = Number(item.costPrice || 0).toFixed(2);
   document.getElementById('editStatSelling').value = Number(item.sellingPrice || 0).toFixed(2);
+  document.getElementById('editStatQty').value = item.quantity || 1;
 
-  const profit = roundCurrency((item.sellingPrice || 0) - (item.costPrice || 0));
-  document.getElementById('editStatProfitPreview').textContent = formatLKR(profit);
+  const total = roundCurrency((item.sellingPrice || 0) * (item.quantity || 1));
+  document.getElementById('editStatTotalPreview').textContent = formatLKR(total);
 
   modal.classList.remove('hidden');
 }
 
-function renderStationeryTable() {
-  const tbody = document.getElementById('stationeryTableBody');
-  const countBadge = document.getElementById('stationeryCountBadge');
-  const dateLabel = document.getElementById('stationeryTableDateLabel');
-
-  if (dateLabel) {
-    dateLabel.textContent = APP_STATE.currentStationeryDate === getTodayDateString() 
-      ? `Today (${APP_STATE.currentStationeryDate})` 
-      : APP_STATE.currentStationeryDate;
-  }
-
-  if (countBadge) {
-    countBadge.textContent = `${APP_STATE.stationeryTransactions.length} Entries`;
-  }
-
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  if (APP_STATE.stationeryTransactions.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="6" class="py-12 text-center theme-text-dim">
-          <span class="text-3xl block mb-2">📦</span>
-          No stationery transactions recorded for ${APP_STATE.currentStationeryDate}.
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
-  APP_STATE.stationeryTransactions.forEach(item => {
-    const tr = document.createElement('tr');
-    tr.className = 'hover:theme-bg-subtle transition';
-    tr.innerHTML = `
-      <td class="py-3 px-3 sm:px-4 font-mono text-xs whitespace-nowrap">
-        <span class="theme-text-muted">${item.time || '--:--'}</span>
-        <span class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20">${item.itemCode || 'ST'}</span>
-      </td>
-      <td class="py-3 px-3 sm:px-4 font-medium theme-text-main">${item.itemName}</td>
-      <td class="py-3 px-3 sm:px-4 text-right font-mono text-xs theme-text-muted">${formatLKR(item.costPrice)}</td>
-      <td class="py-3 px-3 sm:px-4 text-right font-mono text-xs font-bold theme-text-main">${formatLKR(item.sellingPrice)}</td>
-      <td class="py-3 px-3 sm:px-4 text-right font-mono text-xs font-bold text-emerald-400">${formatLKR(item.profit)}</td>
-      <td class="py-3 px-3 sm:px-4 text-center whitespace-nowrap space-x-1">
-        <button type="button" data-edit-stat="${item.id}" class="tap-target p-1 text-sky-400 hover:text-sky-300 transition" title="Edit Sale">
-          ✏️
-        </button>
-        <button type="button" data-delete-stat="${item.id}" class="tap-target p-1 text-red-400 hover:text-red-300 transition" title="Delete Sale">
-          🗑️
-        </button>
-      </td>
-    `;
-
-    const editBtn = tr.querySelector(`[data-edit-stat="${item.id}"]`);
-    if (editBtn) {
-      editBtn.addEventListener('click', () => openEditStationeryModal(item));
-    }
-
-    const deleteBtn = tr.querySelector(`[data-delete-stat="${item.id}"]`);
-    if (deleteBtn) {
-      deleteBtn.addEventListener('click', () => deleteStationeryTransaction(item.id, item.itemName));
-    }
-
-    tbody.appendChild(tr);
-  });
-}
-
-async function deleteStationeryTransaction(id, name) {
-  if (!confirm(`Delete stationery entry "${name}"?`)) return;
-  try {
-    await deleteDoc(doc(db, 'stationery_transactions', id));
-    showToast(`Removed entry: ${name}`, 'info');
-  } catch (err) {
-    showToast(`Delete failed: ${err.message}`, 'error');
-  }
-}
-
-function updateStationerySummary() {
-  let totalSales = 0;
-  let totalCost = 0;
-  let totalProfit = 0;
-
-  APP_STATE.stationeryTransactions.forEach(t => {
-    totalSales += Number(t.sellingPrice) || 0;
-    totalCost += Number(t.costPrice) || 0;
-    totalProfit += Number(t.profit) || 0;
-  });
-
-  totalSales = roundCurrency(totalSales);
-  totalCost = roundCurrency(totalCost);
-  totalProfit = roundCurrency(totalProfit);
-
-  const overallMargin = totalSales > 0 ? ((totalProfit / totalSales) * 100).toFixed(2) : '0.00';
-
-  const statTotalSales = document.getElementById('statTotalSales');
-  const statTotalCost = document.getElementById('statTotalCost');
-  const statTotalProfit = document.getElementById('statTotalProfit');
-  const statOverallMargin = document.getElementById('statOverallMargin');
-
-  if (statTotalSales) statTotalSales.textContent = formatLKR(totalSales);
-  if (statTotalCost) statTotalCost.textContent = formatLKR(totalCost);
-  if (statTotalProfit) statTotalProfit.textContent = formatLKR(totalProfit);
-  if (statOverallMargin) statOverallMargin.textContent = `${overallMargin}%`;
-}
-
 // =============================================================================
-// 10. MODULE 3: MOBILE RELOAD & COMMISSION LEDGER LOGIC
-// =============================================================================
-
-function setupReloadModule() {
-  const reloadDateInput = document.getElementById('reloadDateInput');
-  const reloadTodayBtn = document.getElementById('reloadTodayBtn');
-  const reloadEntryForm = document.getElementById('reloadEntryForm');
-  const reloadAmountInput = document.getElementById('reloadAmountInput');
-  const reloadCommissionPreview = document.getElementById('reloadCommissionPreview');
-  const reloadActiveRatePreview = document.getElementById('reloadActiveRatePreview');
-
-  // Date Change Handlers
-  if (reloadDateInput) {
-    reloadDateInput.addEventListener('change', () => {
-      APP_STATE.currentReloadDate = reloadDateInput.value;
-      listenToReloads(APP_STATE.currentReloadDate);
-    });
-  }
-
-  if (reloadTodayBtn) {
-    reloadTodayBtn.addEventListener('click', () => {
-      const today = getTodayDateString();
-      if (reloadDateInput) reloadDateInput.value = today;
-      APP_STATE.currentReloadDate = today;
-      listenToReloads(today);
-    });
-  }
-
-  // Operator Select Buttons in Reload Entry Card
-  document.querySelectorAll('[data-select-op]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const op = btn.getAttribute('data-select-op');
-      APP_STATE.activeReloadOperator = op;
-
-      document.querySelectorAll('[data-select-op]').forEach(b => {
-        b.classList.remove('ring-2', 'ring-sky-400', 'theme-bg-elevated');
-      });
-      btn.classList.add('ring-2', 'ring-sky-400', 'theme-bg-elevated');
-
-      updateReloadRatePreview();
-    });
-  });
-
-  // Quick Amount Preset Buttons (50, 100, 200, 500, 1000, 2000)
-  document.querySelectorAll('[data-preset]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const val = btn.getAttribute('data-preset');
-      if (reloadAmountInput) {
-        reloadAmountInput.value = val;
-        updateReloadRatePreview();
-        reloadAmountInput.focus();
-      }
-    });
-  });
-
-  // Calculate Commission Preview on Amount input
-  function updateReloadRatePreview() {
-    const op = APP_STATE.activeReloadOperator;
-    const rate = Number(APP_STATE.commissionRates[op]) || 0;
-    const amount = Number(reloadAmountInput.value) || 0;
-    const earned = roundCurrency((amount * rate) / 100);
-
-    if (reloadActiveRatePreview) reloadActiveRatePreview.textContent = `${rate.toFixed(2)}%`;
-    if (reloadCommissionPreview) reloadCommissionPreview.textContent = formatLKR(earned);
-  }
-
-  if (reloadAmountInput) {
-    reloadAmountInput.addEventListener('input', updateReloadRatePreview);
-  }
-
-  // Operator Sub-tabs / Filters for Log Table
-  document.querySelectorAll('.reload-filter-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const opFilter = btn.getAttribute('data-operator');
-      APP_STATE.activeReloadFilter = opFilter;
-
-      document.querySelectorAll('.reload-filter-btn').forEach(b => {
-        b.classList.remove('active', 'theme-bg-accent', 'text-white');
-      });
-      btn.classList.add('active', 'theme-bg-accent', 'text-white');
-
-      renderReloadTable();
-      updateReloadSummary();
-    });
-  });
-
-  // Submit Reload Form
-  if (reloadEntryForm) {
-    reloadEntryForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const amount = roundCurrency(reloadAmountInput.value);
-      if (amount <= 0) {
-        showToast('Please enter a valid reload amount', 'error');
-        return;
-      }
-
-      const op = APP_STATE.activeReloadOperator;
-      const rate = Number(APP_STATE.commissionRates[op]) || 0;
-      const commissionAmount = roundCurrency((amount * rate) / 100);
-
-      const reloadPayload = {
-        date: APP_STATE.currentReloadDate,
-        time: getCurrentTimeString(),
-        operator: op,
-        amount: amount,
-        commissionRate: rate,
-        commissionAmount: commissionAmount,
-        timestamp: serverTimestamp()
-      };
-
-      try {
-        await addDoc(collection(db, 'reload_transactions'), reloadPayload);
-        showToast(`Recorded ${op} Reload: ${formatLKR(amount)} (+${formatLKR(commissionAmount)})`, 'success');
-
-        reloadAmountInput.value = '';
-        updateReloadRatePreview();
-        reloadAmountInput.focus();
-      } catch (err) {
-        logDebug(`Error adding reload transaction: ${err.message}`, 'ERROR');
-        showToast(`Failed to record reload: ${err.message}`, 'error');
-      }
-    });
-  }
-
-  // Set default active button
-  const defaultOpBtn = document.querySelector('[data-select-op="MOBITEL"]');
-  if (defaultOpBtn) defaultOpBtn.click();
-}
-
-function renderReloadTable() {
-  const tbody = document.getElementById('reloadTableBody');
-  const countBadge = document.getElementById('reloadCountBadge');
-  const dateLabel = document.getElementById('reloadTableDateLabel');
-
-  if (dateLabel) {
-    dateLabel.textContent = APP_STATE.currentReloadDate === getTodayDateString() 
-      ? `Today (${APP_STATE.currentReloadDate})` 
-      : APP_STATE.currentReloadDate;
-  }
-
-  // Filter list by selected operator tab
-  const filtered = APP_STATE.activeReloadFilter === 'ALL'
-    ? APP_STATE.reloadTransactions
-    : APP_STATE.reloadTransactions.filter(r => r.operator === APP_STATE.activeReloadFilter);
-
-  if (countBadge) countBadge.textContent = `${filtered.length} Entries`;
-
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="6" class="py-12 text-center theme-text-dim">
-          <span class="text-3xl block mb-2">📱</span>
-          No mobile reloads recorded for this date and filter.
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
-  const opBadges = {
-    AIRTEL: '<span class="px-2 py-0.5 rounded text-[11px] font-bold badge-airtel">Airtel</span>',
-    DIALOG: '<span class="px-2 py-0.5 rounded text-[11px] font-bold badge-dialog">Dialog</span>',
-    MOBITEL: '<span class="px-2 py-0.5 rounded text-[11px] font-bold badge-mobitel">Mobitel</span>',
-    HUTCH: '<span class="px-2 py-0.5 rounded text-[11px] font-bold badge-hutch">Hutch</span>'
-  };
-
-  filtered.forEach(item => {
-    const tr = document.createElement('tr');
-    tr.className = 'hover:theme-bg-subtle transition';
-    tr.innerHTML = `
-      <td class="py-3 px-3 sm:px-4 font-mono text-xs whitespace-nowrap theme-text-muted">${item.time || '--:--'}</td>
-      <td class="py-3 px-3 sm:px-4 font-medium">${opBadges[item.operator] || item.operator}</td>
-      <td class="py-3 px-3 sm:px-4 text-right font-mono text-xs font-bold theme-text-main">${formatLKR(item.amount)}</td>
-      <td class="py-3 px-3 sm:px-4 text-center font-mono text-xs theme-text-dim">${Number(item.commissionRate || 0).toFixed(2)}%</td>
-      <td class="py-3 px-3 sm:px-4 text-right font-mono text-xs font-bold text-emerald-400">${formatLKR(item.commissionAmount)}</td>
-      <td class="py-3 px-3 sm:px-4 text-center whitespace-nowrap">
-        <button type="button" data-delete-reload="${item.id}" class="tap-target p-1 text-red-400 hover:text-red-300 transition" title="Delete Reload">
-          🗑️
-        </button>
-      </td>
-    `;
-
-    const deleteBtn = tr.querySelector(`[data-delete-reload="${item.id}"]`);
-    if (deleteBtn) {
-      deleteBtn.addEventListener('click', () => deleteReloadTransaction(item.id, item.operator, item.amount));
-    }
-
-    tbody.appendChild(tr);
-  });
-}
-
-async function deleteReloadTransaction(id, operator, amount) {
-  if (!confirm(`Delete reload record for ${operator} (${formatLKR(amount)})?`)) return;
-  try {
-    await deleteDoc(doc(db, 'reload_transactions', id));
-    showToast(`Removed ${operator} reload record`, 'info');
-  } catch (err) {
-    showToast(`Delete failed: ${err.message}`, 'error');
-  }
-}
-
-function updateReloadSummary() {
-  const filtered = APP_STATE.activeReloadFilter === 'ALL'
-    ? APP_STATE.reloadTransactions
-    : APP_STATE.reloadTransactions.filter(r => r.operator === APP_STATE.activeReloadFilter);
-
-  let totalVolume = 0;
-  let totalCommission = 0;
-
-  filtered.forEach(r => {
-    totalVolume += Number(r.amount) || 0;
-    totalCommission += Number(r.commissionAmount) || 0;
-  });
-
-  const reloadTotalVolume = document.getElementById('reloadTotalVolume');
-  const reloadTotalCommission = document.getElementById('reloadTotalCommission');
-
-  if (reloadTotalVolume) reloadTotalVolume.textContent = formatLKR(roundCurrency(totalVolume));
-  if (reloadTotalCommission) reloadTotalCommission.textContent = formatLKR(roundCurrency(totalCommission));
-}
-
-// =============================================================================
-// 11. DASHBOARD OVERVIEW & FINANCIAL PULSE KPIS
-// =============================================================================
-
-function updateDashboardKPIs() {
-  // Compute Stationery Stats for Today
-  let stationerySales = 0;
-  let stationeryProfit = 0;
-  APP_STATE.stationeryTransactions.forEach(s => {
-    stationerySales += Number(s.sellingPrice) || 0;
-    stationeryProfit += Number(s.profit) || 0;
-  });
-
-  // Compute Reload Stats for Today
-  let reloadVolume = 0;
-  let reloadCommission = 0;
-  const opTotals = { AIRTEL: 0, DIALOG: 0, MOBITEL: 0, HUTCH: 0 };
-
-  APP_STATE.reloadTransactions.forEach(r => {
-    const amt = Number(r.amount) || 0;
-    const comm = Number(r.commissionAmount) || 0;
-    reloadVolume += amt;
-    reloadCommission += comm;
-
-    if (opTotals[r.operator] !== undefined) {
-      opTotals[r.operator] += comm;
-    }
-  });
-
-  const combinedProfit = roundCurrency(stationeryProfit + reloadCommission);
-
-  // Update DOM Elements
-  const dashStationerySales = document.getElementById('dashStationerySales');
-  const dashStationeryProfit = document.getElementById('dashStationeryProfit');
-  const dashReloadVolume = document.getElementById('dashReloadVolume');
-  const dashReloadCommission = document.getElementById('dashReloadCommission');
-  const dashTodayCombinedProfit = document.getElementById('dashTodayCombinedProfit');
-
-  if (dashStationerySales) dashStationerySales.textContent = formatLKR(roundCurrency(stationerySales));
-  if (dashStationeryProfit) dashStationeryProfit.textContent = formatLKR(roundCurrency(stationeryProfit));
-  if (dashReloadVolume) dashReloadVolume.textContent = formatLKR(roundCurrency(reloadVolume));
-  if (dashReloadCommission) dashReloadCommission.textContent = formatLKR(roundCurrency(reloadCommission));
-  if (dashTodayCombinedProfit) dashTodayCombinedProfit.textContent = formatLKR(combinedProfit);
-
-  // Operator pulse cards
-  const dashAirtelComm = document.getElementById('dashAirtelComm');
-  const dashDialogComm = document.getElementById('dashDialogComm');
-  const dashMobitelComm = document.getElementById('dashMobitelComm');
-  const dashHutchComm = document.getElementById('dashHutchComm');
-
-  if (dashAirtelComm) dashAirtelComm.textContent = formatLKR(roundCurrency(opTotals.AIRTEL));
-  if (dashDialogComm) dashDialogComm.textContent = formatLKR(roundCurrency(opTotals.DIALOG));
-  if (dashMobitelComm) dashMobitelComm.textContent = formatLKR(roundCurrency(opTotals.MOBITEL));
-  if (dashHutchComm) dashHutchComm.textContent = formatLKR(roundCurrency(opTotals.HUTCH));
-}
-
-function updateCommissionUI() {
-  const rates = APP_STATE.commissionRates;
-
-  // Header and Dashboard Badges
-  const rAirtel = document.getElementById('rateAirtelBadge');
-  const rDialog = document.getElementById('rateDialogBadge');
-  const rMobitel = document.getElementById('rateMobitelBadge');
-  const rHutch = document.getElementById('rateHutchBadge');
-
-  if (rAirtel) rAirtel.textContent = `${rates.AIRTEL.toFixed(2)}%`;
-  if (rDialog) rDialog.textContent = `${rates.DIALOG.toFixed(2)}%`;
-  if (rMobitel) rMobitel.textContent = `${rates.MOBITEL.toFixed(2)}%`;
-  if (rHutch) rHutch.textContent = `${rates.HUTCH.toFixed(2)}%`;
-
-  // Reload Entry form labels
-  const fAirtel = document.getElementById('formRateAirtel');
-  const fDialog = document.getElementById('formRateDialog');
-  const fMobitel = document.getElementById('formRateMobitel');
-  const fHutch = document.getElementById('formRateHutch');
-
-  if (fAirtel) fAirtel.textContent = `${rates.AIRTEL.toFixed(2)}%`;
-  if (fDialog) fDialog.textContent = `${rates.DIALOG.toFixed(2)}%`;
-  if (fMobitel) fMobitel.textContent = `${rates.MOBITEL.toFixed(2)}%`;
-  if (fHutch) fHutch.textContent = `${rates.HUTCH.toFixed(2)}%`;
-
-  // Settings form input values
-  const inAirtel = document.getElementById('rateAirtelInput');
-  const inDialog = document.getElementById('rateDialogInput');
-  const inMobitel = document.getElementById('rateMobitelInput');
-  const inHutch = document.getElementById('rateHutchInput');
-
-  if (inAirtel) inAirtel.value = rates.AIRTEL.toFixed(2);
-  if (inDialog) inDialog.value = rates.DIALOG.toFixed(2);
-  if (inMobitel) inMobitel.value = rates.MOBITEL.toFixed(2);
-  if (inHutch) inHutch.value = rates.HUTCH.toFixed(2);
-
-  // Trigger preview update if reload input is open
-  const reloadAmountInput = document.getElementById('reloadAmountInput');
-  if (reloadAmountInput) {
-    reloadAmountInput.dispatchEvent(new Event('input'));
-  }
-}
-
-// =============================================================================
-// 12. MODULE 4: MASTER INVENTORY CATALOG & SETTINGS
-// =============================================================================
-
-function setupCatalogAndSettings() {
-  const catalogItemForm = document.getElementById('catalogItemForm');
-  const catalogDocId = document.getElementById('catalogDocId');
-  const catalogCode = document.getElementById('catalogCode');
-  const catalogName = document.getElementById('catalogName');
-  const catalogCostPrice = document.getElementById('catalogCostPrice');
-  const catalogSellingPrice = document.getElementById('catalogSellingPrice');
-  const catalogSaveBtn = document.getElementById('catalogSaveBtn');
-  const catalogFormTitle = document.getElementById('catalogFormTitle');
-  const catalogResetFormBtn = document.getElementById('catalogResetFormBtn');
-  const seedCatalogBtn = document.getElementById('seedCatalogBtn');
-  const catalogSearchInput = document.getElementById('catalogSearchInput');
-  const commissionsForm = document.getElementById('commissionsForm');
-
-  // Reset catalog edit form
-  function resetCatalogForm() {
-    catalogItemForm.reset();
-    catalogDocId.value = '';
-    catalogFormTitle.textContent = 'Add New Catalog Item';
-    catalogSaveBtn.textContent = 'Save Item to Catalog';
-    catalogResetFormBtn.classList.add('hidden');
-  }
-
-  if (catalogResetFormBtn) catalogResetFormBtn.addEventListener('click', resetCatalogForm);
-
-  // Add or Edit Catalog Item
-  if (catalogItemForm) {
-    catalogItemForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const code = catalogCode.value.trim().toUpperCase();
-      const name = catalogName.value.trim();
-      const cost = roundCurrency(catalogCostPrice.value);
-      const sell = roundCurrency(catalogSellingPrice.value);
-      const docId = catalogDocId.value;
-
-      if (!code || !name) {
-        showToast('Please provide an Item Code and Name', 'error');
-        return;
-      }
-
-      const itemPayload = {
-        code,
-        name,
-        costPrice: cost,
-        sellingPrice: sell,
-        updatedAt: serverTimestamp()
-      };
-
-      try {
-        if (docId) {
-          // Edit existing item
-          await updateDoc(doc(db, 'inventory', docId), itemPayload);
-          showToast(`Updated catalog item: ${name}`, 'success');
-        } else {
-          // Add new item
-          await addDoc(collection(db, 'inventory'), itemPayload);
-          showToast(`Added ${name} to Master Catalog`, 'success');
-        }
-        resetCatalogForm();
-      } catch (err) {
-        showToast(`Catalog error: ${err.message}`, 'error');
-      }
-    });
-  }
-
-  // Filter Inventory Table in Settings
-  if (catalogSearchInput) {
-    catalogSearchInput.addEventListener('input', renderInventoryTable);
-  }
-
-  // Seed standard Sri Lankan stationery catalog
-  if (seedCatalogBtn) {
-    seedCatalogBtn.addEventListener('click', async () => {
-      if (!confirm('Populate standard Sri Lankan stationery catalog items?')) return;
-      try {
-        let addedCount = 0;
-        for (const item of SAMPLE_SRI_LANKAN_CATALOG) {
-          // Check if item code already exists in catalog
-          const exists = APP_STATE.inventoryCatalog.some(c => c.code === item.code);
-          if (!exists) {
-            await addDoc(collection(db, 'inventory'), {
-              ...item,
-              updatedAt: serverTimestamp()
-            });
-            addedCount++;
-          }
-        }
-        showToast(`Successfully seeded ${addedCount} stationery items!`, 'success');
-      } catch (err) {
-        showToast(`Error seeding catalog: ${err.message}`, 'error');
-      }
-    });
-  }
-
-  // Commission Rates Form Submission
-  if (commissionsForm) {
-    commissionsForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const airtel = roundCurrency(document.getElementById('rateAirtelInput').value);
-      const dialog = roundCurrency(document.getElementById('rateDialogInput').value);
-      const mobitel = roundCurrency(document.getElementById('rateMobitelInput').value);
-      const hutch = roundCurrency(document.getElementById('rateHutchInput').value);
-
-      try {
-        await setDoc(doc(db, 'settings', 'commissions'), {
-          airtel,
-          dialog,
-          mobitel,
-          hutch,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-
-        showToast('Commission rates updated across all modules!', 'success');
-      } catch (err) {
-        showToast(`Failed to save rates: ${err.message}`, 'error');
-      }
-    });
-  }
-}
-
-function renderInventoryTable() {
-  const tbody = document.getElementById('catalogTableBody');
-  const searchInput = document.getElementById('catalogSearchInput');
-  const queryStr = searchInput ? searchInput.value.trim().toLowerCase() : '';
-
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  const filtered = APP_STATE.inventoryCatalog.filter(item => {
-    if (!queryStr) return true;
-    return (item.code || '').toLowerCase().includes(queryStr) ||
-           (item.name || '').toLowerCase().includes(queryStr);
-  });
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="6" class="py-6 text-center theme-text-dim">
-          No inventory items match "${queryStr}".
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
-  filtered.forEach(item => {
-    const profit = roundCurrency((item.sellingPrice || 0) - (item.costPrice || 0));
-    const tr = document.createElement('tr');
-    tr.className = 'hover:theme-bg-subtle transition';
-    tr.innerHTML = `
-      <td class="py-2.5 px-3 font-mono font-bold text-sky-400 whitespace-nowrap">${item.code}</td>
-      <td class="py-2.5 px-3 font-medium theme-text-main">${item.name}</td>
-      <td class="py-2.5 px-3 text-right font-mono theme-text-muted">${formatLKR(item.costPrice)}</td>
-      <td class="py-2.5 px-3 text-right font-mono font-bold theme-text-main">${formatLKR(item.sellingPrice)}</td>
-      <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-400">${formatLKR(profit)}</td>
-      <td class="py-2.5 px-3 text-center whitespace-nowrap space-x-1">
-        <button type="button" data-edit-item="${item.id}" class="p-1 text-sky-400 hover:text-sky-300" title="Edit Item">
-          ✏️
-        </button>
-        <button type="button" data-delete-item="${item.id}" class="p-1 text-red-400 hover:text-red-300" title="Delete Item">
-          🗑️
-        </button>
-      </td>
-    `;
-
-    // Edit button click
-    const editBtn = tr.querySelector(`[data-edit-item="${item.id}"]`);
-    if (editBtn) {
-      editBtn.addEventListener('click', () => {
-        document.getElementById('catalogDocId').value = item.id;
-        document.getElementById('catalogCode').value = item.code;
-        document.getElementById('catalogName').value = item.name;
-        document.getElementById('catalogCostPrice').value = Number(item.costPrice).toFixed(2);
-        document.getElementById('catalogSellingPrice').value = Number(item.sellingPrice).toFixed(2);
-        document.getElementById('catalogFormTitle').textContent = `Edit Item: ${item.name}`;
-        document.getElementById('catalogSaveBtn').textContent = 'Update Catalog Item';
-        document.getElementById('catalogResetFormBtn').classList.remove('hidden');
-        document.getElementById('catalogCode').focus();
-      });
-    }
-
-    // Delete button click
-    const delBtn = tr.querySelector(`[data-delete-item="${item.id}"]`);
-    if (delBtn) {
-      delBtn.addEventListener('click', async () => {
-        if (!confirm(`Delete item "${item.name}" from master inventory?`)) return;
-        try {
-          await deleteDoc(doc(db, 'inventory', item.id));
-          showToast(`Deleted ${item.name} from catalog`, 'info');
-        } catch (err) {
-          showToast(`Failed to delete: ${err.message}`, 'error');
-        }
-      });
-    }
-
-    tbody.appendChild(tr);
-  });
-}
-
-// =============================================================================
-// 13. HIDDEN DEVELOPER DEBUGGER CONSOLE
+// 17. DEVELOPER DEBUGGER CONSOLE
 // =============================================================================
 
 function setupDeveloperConsole() {
   const devConsoleToggle = document.getElementById('devConsoleToggle');
   const devConsoleBody = document.getElementById('devConsoleBody');
   const dbgFirestoreHealth = document.getElementById('dbgFirestoreHealth');
-  const dbgAuthState = document.getElementById('dbgAuthState');
   const dbgTestWriteBtn = document.getElementById('dbgTestWriteBtn');
   const dbgExportDataBtn = document.getElementById('dbgExportDataBtn');
   const dbgClearCacheBtn = document.getElementById('dbgClearCacheBtn');
@@ -1793,7 +2426,6 @@ function setupDeveloperConsole() {
     });
   }
 
-  // Latency & Firestore Ping Test
   if (dbgTestWriteBtn) {
     dbgTestWriteBtn.addEventListener('click', async () => {
       logDebug('Testing Firestore ping and latency...');
@@ -1811,7 +2443,7 @@ function setupDeveloperConsole() {
       } catch (err) {
         logDebug(`Firestore ping test failed: ${err.message}`, 'ERROR');
         if (dbgFirestoreHealth) {
-          dbgFirestoreHealth.textContent = 'Degraded / Error';
+          dbgFirestoreHealth.textContent = 'Error';
           dbgFirestoreHealth.className = 'font-bold font-mono text-red-400';
         }
         showToast(`Ping failed: ${err.message}`, 'error');
@@ -1819,19 +2451,16 @@ function setupDeveloperConsole() {
     });
   }
 
-  // Clear LocalStorage Cache
   if (dbgClearCacheBtn) {
     dbgClearCacheBtn.addEventListener('click', () => {
-      if (confirm('Clear local theme & API key storage cache? (Firestore cloud data will remain untouched)')) {
+      if (confirm('Clear local browser storage cache? Cloud data will remain safe.')) {
         localStorage.clear();
         updateCacheMetrics();
         showToast('Local browser storage cache cleared', 'info');
-        logDebug('LocalStorage cache purged by developer action');
       }
     });
   }
 
-  // Clear Debug Logs
   if (dbgClearLogsBtn) {
     dbgClearLogsBtn.addEventListener('click', () => {
       APP_STATE.devLogs = [];
@@ -1840,7 +2469,6 @@ function setupDeveloperConsole() {
     });
   }
 
-  // Export JSON Backup
   if (dbgExportDataBtn) {
     dbgExportDataBtn.addEventListener('click', exportCompleteBackup);
   }
@@ -1862,13 +2490,14 @@ function updateCacheMetrics() {
 
 function exportCompleteBackup() {
   const backupData = {
+    system: 'AL Communication',
     exportedAt: new Date().toISOString(),
     projectId: 'al-p1-fb432',
     user: APP_STATE.currentUser ? APP_STATE.currentUser.email : 'anonymous',
     commissionRates: APP_STATE.commissionRates,
     inventoryCatalog: APP_STATE.inventoryCatalog,
-    stationeryTransactions: APP_STATE.stationeryTransactions,
-    reloadTransactions: APP_STATE.reloadTransactions
+    stationeryTransactions: APP_STATE.masterStationeryRecords,
+    reloadTransactions: APP_STATE.masterReloadRecords
   };
 
   const jsonStr = JSON.stringify(backupData, null, 2);
@@ -1876,49 +2505,34 @@ function exportCompleteBackup() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `sri-lankan-pos-backup-${getTodayDateString()}.json`;
+  a.download = `AL_Communication_Backup_${getTodayDateString()}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
   showToast('Exported complete data JSON backup', 'success');
-  logDebug('JSON database backup downloaded', 'SUCCESS');
 }
 
 // =============================================================================
-// 14. APPLICATION INITIALIZATION LIFECYCLE
+// 18. INITIALIZATION LIFECYCLE ENTRY
 // =============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  logDebug('POS System initializing for GitHub Pages (Project: al-p1-fb432)...');
+  logDebug('AL Communication System initializing for GitHub Pages (al-p1-fb432)...');
 
-  // 1. Initialize Theme Engine
   initTheme();
-
-  // 2. Start Live Digital Clock
   startLiveClock();
-
-  // 3. Start Cloud / Network Monitor
   initNetworkMonitor();
-
-  // 4. Setup Authentication Guard & Forms
   setupAuth();
-
-  // 5. Setup View Navigation & Modals
   initNavigation();
-
-  // 6. Setup Stationery POS Module
   setupStationeryModule();
-
-  // 7. Setup Reload & Commission Module
   setupReloadModule();
-
-  // 8. Setup Catalog & Settings Sub-panels
+  setupStockModule();
+  setupMasterLogsModule();
+  setupAnalyticsModule();
   setupCatalogAndSettings();
-
-  // 9. Setup Developer Debug Console
   setupDeveloperConsole();
 
-  logDebug('Application Lifecycle initialization complete.');
+  logDebug('AL Communication V1.0 Lifecycle Initialization Complete.');
 });
