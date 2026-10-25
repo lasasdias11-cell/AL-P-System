@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="modern-slate">
+<html lang="en" data-theme="modern-slate" data-ui-style="glass">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#0b1120">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="AL Communication - Professional Retail Stationery & Mobile Reload Management System.">
+  <meta name="description" content="AL Communication - Professional Retail Stationery & Mobile Reload POS System.">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -31,7 +31,7 @@
     }
   </script>
 
-  <!-- jsPDF & jsPDF-AutoTable for Professional Client-Side PDF Generation -->
+  <!-- jsPDF & jsPDF-AutoTable for Client-Side PDF Generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
@@ -41,9 +41,26 @@
 <body class="theme-bg-app theme-text-main antialiased selection:bg-sky-500 selection:text-white pb-20 md:pb-6">
 
   <!-- =========================================================================
+       0. INITIAL AUTH TRANSITION GATE (Smooth 1.5s check preventing login flashes)
+       ========================================================================= -->
+  <div id="authGateScreen" class="fixed inset-0 z-[60] flex flex-col items-center justify-center theme-bg-app transition-opacity duration-300">
+    <div class="w-16 h-16 rounded-2xl theme-bg-accent-light text-sky-400 flex items-center justify-center mb-4 shadow-inner">
+      <svg class="icon-svg-lg animate-pulse" viewBox="0 0 24 24">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+      </svg>
+    </div>
+    <div class="text-xl font-bold tracking-tight theme-text-main">AL Communication</div>
+    <div class="text-xs theme-text-dim mt-2 flex items-center gap-2 font-medium">
+      <span class="w-2 h-2 rounded-full bg-sky-400 pulse-dot"></span>
+      <span>Securing Session</span>
+    </div>
+  </div>
+
+  <!-- =========================================================================
        1. AUTHENTICATION GUARD: FULL-SCREEN LOGIN SCREEN
        ========================================================================= -->
-  <section id="loginScreen" class="fixed inset-0 z-50 flex items-center justify-center p-4 theme-bg-app overflow-y-auto">
+  <section id="loginScreen" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 theme-bg-app overflow-y-auto">
     <div class="w-full max-w-md p-6 sm:p-8 rounded-2xl theme-bg-surface theme-border border theme-shadow relative">
       
       <!-- Brand Header -->
@@ -55,9 +72,8 @@
           </svg>
         </div>
         <h1 class="text-2xl font-bold tracking-tight theme-text-main">AL Communication</h1>
-        <p class="text-xs sm:text-sm theme-text-muted mt-1">Retail Stationery & Mobile Reload System</p>
-        <div class="mt-2.5 inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">
-          <span>Project: al-p1-fb432</span>
+        <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">
+          <span>Counter POS System</span>
         </div>
       </div>
 
@@ -111,7 +127,7 @@
         <button 
           type="submit" 
           id="loginSubmitBtn"
-          class="w-full py-3.5 px-4 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+          class="w-full py-3.5 px-4 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 shadow-lg cursor-pointer glass-btn"
         >
           <span id="loginBtnText">Sign In to Counter Ledger</span>
           <span id="loginBtnSpinner" class="hidden animate-spin">
@@ -137,7 +153,7 @@
             </p>
             <div class="flex gap-2">
               <input type="text" id="customApiKeyInput" placeholder="AIzaSy..." class="form-input text-xs py-1.5 px-2">
-              <button type="button" id="saveApiKeyBtn" class="px-3 py-1.5 rounded-lg theme-bg-accent text-white font-medium text-xs whitespace-nowrap">
+              <button type="button" id="saveApiKeyBtn" class="px-3 py-1.5 rounded-lg theme-bg-accent text-white font-medium text-xs whitespace-nowrap glass-btn">
                 Save Key
               </button>
             </div>
@@ -157,7 +173,7 @@
     <header class="sticky top-0 z-40 theme-header border-b theme-border px-3 sm:px-6 py-2.5 shadow-sm">
       <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
         
-        <!-- Left: Brand Logo & Title -->
+        <!-- Left: Brand Logo & Title (Clean Icon & Main Title only) -->
         <div class="flex items-center gap-3">
           <button type="button" id="headerHomeBtn" class="flex items-center gap-2.5 text-left group">
             <div class="w-10 h-10 rounded-xl theme-bg-accent-light text-sky-400 flex items-center justify-center shadow-inner group-hover:scale-105 transition">
@@ -174,7 +190,6 @@
                   <span id="syncStatusText">Cloud Live</span>
                 </span>
               </div>
-              <span class="text-xs theme-text-muted block">Retail & Mobile Reload Hub</span>
             </div>
           </button>
         </div>
@@ -221,8 +236,8 @@
           <button 
             type="button" 
             id="openSettingsBtn" 
-            class="tap-target w-10 h-10 rounded-xl theme-bg-subtle border theme-border hover:theme-bg-elevated active:scale-95 transition flex items-center justify-center text-sky-400"
-            title="System Settings & Master Catalog"
+            class="tap-target w-10 h-10 rounded-xl theme-bg-subtle border theme-border hover:theme-bg-elevated active:scale-95 transition flex items-center justify-center text-sky-400 glass-btn"
+            title="System Settings"
             aria-label="Open Settings"
           >
             <svg class="icon-svg" viewBox="0 0 24 24">
@@ -239,17 +254,17 @@
     <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-6">
 
       <!-- =====================================================================
-           SECTION 1: DASHBOARD
+           SECTION 1: DASHBOARD (Ultra-Clean Minimalist UI)
            ===================================================================== -->
       <section id="viewDashboard" class="app-view space-y-6">
         
-        <!-- Header & Counter Session Bar -->
+        <!-- Header: Clean Icon & Title Only (No Sub-text/Paragraphs) -->
         <div class="p-5 sm:p-6 rounded-2xl theme-bg-surface theme-border border theme-shadow flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-sky-500/15 text-sky-400 flex items-center justify-center">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            </div>
             <h2 class="text-xl sm:text-2xl font-bold tracking-tight theme-text-main">Dashboard</h2>
-            <p class="text-xs sm:text-sm theme-text-muted mt-1">
-              Active Counter Session: <span id="userEmailBadge" class="font-mono font-medium text-sky-400">lasasdias11@gmail.com</span>
-            </p>
           </div>
           <div class="flex items-center gap-3">
             <div class="px-4 py-2.5 rounded-xl theme-bg-subtle border theme-border flex items-center gap-3">
@@ -263,194 +278,88 @@
           </div>
         </div>
 
-        <!-- 4 Primary KPI Summary Cards -->
+        <!-- 4 Primary KPI Summary Cards (Clean Title & Value Only, No Descriptions) -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div class="p-4 sm:p-5 rounded-2xl theme-bg-surface theme-border border theme-shadow">
-            <span class="text-[11px] font-semibold uppercase tracking-wider theme-text-muted">Today's Stationery Sales</span>
-            <div id="dashStationerySales" class="text-lg sm:text-2xl font-bold theme-text-main mt-1 currency-lkr">Rs. 0.00</div>
-            <div class="text-[11px] theme-text-dim mt-1 font-mono"><span id="dashStationeryItemsSold">0</span> items sold</div>
+            <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted">Today's Stationery Sales</span>
+            <div id="dashStationerySales" class="text-lg sm:text-2xl font-bold theme-text-main mt-1.5 currency-lkr">Rs. 0.00</div>
           </div>
 
           <div class="p-4 sm:p-5 rounded-2xl theme-bg-surface theme-border border theme-shadow">
-            <span class="text-[11px] font-semibold uppercase tracking-wider theme-text-muted">Today's Reload Volume</span>
-            <div id="dashReloadVolume" class="text-lg sm:text-2xl font-bold theme-text-main mt-1 currency-lkr">Rs. 0.00</div>
-            <div class="text-[11px] theme-text-dim mt-1 font-mono"><span id="dashReloadCount">0</span> top-ups processed</div>
+            <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted">Today's Reload Volume</span>
+            <div id="dashReloadVolume" class="text-lg sm:text-2xl font-bold theme-text-main mt-1.5 currency-lkr">Rs. 0.00</div>
           </div>
 
           <div class="p-4 sm:p-5 rounded-2xl theme-bg-surface theme-border border theme-shadow">
-            <span class="text-[11px] font-semibold uppercase tracking-wider theme-text-muted">Today's Reload Commission</span>
-            <div id="dashReloadCommission" class="text-lg sm:text-2xl font-bold text-emerald-400 mt-1 currency-lkr">Rs. 0.00</div>
-            <div class="text-[11px] theme-text-dim mt-1">Earned margin</div>
+            <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted">Today's Reload Commission</span>
+            <div id="dashReloadCommission" class="text-lg sm:text-2xl font-bold text-emerald-400 mt-1.5 currency-lkr">Rs. 0.00</div>
           </div>
 
           <div class="p-4 sm:p-5 rounded-2xl theme-bg-surface theme-border border theme-shadow">
-            <span class="text-[11px] font-semibold uppercase tracking-wider theme-text-muted">Total Active Catalog</span>
-            <div id="dashCatalogCount" class="text-lg sm:text-2xl font-bold text-sky-400 mt-1 font-mono">0 Items</div>
-            <div class="text-[11px] theme-text-dim mt-1"><span id="dashLowStockCount" class="text-amber-400 font-semibold">0</span> items low in stock</div>
+            <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted">Total Active Catalog</span>
+            <div id="dashCatalogCount" class="text-lg sm:text-2xl font-bold text-sky-400 mt-1.5 font-mono">0 Items</div>
           </div>
         </div>
 
-        <!-- Quick Access Operational Shortcut Tiles -->
-        <div>
-          <h3 class="text-xs font-bold uppercase tracking-wider theme-text-muted mb-3">Counter Operations & Navigation</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            <!-- Tile 1: Stationery Entry -->
-            <button 
-              type="button" 
-              id="dashTileStationery" 
-              class="group text-left p-5 rounded-2xl theme-bg-surface hover:theme-bg-elevated border theme-border hover:border-sky-500/50 theme-shadow transition-all duration-150 flex flex-col justify-between"
-            >
-              <div>
-                <div class="w-12 h-12 rounded-xl bg-sky-500/15 text-sky-400 flex items-center justify-center mb-3 group-hover:scale-105 transition">
-                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                </div>
-                <h4 class="text-base font-bold theme-text-main group-hover:text-sky-400 transition">Stationery Entry</h4>
-                <p class="text-xs theme-text-muted mt-1 leading-relaxed">
-                  Fast barcode/code sales entry with automated real-time stock deduction.
-                </p>
-              </div>
-              <div class="mt-4 pt-3 border-t theme-border flex items-center justify-between text-xs font-semibold text-sky-400">
-                <span>Record Sale</span>
-                <span>→</span>
-              </div>
-            </button>
-
-            <!-- Tile 2: Mobile Reloads -->
-            <button 
-              type="button" 
-              id="dashTileReloads" 
-              class="group text-left p-5 rounded-2xl theme-bg-surface hover:theme-bg-elevated border theme-border hover:border-emerald-500/50 theme-shadow transition-all duration-150 flex flex-col justify-between"
-            >
-              <div>
-                <div class="w-12 h-12 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-3 group-hover:scale-105 transition">
-                  <svg class="icon-svg" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-                </div>
-                <h4 class="text-base font-bold theme-text-main group-hover:text-emerald-400 transition">Mobile Reloads</h4>
-                <p class="text-xs theme-text-muted mt-1 leading-relaxed">
-                  Fast top-ups for Airtel, Dialog, Mobitel, and Hutch with instant commissions.
-                </p>
-              </div>
-              <div class="mt-4 pt-3 border-t theme-border flex items-center justify-between text-xs font-semibold text-emerald-400">
-                <span>Process Reload</span>
-                <span>→</span>
-              </div>
-            </button>
-
-            <!-- Tile 3: Stock Inventory Levels -->
-            <button 
-              type="button" 
-              id="dashTileStock" 
-              class="group text-left p-5 rounded-2xl theme-bg-surface hover:theme-bg-elevated border theme-border hover:border-amber-500/50 theme-shadow transition-all duration-150 flex flex-col justify-between"
-            >
-              <div>
-                <div class="w-12 h-12 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center mb-3 group-hover:scale-105 transition">
-                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-                </div>
-                <h4 class="text-base font-bold theme-text-main group-hover:text-amber-400 transition">Stock Inventory Levels</h4>
-                <p class="text-xs theme-text-muted mt-1 leading-relaxed">
-                  View live stock quantities, low-stock alerts, and quick replenishment.
-                </p>
-              </div>
-              <div class="mt-4 pt-3 border-t theme-border flex items-center justify-between text-xs font-semibold text-amber-400">
-                <span>Inspect Stock</span>
-                <span>→</span>
-              </div>
-            </button>
-
-            <!-- Tile 4: Master Logs -->
-            <button 
-              type="button" 
-              id="dashTileLogs" 
-              class="group text-left p-5 rounded-2xl theme-bg-surface hover:theme-bg-elevated border theme-border hover:border-indigo-500/50 theme-shadow transition-all duration-150 flex flex-col justify-between"
-            >
-              <div>
-                <div class="w-12 h-12 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center mb-3 group-hover:scale-105 transition">
-                  <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                </div>
-                <h4 class="text-base font-bold theme-text-main group-hover:text-indigo-400 transition">Master Logs & Reports</h4>
-                <p class="text-xs theme-text-muted mt-1 leading-relaxed">
-                  Unified history, custom date ranges, and professional PDF report export.
-                </p>
-              </div>
-              <div class="mt-4 pt-3 border-t theme-border flex items-center justify-between text-xs font-semibold text-indigo-400">
-                <span>View Logs</span>
-                <span>→</span>
-              </div>
-            </button>
-
-          </div>
-        </div>
-
-        <!-- Monthly & Yearly Financial Summaries -->
-        <div class="p-5 sm:p-6 rounded-2xl theme-bg-surface theme-border border theme-shadow space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 class="text-base font-bold theme-text-main">Store Financial Analytics</h3>
-              <p class="text-xs theme-text-muted">Aggregated performance across Stationery Sales and Mobile Reloads</p>
+        <!-- Counter Operations Shortcut Tiles (Clean Icon & Main Title Only, No Subtext) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          
+          <!-- Tile 1: Stationery Entry -->
+          <button 
+            type="button" 
+            id="dashTileStationery" 
+            class="group p-5 rounded-2xl theme-bg-surface hover:theme-bg-elevated border theme-border hover:border-sky-500/50 theme-shadow transition-all duration-150 flex items-center gap-3.5 glass-btn cursor-pointer"
+          >
+            <div class="w-12 h-12 rounded-xl bg-sky-500/15 text-sky-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
             </div>
-            
-            <div class="flex items-center gap-2">
-              <input type="month" id="analyticsMonthPicker" class="form-input py-1.5 px-3 text-xs w-auto cursor-pointer">
-              <button type="button" id="refreshAnalyticsBtn" class="px-3 py-1.5 rounded-lg text-xs font-bold theme-bg-accent text-white">
-                Refresh
-              </button>
+            <div class="text-left font-bold text-base theme-text-main group-hover:text-sky-400 transition">
+              Stationery Entry
             </div>
-          </div>
+          </button>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Monthly Summary Card -->
-            <div class="p-4 rounded-xl theme-bg-subtle border theme-border space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Monthly Statement</span>
-                <span id="analyticsMonthLabel" class="text-xs font-mono font-semibold text-sky-400">--</span>
-              </div>
-              <div class="grid grid-cols-2 gap-3 pt-1">
-                <div>
-                  <span class="text-[11px] theme-text-dim">Stationery Sales</span>
-                  <div id="analyticsMonthlyStationery" class="text-base font-bold theme-text-main currency-lkr">Rs. 0.00</div>
-                </div>
-                <div>
-                  <span class="text-[11px] theme-text-dim">Reload Volume</span>
-                  <div id="analyticsMonthlyReload" class="text-base font-bold theme-text-main currency-lkr">Rs. 0.00</div>
-                </div>
-                <div>
-                  <span class="text-[11px] theme-text-dim">Reload Commissions</span>
-                  <div id="analyticsMonthlyCommission" class="text-base font-bold text-emerald-400 currency-lkr">Rs. 0.00</div>
-                </div>
-                <div>
-                  <span class="text-[11px] theme-text-dim">Net Store Revenue</span>
-                  <div id="analyticsMonthlyCombined" class="text-base font-bold text-sky-400 currency-lkr">Rs. 0.00</div>
-                </div>
-              </div>
+          <!-- Tile 2: Mobile Reloads -->
+          <button 
+            type="button" 
+            id="dashTileReloads" 
+            class="group p-5 rounded-2xl theme-bg-surface hover:theme-bg-elevated border theme-border hover:border-emerald-500/50 theme-shadow transition-all duration-150 flex items-center gap-3.5 glass-btn cursor-pointer"
+          >
+            <div class="w-12 h-12 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+              <svg class="icon-svg" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
             </div>
+            <div class="text-left font-bold text-base theme-text-main group-hover:text-emerald-400 transition">
+              Mobile Reloads
+            </div>
+          </button>
 
-            <!-- Annual / Yearly Summary Card -->
-            <div class="p-4 rounded-xl theme-bg-subtle border theme-border space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Annual Statement (YTD)</span>
-                <span id="analyticsYearLabel" class="text-xs font-mono font-semibold text-sky-400">--</span>
-              </div>
-              <div class="grid grid-cols-2 gap-3 pt-1">
-                <div>
-                  <span class="text-[11px] theme-text-dim">Stationery Sales (YTD)</span>
-                  <div id="analyticsYearlyStationery" class="text-base font-bold theme-text-main currency-lkr">Rs. 0.00</div>
-                </div>
-                <div>
-                  <span class="text-[11px] theme-text-dim">Reload Volume (YTD)</span>
-                  <div id="analyticsYearlyReload" class="text-base font-bold theme-text-main currency-lkr">Rs. 0.00</div>
-                </div>
-                <div>
-                  <span class="text-[11px] theme-text-dim">Reload Commissions (YTD)</span>
-                  <div id="analyticsYearlyCommission" class="text-base font-bold text-emerald-400 currency-lkr">Rs. 0.00</div>
-                </div>
-                <div>
-                  <span class="text-[11px] theme-text-dim">Annual Store Revenue</span>
-                  <div id="analyticsYearlyCombined" class="text-base font-bold text-sky-400 currency-lkr">Rs. 0.00</div>
-                </div>
-              </div>
+          <!-- Tile 3: Stock Inventory Levels -->
+          <button 
+            type="button" 
+            id="dashTileStock" 
+            class="group p-5 rounded-2xl theme-bg-surface hover:theme-bg-elevated border theme-border hover:border-amber-500/50 theme-shadow transition-all duration-150 flex items-center gap-3.5 glass-btn cursor-pointer"
+          >
+            <div class="w-12 h-12 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
             </div>
-          </div>
+            <div class="text-left font-bold text-base theme-text-main group-hover:text-amber-400 transition">
+              Stock Inventory
+            </div>
+          </button>
+
+          <!-- Tile 4: Master Logs -->
+          <button 
+            type="button" 
+            id="dashTileLogs" 
+            class="group p-5 rounded-2xl theme-bg-surface hover:theme-bg-elevated border theme-border hover:border-indigo-500/50 theme-shadow transition-all duration-150 flex items-center gap-3.5 glass-btn cursor-pointer"
+          >
+            <div class="w-12 h-12 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            </div>
+            <div class="text-left font-bold text-base theme-text-main group-hover:text-indigo-400 transition">
+              Master Logs
+            </div>
+          </button>
+
         </div>
 
       </section>
@@ -460,17 +369,19 @@
            ===================================================================== -->
       <section id="viewStationery" class="app-view hidden space-y-6">
 
-        <!-- Top Navigation / Shortcut Bar -->
-        <div class="p-4 rounded-2xl theme-bg-surface theme-border border theme-shadow flex items-center justify-between">
-          <div>
-            <h2 class="text-lg font-bold theme-text-main">Stationery Entry</h2>
-            <p class="text-xs theme-text-muted">Fast barcode & catalog sales logging with live stock tracking</p>
+        <!-- Top Header: Clean Icon & Title Only -->
+        <div class="p-4 sm:p-5 rounded-2xl theme-bg-surface theme-border border theme-shadow flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-sky-500/15 text-sky-400 flex items-center justify-center">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            </div>
+            <h2 class="text-xl font-bold theme-text-main">Stationery Entry</h2>
           </div>
           <div class="flex items-center gap-2">
-            <button type="button" data-view="stock" class="nav-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition">
+            <button type="button" data-view="stock" class="nav-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition glass-btn">
               Stock Levels
             </button>
-            <button type="button" data-view="logs" class="nav-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition">
+            <button type="button" data-view="logs" class="nav-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition glass-btn">
               Master Logs
             </button>
           </div>
@@ -549,10 +460,10 @@
                   
                   <!-- Quick Preset Pills -->
                   <div class="flex gap-1">
-                    <button type="button" data-qty-pill="1" class="qty-pill-btn px-2.5 py-2.5 rounded-lg theme-bg-subtle border theme-border text-xs font-bold hover:theme-bg-elevated transition">1</button>
-                    <button type="button" data-qty-pill="2" class="qty-pill-btn px-2.5 py-2.5 rounded-lg theme-bg-subtle border theme-border text-xs font-bold hover:theme-bg-elevated transition">2</button>
-                    <button type="button" data-qty-pill="5" class="qty-pill-btn px-2.5 py-2.5 rounded-lg theme-bg-subtle border theme-border text-xs font-bold hover:theme-bg-elevated transition">5</button>
-                    <button type="button" data-qty-pill="10" class="qty-pill-btn px-2.5 py-2.5 rounded-lg theme-bg-subtle border theme-border text-xs font-bold hover:theme-bg-elevated transition">10</button>
+                    <button type="button" data-qty-pill="1" class="qty-pill-btn px-2.5 py-2.5 rounded-lg theme-bg-subtle border theme-border text-xs font-bold hover:theme-bg-elevated transition glass-btn">1</button>
+                    <button type="button" data-qty-pill="2" class="qty-pill-btn px-2.5 py-2.5 rounded-lg theme-bg-subtle border theme-border text-xs font-bold hover:theme-bg-elevated transition glass-btn">2</button>
+                    <button type="button" data-qty-pill="5" class="qty-pill-btn px-2.5 py-2.5 rounded-lg theme-bg-subtle border theme-border text-xs font-bold hover:theme-bg-elevated transition glass-btn">5</button>
+                    <button type="button" data-qty-pill="10" class="qty-pill-btn px-2.5 py-2.5 rounded-lg theme-bg-subtle border theme-border text-xs font-bold hover:theme-bg-elevated transition glass-btn">10</button>
                   </div>
                 </div>
               </div>
@@ -560,10 +471,10 @@
               <!-- Live Total Amount Preview -->
               <div>
                 <label class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5">
-                  Total Transaction Amount
+                  Total
                 </label>
                 <div class="p-2.5 rounded-xl theme-bg-subtle border theme-border flex items-center justify-between min-h-[46px]">
-                  <span class="text-xs theme-text-dim">Total:</span>
+                  <span class="text-xs theme-text-dim">Amount:</span>
                   <span id="posTotalAmountPreview" class="text-lg font-bold text-emerald-400 currency-lkr">Rs. 0.00</span>
                 </div>
               </div>
@@ -575,7 +486,7 @@
               <button 
                 type="submit" 
                 id="posSubmitBtn"
-                class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition shadow-md flex items-center justify-center gap-2 cursor-pointer glass-btn"
               >
                 <svg class="icon-svg-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 <span>Log Stationery Sale</span>
@@ -584,37 +495,18 @@
           </form>
         </div>
 
-        <!-- Consolidated Summary Metric Block (Clean Counter Statistics) -->
-        <div class="p-5 sm:p-6 rounded-2xl theme-bg-surface theme-border border theme-shadow space-y-4">
+        <!-- Recent Sales Quick Feed (Clean Compact List) -->
+        <div class="p-5 sm:p-6 rounded-2xl theme-bg-surface theme-border border theme-shadow space-y-3">
           <div class="flex items-center justify-between">
-            <h3 class="font-bold text-base theme-text-main">Today's Stationery Summary</h3>
+            <h3 class="font-bold text-base theme-text-main">Recent Sales</h3>
             <button type="button" data-view="logs" class="text-xs font-semibold text-sky-400 hover:underline">
-              View Detailed Ledger in Master Logs →
+              View All in Master Logs →
             </button>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div class="p-4 rounded-xl theme-bg-subtle border theme-border">
-              <span class="text-[11px] theme-text-dim uppercase font-semibold">Today's Total Sales (LKR)</span>
-              <div id="statTodayTotalSales" class="text-xl sm:text-2xl font-bold theme-text-main currency-lkr mt-1">Rs. 0.00</div>
-            </div>
-            <div class="p-4 rounded-xl theme-bg-subtle border theme-border">
-              <span class="text-[11px] theme-text-dim uppercase font-semibold">Units / Items Sold Today</span>
-              <div id="statTodayUnitsSold" class="text-xl sm:text-2xl font-bold text-sky-400 font-mono mt-1">0</div>
-            </div>
-            <div class="p-4 rounded-xl theme-bg-subtle border theme-border">
-              <span class="text-[11px] theme-text-dim uppercase font-semibold">Transactions Recorded</span>
-              <div id="statTodayTxCount" class="text-xl sm:text-2xl font-bold theme-text-muted font-mono mt-1">0</div>
-            </div>
-          </div>
-
-          <!-- Quick Recent 5 Transactions Preview -->
-          <div class="pt-2">
-            <h4 class="text-xs font-bold uppercase tracking-wider theme-text-muted mb-2">Recent Sales Feed</h4>
-            <div id="statRecentFeed" class="space-y-2">
-              <div class="p-3 text-xs text-center theme-text-dim rounded-xl border theme-border">
-                No stationery sales recorded yet today.
-              </div>
+          <div id="statRecentFeed" class="space-y-2">
+            <div class="p-3 text-xs text-center theme-text-dim rounded-xl border theme-border">
+              No stationery sales recorded yet today.
             </div>
           </div>
         </div>
@@ -626,13 +518,15 @@
            ===================================================================== -->
       <section id="viewReloads" class="app-view hidden space-y-6">
 
-        <!-- Top Navigation -->
-        <div class="p-4 rounded-2xl theme-bg-surface theme-border border theme-shadow flex items-center justify-between">
-          <div>
-            <h2 class="text-lg font-bold theme-text-main">Mobile Reloads</h2>
-            <p class="text-xs theme-text-muted">Airtel, Dialog, Mobitel, and Hutch counter top-ups</p>
+        <!-- Top Header: Clean Icon & Title Only -->
+        <div class="p-4 sm:p-5 rounded-2xl theme-bg-surface theme-border border theme-shadow flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+              <svg class="icon-svg" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+            </div>
+            <h2 class="text-xl font-bold theme-text-main">Mobile Reloads</h2>
           </div>
-          <button type="button" data-view="logs" class="nav-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition">
+          <button type="button" data-view="logs" class="nav-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition glass-btn">
             Master Logs
           </button>
         </div>
@@ -644,13 +538,13 @@
             <!-- Operator Selection Pills -->
             <div>
               <label class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-2">
-                1. Select Network Operator
+                1. Network Operator
               </label>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                 <button 
                   type="button" 
                   data-select-op="AIRTEL" 
-                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated"
+                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated glass-btn"
                 >
                   <span class="text-sm font-bold text-red-400">Airtel</span>
                   <span class="text-xs font-mono theme-text-dim" id="formRateAirtel">6.80%</span>
@@ -659,7 +553,7 @@
                 <button 
                   type="button" 
                   data-select-op="DIALOG" 
-                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated"
+                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated glass-btn"
                 >
                   <span class="text-sm font-bold text-orange-400">Dialog</span>
                   <span class="text-xs font-mono theme-text-dim" id="formRateDialog">3.80%</span>
@@ -668,7 +562,7 @@
                 <button 
                   type="button" 
                   data-select-op="MOBITEL" 
-                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated active ring-2 ring-sky-400"
+                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated active ring-2 ring-sky-400 glass-btn"
                 >
                   <span class="text-sm font-bold text-sky-400">Mobitel</span>
                   <span class="text-xs font-mono theme-text-dim" id="formRateMobitel">6.80%</span>
@@ -677,7 +571,7 @@
                 <button 
                   type="button" 
                   data-select-op="HUTCH" 
-                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated"
+                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated glass-btn"
                 >
                   <span class="text-sm font-bold text-amber-400">Hutch</span>
                   <span class="text-xs font-mono theme-text-dim" id="formRateHutch">5.00%</span>
@@ -685,38 +579,44 @@
               </div>
             </div>
 
-            <!-- Quick Amount Presets -->
+            <!-- Quick Amount Presets (Dynamically Configured from Settings) -->
             <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-2">
-                2. Quick Preset Amount (LKR)
-              </label>
-              <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                <button type="button" data-preset="50" class="reload-preset-btn py-2 px-3 rounded-lg theme-bg-subtle border theme-border text-xs font-bold font-mono hover:theme-bg-elevated transition">
-                  Rs. 50
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-xs font-semibold uppercase tracking-wider theme-text-muted">
+                  2. Quick Preset Amount (LKR)
+                </label>
+                <button type="button" id="openPresetConfigBtn" class="text-xs text-sky-400 hover:underline font-medium">
+                  Customize Presets
                 </button>
-                <button type="button" data-preset="100" class="reload-preset-btn py-2 px-3 rounded-lg theme-bg-subtle border theme-border text-xs font-bold font-mono hover:theme-bg-elevated transition">
-                  Rs. 100
-                </button>
-                <button type="button" data-preset="200" class="reload-preset-btn py-2 px-3 rounded-lg theme-bg-subtle border theme-border text-xs font-bold font-mono hover:theme-bg-elevated transition">
-                  Rs. 200
-                </button>
-                <button type="button" data-preset="500" class="reload-preset-btn py-2 px-3 rounded-lg theme-bg-subtle border theme-border text-xs font-bold font-mono hover:theme-bg-elevated transition">
-                  Rs. 500
-                </button>
-                <button type="button" data-preset="1000" class="reload-preset-btn py-2 px-3 rounded-lg theme-bg-subtle border theme-border text-xs font-bold font-mono hover:theme-bg-elevated transition">
-                  Rs. 1,000
-                </button>
-                <button type="button" data-preset="2000" class="reload-preset-btn py-2 px-3 rounded-lg theme-bg-subtle border theme-border text-xs font-bold font-mono hover:theme-bg-elevated transition">
-                  Rs. 2,000
-                </button>
+              </div>
+              <div id="reloadPresetsContainer" class="flex flex-wrap gap-2">
+                <!-- Dynamically populated preset buttons -->
               </div>
             </div>
 
-            <!-- Amount Input & Real-Time Commission Preview -->
+            <!-- Mobile Number Field + Amount Input Field (Prompt strictly "Amount") -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
               <div>
+                <label for="reloadMobileInput" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5">
+                  Mobile Number
+                </label>
+                <div class="relative">
+                  <input 
+                    type="tel" 
+                    id="reloadMobileInput" 
+                    placeholder="07X XXX XXXX" 
+                    class="form-input text-base font-mono font-bold pl-10"
+                    autocomplete="tel"
+                  >
+                  <span class="absolute left-3.5 top-3.5 theme-text-dim">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                  </span>
+                </div>
+              </div>
+
+              <div>
                 <label for="reloadAmountInput" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5">
-                  Reload Top-Up Amount (LKR)
+                  Amount
                 </label>
                 <div class="relative">
                   <input 
@@ -726,74 +626,33 @@
                     min="10" 
                     required 
                     placeholder="Enter amount..." 
-                    class="form-input text-lg font-mono font-bold pl-12"
+                    class="form-input text-base font-mono font-bold pl-12"
                   >
-                  <span class="absolute left-3.5 top-3 text-sm font-bold theme-text-dim">Rs.</span>
+                  <span class="absolute left-3.5 top-3.5 text-xs font-bold theme-text-dim">Rs.</span>
                 </div>
               </div>
+            </div>
 
-              <!-- Live Commission Computation Card -->
-              <div class="p-3.5 rounded-xl theme-bg-subtle border theme-border flex items-center justify-between">
-                <div>
-                  <span class="text-[11px] theme-text-dim uppercase font-semibold">Earned Commission Preview</span>
-                  <div id="reloadCommissionPreview" class="text-xl font-bold text-emerald-400 currency-lkr">Rs. 0.00</div>
-                </div>
-                <div class="text-right">
-                  <span class="text-[11px] theme-text-dim uppercase font-semibold">Applied Rate</span>
-                  <div id="reloadActiveRatePreview" class="text-sm font-mono font-bold text-sky-400">6.80%</div>
-                </div>
+            <!-- Live Commission Preview Card -->
+            <div class="p-3.5 rounded-xl theme-bg-subtle border theme-border flex items-center justify-between">
+              <div>
+                <span class="text-[11px] theme-text-dim uppercase font-semibold">Earned Commission</span>
+                <div id="reloadCommissionPreview" class="text-xl font-bold text-emerald-400 currency-lkr">Rs. 0.00</div>
+              </div>
+              <div class="text-right">
+                <span class="text-[11px] theme-text-dim uppercase font-semibold">Rate</span>
+                <div id="reloadActiveRatePreview" class="text-sm font-mono font-bold text-sky-400">6.80%</div>
               </div>
             </div>
 
             <button 
               type="submit" 
               id="reloadSubmitBtn"
-              class="w-full py-3.5 px-4 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              class="w-full py-3.5 px-4 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition shadow-md flex items-center justify-center gap-2 cursor-pointer glass-btn"
             >
               <span>Record Mobile Reload</span>
             </button>
           </form>
-        </div>
-
-        <!-- Consolidated Summary Metric Block -->
-        <div class="p-5 sm:p-6 rounded-2xl theme-bg-surface theme-border border theme-shadow space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="font-bold text-base theme-text-main">Today's Reload Summary</h3>
-            <button type="button" data-view="logs" class="text-xs font-semibold text-sky-400 hover:underline">
-              View Detailed Ledger in Master Logs →
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="p-4 rounded-xl theme-bg-subtle border theme-border">
-              <span class="text-[11px] theme-text-dim uppercase font-semibold">Total Reload Volume (Rs.)</span>
-              <div id="reloadTodayVolume" class="text-xl sm:text-2xl font-bold theme-text-main currency-lkr mt-1">Rs. 0.00</div>
-            </div>
-            <div class="p-4 rounded-xl theme-bg-subtle border theme-border">
-              <span class="text-[11px] theme-text-dim uppercase font-semibold">Total Earned Commission (Rs.)</span>
-              <div id="reloadTodayCommission" class="text-xl sm:text-2xl font-bold text-emerald-400 currency-lkr mt-1">Rs. 0.00</div>
-            </div>
-          </div>
-
-          <!-- Operator Breakdown Cards -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-            <div class="p-3 rounded-xl theme-bg-subtle border theme-border">
-              <div class="text-xs font-bold text-red-400">Airtel</div>
-              <div id="reloadTodayAirtel" class="text-sm font-bold theme-text-main mt-0.5 currency-lkr">Rs. 0.00</div>
-            </div>
-            <div class="p-3 rounded-xl theme-bg-subtle border theme-border">
-              <div class="text-xs font-bold text-orange-400">Dialog</div>
-              <div id="reloadTodayDialog" class="text-sm font-bold theme-text-main mt-0.5 currency-lkr">Rs. 0.00</div>
-            </div>
-            <div class="p-3 rounded-xl theme-bg-subtle border theme-border">
-              <div class="text-xs font-bold text-sky-400">Mobitel</div>
-              <div id="reloadTodayMobitel" class="text-sm font-bold theme-text-main mt-0.5 currency-lkr">Rs. 0.00</div>
-            </div>
-            <div class="p-3 rounded-xl theme-bg-subtle border theme-border">
-              <div class="text-xs font-bold text-amber-400">Hutch</div>
-              <div id="reloadTodayHutch" class="text-sm font-bold theme-text-main mt-0.5 currency-lkr">Rs. 0.00</div>
-            </div>
-          </div>
         </div>
 
       </section>
@@ -805,12 +664,14 @@
 
         <div class="p-5 sm:p-6 rounded-2xl theme-bg-surface theme-border border theme-shadow space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 class="text-lg sm:text-xl font-bold theme-text-main">Stock Inventory Levels</h2>
-              <p class="text-xs theme-text-muted">Real-time product stock counts, low-stock warnings, and fast intake</p>
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center">
+                <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+              </div>
+              <h2 class="text-xl font-bold theme-text-main">Stock Inventory</h2>
             </div>
-            <button type="button" id="stockOpenCatalogSettingsBtn" class="px-3.5 py-2 rounded-xl text-xs font-bold theme-bg-accent text-white hover:opacity-90 transition">
-              + Manage Catalog Items
+            <button type="button" id="stockOpenCatalogSettingsBtn" class="px-3.5 py-2 rounded-xl text-xs font-bold theme-bg-accent text-white hover:opacity-90 transition glass-btn">
+              + Manage Catalog
             </button>
           </div>
 
@@ -829,13 +690,13 @@
             </div>
 
             <div class="flex items-center gap-1.5 text-xs font-semibold">
-              <button type="button" data-stock-filter="ALL" class="stock-filter-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-subtle">
+              <button type="button" data-stock-filter="ALL" class="stock-filter-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-subtle glass-btn">
                 All Items
               </button>
-              <button type="button" data-stock-filter="LOW" class="stock-filter-btn px-3 py-1.5 rounded-lg border theme-border hover:theme-bg-subtle text-amber-400">
+              <button type="button" data-stock-filter="LOW" class="stock-filter-btn px-3 py-1.5 rounded-lg border theme-border hover:theme-bg-subtle text-amber-400 glass-btn">
                 Low Stock (≤ 5)
               </button>
-              <button type="button" data-stock-filter="OUT" class="stock-filter-btn px-3 py-1.5 rounded-lg border theme-border hover:theme-bg-subtle text-red-400">
+              <button type="button" data-stock-filter="OUT" class="stock-filter-btn px-3 py-1.5 rounded-lg border theme-border hover:theme-bg-subtle text-red-400 glass-btn">
                 Out of Stock
               </button>
             </div>
@@ -851,7 +712,7 @@
                   <th class="py-3 px-3 sm:px-4 font-semibold text-right">Selling Price</th>
                   <th class="py-3 px-3 sm:px-4 font-semibold text-center">Remaining Stock</th>
                   <th class="py-3 px-3 sm:px-4 font-semibold text-center">Status</th>
-                  <th class="py-3 px-3 sm:px-4 font-semibold text-center">Quick Stock Intake</th>
+                  <th class="py-3 px-3 sm:px-4 font-semibold text-center">Quick Restock</th>
                 </tr>
               </thead>
               <tbody id="stockTableBody" class="divide-y theme-border">
@@ -866,43 +727,221 @@
       </section>
 
       <!-- =====================================================================
-           SECTION 5: UNIFIED MASTER LOG MODULE & ADVANCED FILTERING
+           SECTION 5: UNIFIED MASTER LOGS & CONSOLIDATED PERFORMANCE OVERVIEW
            ===================================================================== -->
       <section id="viewLogs" class="app-view hidden space-y-6">
 
-        <!-- Top Header & PDF Report Download Button -->
-        <div class="p-5 sm:p-6 rounded-2xl theme-bg-surface theme-border border theme-shadow flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 class="text-xl font-bold theme-text-main">Master Transaction Logs</h2>
-            <p class="text-xs theme-text-muted mt-0.5">Unified historical records for stationery sales and mobile reloads</p>
+        <!-- Top Header & Action Controls -->
+        <div class="p-4 sm:p-5 rounded-2xl theme-bg-surface theme-border border theme-shadow flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            </div>
+            <h2 class="text-xl font-bold theme-text-main">Master Logs</h2>
           </div>
 
-          <!-- Download Professional PDF Report Button -->
-          <button 
-            type="button" 
-            id="downloadPdfReportBtn"
-            class="px-4 py-2.5 rounded-xl font-bold text-xs text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition shadow-md flex items-center gap-2 cursor-pointer"
-          >
-            <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            <span>Download PDF Report</span>
-          </button>
+          <div class="flex items-center gap-2">
+            <button 
+              type="button" 
+              id="resetMetricCardsLayoutBtn" 
+              class="px-3 py-2 rounded-xl text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition glass-btn"
+              title="Reset Cards Layout"
+            >
+              Reset Layout
+            </button>
+            <button 
+              type="button" 
+              id="downloadPdfReportBtn"
+              class="px-4 py-2.5 rounded-xl font-bold text-xs text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition shadow-md flex items-center gap-2 cursor-pointer glass-btn"
+            >
+              <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Download PDF Report</span>
+            </button>
+          </div>
         </div>
 
-        <!-- Advanced Filtering Controls Bar -->
+        <!-- ===================================================================
+             CENTRALIZED UNIFIED PERFORMANCE OVERVIEW AREA (DRAGGABLE & RESIZABLE)
+             =================================================================== -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between px-1">
+            <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Consolidated Performance Overview</span>
+            <span class="text-[11px] theme-text-dim">Drag cards to reorder • Use resize button to toggle width</span>
+          </div>
+
+          <div id="masterLogsMetricsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            
+            <!-- Card 1: Today's Stationery -->
+            <div class="metric-card metric-card-normal p-4 rounded-2xl theme-bg-surface theme-border border theme-shadow" data-card-id="card-today-stationery" draggable="true">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Today's Stationery</span>
+                <div class="flex items-center gap-1">
+                  <button type="button" class="card-resize-btn p-1 text-xs theme-text-dim hover:theme-text-main rounded" title="Resize card">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                  </button>
+                  <span class="metric-card-drag-handle p-1 text-xs theme-text-dim hover:theme-text-main" title="Drag to reorder">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+                  </span>
+                </div>
+              </div>
+              <div class="text-xl sm:text-2xl font-bold theme-text-main currency-lkr" id="logCardStatSales">Rs. 0.00</div>
+              <div class="text-xs theme-text-dim mt-1 font-mono">
+                <span id="logCardStatUnits">0</span> units sold • <span id="logCardStatTx">0</span> txs
+              </div>
+            </div>
+
+            <!-- Card 2: Today's Reloads -->
+            <div class="metric-card metric-card-normal p-4 rounded-2xl theme-bg-surface theme-border border theme-shadow" data-card-id="card-today-reloads" draggable="true">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Today's Reloads</span>
+                <div class="flex items-center gap-1">
+                  <button type="button" class="card-resize-btn p-1 text-xs theme-text-dim hover:theme-text-main rounded" title="Resize card">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                  </button>
+                  <span class="metric-card-drag-handle p-1 text-xs theme-text-dim hover:theme-text-main" title="Drag to reorder">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+                  </span>
+                </div>
+              </div>
+              <div class="text-xl sm:text-2xl font-bold theme-text-main currency-lkr" id="logCardReloadVol">Rs. 0.00</div>
+              <div class="text-xs text-emerald-400 font-bold mt-1 currency-lkr" id="logCardReloadComm">+Rs. 0.00 Comm.</div>
+            </div>
+
+            <!-- Card 3: Combined Store Revenue -->
+            <div class="metric-card metric-card-normal p-4 rounded-2xl theme-bg-surface theme-border border theme-shadow" data-card-id="card-combined-revenue" draggable="true">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-sky-400">Total Today Revenue</span>
+                <div class="flex items-center gap-1">
+                  <button type="button" class="card-resize-btn p-1 text-xs theme-text-dim hover:theme-text-main rounded" title="Resize card">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                  </button>
+                  <span class="metric-card-drag-handle p-1 text-xs theme-text-dim hover:theme-text-main" title="Drag to reorder">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+                  </span>
+                </div>
+              </div>
+              <div class="text-xl sm:text-2xl font-bold text-emerald-400 currency-lkr" id="logCardCombinedRevenue">Rs. 0.00</div>
+              <div class="text-xs theme-text-dim mt-1 font-mono">Sales + Earned Commissions</div>
+            </div>
+
+            <!-- Card 4: Monthly Performance Statement -->
+            <div class="metric-card metric-card-normal p-4 rounded-2xl theme-bg-surface theme-border border theme-shadow" data-card-id="card-monthly-analytics" draggable="true">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Monthly Statement</span>
+                  <input type="month" id="logAnalyticsMonthPicker" class="form-input text-[11px] py-0.5 px-1.5 w-auto cursor-pointer">
+                </div>
+                <div class="flex items-center gap-1">
+                  <button type="button" class="card-resize-btn p-1 text-xs theme-text-dim hover:theme-text-main rounded" title="Resize card">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                  </button>
+                  <span class="metric-card-drag-handle p-1 text-xs theme-text-dim hover:theme-text-main" title="Drag to reorder">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+                  </span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-xs pt-1">
+                <div>
+                  <span class="text-[10px] theme-text-dim">Sales:</span>
+                  <div class="font-bold theme-text-main currency-lkr" id="logCardMonthSales">Rs. 0.00</div>
+                </div>
+                <div>
+                  <span class="text-[10px] theme-text-dim">Reloads:</span>
+                  <div class="font-bold theme-text-main currency-lkr" id="logCardMonthReload">Rs. 0.00</div>
+                </div>
+                <div>
+                  <span class="text-[10px] theme-text-dim">Commissions:</span>
+                  <div class="font-bold text-emerald-400 currency-lkr" id="logCardMonthComm">Rs. 0.00</div>
+                </div>
+                <div>
+                  <span class="text-[10px] theme-text-dim">Net Revenue:</span>
+                  <div class="font-bold text-sky-400 currency-lkr" id="logCardMonthNet">Rs. 0.00</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 5: Annual YTD Statement -->
+            <div class="metric-card metric-card-normal p-4 rounded-2xl theme-bg-surface theme-border border theme-shadow" data-card-id="card-yearly-analytics" draggable="true">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Annual YTD Statement (<span id="logCardYearLabel">2026</span>)</span>
+                <div class="flex items-center gap-1">
+                  <button type="button" class="card-resize-btn p-1 text-xs theme-text-dim hover:theme-text-main rounded" title="Resize card">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                  </button>
+                  <span class="metric-card-drag-handle p-1 text-xs theme-text-dim hover:theme-text-main" title="Drag to reorder">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+                  </span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-xs pt-1">
+                <div>
+                  <span class="text-[10px] theme-text-dim">Sales YTD:</span>
+                  <div class="font-bold theme-text-main currency-lkr" id="logCardYearSales">Rs. 0.00</div>
+                </div>
+                <div>
+                  <span class="text-[10px] theme-text-dim">Reloads YTD:</span>
+                  <div class="font-bold theme-text-main currency-lkr" id="logCardYearReload">Rs. 0.00</div>
+                </div>
+                <div>
+                  <span class="text-[10px] theme-text-dim">Commissions:</span>
+                  <div class="font-bold text-emerald-400 currency-lkr" id="logCardYearComm">Rs. 0.00</div>
+                </div>
+                <div>
+                  <span class="text-[10px] theme-text-dim">Store Revenue:</span>
+                  <div class="font-bold text-sky-400 currency-lkr" id="logCardYearNet">Rs. 0.00</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 6: Operator Reload Breakdown -->
+            <div class="metric-card metric-card-normal p-4 rounded-2xl theme-bg-surface theme-border border theme-shadow" data-card-id="card-operator-breakdown" draggable="true">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Operator Breakdown (Today)</span>
+                <div class="flex items-center gap-1">
+                  <button type="button" class="card-resize-btn p-1 text-xs theme-text-dim hover:theme-text-main rounded" title="Resize card">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                  </button>
+                  <span class="metric-card-drag-handle p-1 text-xs theme-text-dim hover:theme-text-main" title="Drag to reorder">
+                    <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+                  </span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-xs pt-0.5">
+                <div class="p-1.5 rounded theme-bg-subtle">
+                  <span class="text-[10px] font-bold text-red-400">Airtel</span>
+                  <div class="font-bold currency-lkr text-[11px]" id="logCardAirtelVol">Rs. 0.00</div>
+                </div>
+                <div class="p-1.5 rounded theme-bg-subtle">
+                  <span class="text-[10px] font-bold text-orange-400">Dialog</span>
+                  <div class="font-bold currency-lkr text-[11px]" id="logCardDialogVol">Rs. 0.00</div>
+                </div>
+                <div class="p-1.5 rounded theme-bg-subtle">
+                  <span class="text-[10px] font-bold text-sky-400">Mobitel</span>
+                  <div class="font-bold currency-lkr text-[11px]" id="logCardMobitelVol">Rs. 0.00</div>
+                </div>
+                <div class="p-1.5 rounded theme-bg-subtle">
+                  <span class="text-[10px] font-bold text-amber-400">Hutch</span>
+                  <div class="font-bold currency-lkr text-[11px]" id="logCardHutchVol">Rs. 0.00</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Advanced Date & Category Filtering Controls -->
         <div class="p-5 sm:p-6 rounded-2xl theme-bg-surface theme-border border theme-shadow space-y-4">
-          
-          <!-- Category Filter Tabs: All, Stationery, Reloads -->
           <div class="flex flex-wrap items-center justify-between gap-3 border-b theme-border pb-3">
             <div class="flex items-center gap-2">
               <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Category:</span>
               <div class="flex items-center gap-1 text-xs font-semibold">
-                <button type="button" data-log-cat="ALL" class="log-cat-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-accent text-white">
+                <button type="button" data-log-cat="ALL" class="log-cat-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-accent text-white glass-btn">
                   All Records
                 </button>
-                <button type="button" data-log-cat="STATIONERY" class="log-cat-btn px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text-main">
+                <button type="button" data-log-cat="STATIONERY" class="log-cat-btn px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text-main glass-btn">
                   Stationery Sales
                 </button>
-                <button type="button" data-log-cat="RELOAD" class="log-cat-btn px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text-main">
+                <button type="button" data-log-cat="RELOAD" class="log-cat-btn px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text-main glass-btn">
                   Mobile Reloads
                 </button>
               </div>
@@ -910,13 +949,13 @@
 
             <!-- Quick Date Filters -->
             <div class="flex items-center gap-1.5 text-xs font-semibold">
-              <button type="button" id="logFilterTodayBtn" class="px-2.5 py-1.5 rounded-lg theme-bg-subtle border theme-border hover:theme-bg-elevated transition">
+              <button type="button" id="logFilterTodayBtn" class="px-2.5 py-1.5 rounded-lg theme-bg-subtle border theme-border hover:theme-bg-elevated transition glass-btn">
                 Today
               </button>
-              <button type="button" id="logFilterYesterdayBtn" class="px-2.5 py-1.5 rounded-lg theme-bg-subtle border theme-border hover:theme-bg-elevated transition">
+              <button type="button" id="logFilterYesterdayBtn" class="px-2.5 py-1.5 rounded-lg theme-bg-subtle border theme-border hover:theme-bg-elevated transition glass-btn">
                 Yesterday
               </button>
-              <button type="button" id="logFilterThisMonthBtn" class="px-2.5 py-1.5 rounded-lg theme-bg-subtle border theme-border hover:theme-bg-elevated transition">
+              <button type="button" id="logFilterThisMonthBtn" class="px-2.5 py-1.5 rounded-lg theme-bg-subtle border theme-border hover:theme-bg-elevated transition glass-btn">
                 This Month
               </button>
             </div>
@@ -933,17 +972,17 @@
               <input type="date" id="logDateTo" class="form-input text-xs py-2">
             </div>
             <div>
-              <button type="button" id="applyLogDateRangeBtn" class="w-full py-2 px-4 rounded-xl text-xs font-bold theme-bg-subtle border theme-border hover:theme-bg-elevated transition flex items-center justify-center gap-1.5">
+              <button type="button" id="applyLogDateRangeBtn" class="w-full py-2 px-4 rounded-xl text-xs font-bold theme-bg-subtle border theme-border hover:theme-bg-elevated transition flex items-center justify-center gap-1.5 glass-btn">
                 <svg class="icon-svg-sm" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
                 <span>Apply Date Filter</span>
               </button>
             </div>
           </div>
 
-          <!-- Filtered Period Summary KPI Metrics Bar -->
-          <div class="p-4 rounded-xl theme-bg-subtle border theme-border grid grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+          <!-- Filtered Period Summary KPI Bar -->
+          <div class="p-3.5 rounded-xl theme-bg-subtle border theme-border grid grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
             <div>
-              <span class="theme-text-dim block">Stationery Sales</span>
+              <span class="theme-text-dim block">Filtered Stationery</span>
               <span id="logSummaryStatSales" class="font-bold text-sm sm:text-base theme-text-main currency-lkr">Rs. 0.00</span>
             </div>
             <div>
@@ -951,21 +990,21 @@
               <span id="logSummaryUnitsSold" class="font-bold text-sm sm:text-base text-sky-400 font-mono">0</span>
             </div>
             <div>
-              <span class="theme-text-dim block">Reload Volume</span>
+              <span class="theme-text-dim block">Filtered Reloads</span>
               <span id="logSummaryReloadVol" class="font-bold text-sm sm:text-base theme-text-main currency-lkr">Rs. 0.00</span>
             </div>
             <div>
-              <span class="theme-text-dim block">Reload Commissions</span>
+              <span class="theme-text-dim block">Commissions</span>
               <span id="logSummaryReloadComm" class="font-bold text-sm sm:text-base text-emerald-400 currency-lkr">Rs. 0.00</span>
             </div>
             <div class="col-span-2 lg:col-span-1 border-t sm:border-t-0 sm:border-l theme-border pt-2 sm:pt-0 sm:pl-3">
-              <span class="theme-text-dim block font-bold text-sky-400">Total Period Revenue</span>
+              <span class="theme-text-dim block font-bold text-sky-400">Period Total</span>
               <span id="logSummaryTotalRevenue" class="font-bold text-base sm:text-lg text-emerald-400 currency-lkr">Rs. 0.00</span>
             </div>
           </div>
         </div>
 
-        <!-- Master Log Table -->
+        <!-- Master Log Records Table -->
         <div class="p-5 sm:p-6 rounded-2xl theme-bg-surface theme-border border theme-shadow space-y-4">
           <div class="flex items-center justify-between">
             <h3 class="font-bold text-sm sm:text-base theme-text-main">
@@ -982,7 +1021,8 @@
                 <tr class="theme-bg-subtle border-b theme-border uppercase theme-text-muted">
                   <th class="py-3 px-3 sm:px-4 font-semibold whitespace-nowrap">Date / Time</th>
                   <th class="py-3 px-3 sm:px-4 font-semibold">Type</th>
-                  <th class="py-3 px-3 sm:px-4 font-semibold">Item / Network</th>
+                  <th class="py-3 px-3 sm:px-4 font-semibold">Item / Operator</th>
+                  <th class="py-3 px-3 sm:px-4 font-semibold">Mobile Number</th>
                   <th class="py-3 px-3 sm:px-4 font-semibold text-center">Qty / Rate</th>
                   <th class="py-3 px-3 sm:px-4 font-semibold text-right">Amount (LKR)</th>
                   <th class="py-3 px-3 sm:px-4 font-semibold text-right">Earnings / Profit</th>
@@ -991,7 +1031,7 @@
               </thead>
               <tbody id="masterLogTableBody" class="divide-y theme-border font-medium">
                 <tr>
-                  <td colspan="7" class="py-10 text-center theme-text-dim">
+                  <td colspan="8" class="py-10 text-center theme-text-dim">
                     Loading records...
                   </td>
                 </tr>
@@ -1038,7 +1078,7 @@
       
       <!-- Modal Header -->
       <div class="px-5 py-4 border-b theme-border flex items-center justify-between theme-bg-subtle">
-        <h3 class="font-bold text-base sm:text-lg theme-text-main">System Settings & Master Catalog</h3>
+        <h3 class="font-bold text-base sm:text-lg theme-text-main">System Settings</h3>
         <button type="button" id="closeSettingsBtn" class="tap-target w-8 h-8 rounded-lg hover:theme-bg-elevated theme-text-dim hover:theme-text-main transition text-lg font-bold flex items-center justify-center">
           ✕
         </button>
@@ -1047,16 +1087,19 @@
       <!-- Settings Sub-Navigation Tabs -->
       <div class="px-4 py-2 border-b theme-border flex items-center gap-2 overflow-x-auto text-xs font-semibold select-none theme-bg-subtle">
         <button type="button" data-settings-tab="catalog" class="settings-tab-btn active px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
-          Master Inventory Catalog
+          Inventory Catalog
+        </button>
+        <button type="button" data-settings-tab="presets" class="settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
+          Reload Presets
         </button>
         <button type="button" data-settings-tab="rates" class="settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
           Commission Rates
         </button>
+        <button type="button" data-settings-tab="themes" class="settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
+          Themes & Glass UI
+        </button>
         <button type="button" data-settings-tab="security" class="settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
           Account Security
-        </button>
-        <button type="button" data-settings-tab="themes" class="settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
-          Theme Switcher
         </button>
         <button type="button" data-settings-tab="developer" class="settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
           Debug Console
@@ -1066,7 +1109,7 @@
       <!-- Settings Modal Content Body -->
       <div class="p-5 overflow-y-auto flex-1 space-y-6">
 
-        <!-- SUB-PANEL 1: MASTER INVENTORY CATALOG (Operating strictly on Selling Price and Stock Quantity) -->
+        <!-- SUB-PANEL 1: MASTER INVENTORY CATALOG -->
         <div id="settingsPanelCatalog" class="settings-panel space-y-5">
           <div class="p-4 rounded-xl theme-bg-subtle border theme-border">
             <h4 class="font-bold text-sm theme-text-main mb-3 flex items-center justify-between">
@@ -1094,9 +1137,8 @@
                 <input type="number" step="0.01" min="0" id="catalogSellingPrice" required placeholder="0.00" class="form-input text-xs font-mono font-bold">
               </div>
 
-              <!-- Mandatory Initial Stock Quantity Field -->
               <div>
-                <label for="catalogStockQuantity" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1">Initial Stock / Quantity</label>
+                <label for="catalogStockQuantity" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1">Initial Stock</label>
                 <input type="number" step="1" min="0" id="catalogStockQuantity" required placeholder="0" value="50" class="form-input text-xs font-mono font-bold">
               </div>
 
@@ -1104,7 +1146,7 @@
                 <button type="button" id="seedCatalogBtn" class="text-xs theme-text-dim hover:theme-accent transition underline">
                   Seed Standard Stationery Items with Stock
                 </button>
-                <button type="submit" id="catalogSaveBtn" class="px-5 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition">
+                <button type="submit" id="catalogSaveBtn" class="px-5 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition glass-btn">
                   Save Item to Catalog
                 </button>
               </div>
@@ -1139,12 +1181,52 @@
           </div>
         </div>
 
-        <!-- SUB-PANEL 2: RELOAD COMMISSION RATE MANAGER -->
+        <!-- SUB-PANEL 2: QUICK PRESET AMOUNT CUSTOMIZATION -->
+        <div id="settingsPanelPresets" class="settings-panel hidden space-y-5">
+          <div class="p-4 rounded-xl theme-bg-subtle border theme-border space-y-4">
+            <h4 class="font-bold text-sm theme-text-main">Quick Preset Reload Amounts</h4>
+            <p class="text-xs theme-text-muted">
+              Configure the quick-preset amount buttons displayed in the Mobile Reloads interface.
+            </p>
+
+            <!-- Active Presets Display -->
+            <div>
+              <span class="block text-xs font-semibold theme-text-muted mb-2">Active Reload Presets</span>
+              <div id="settingsPresetsList" class="flex flex-wrap gap-2">
+                <!-- Dynamically populated tags with delete button -->
+              </div>
+            </div>
+
+            <!-- Add New Preset Form -->
+            <form id="addPresetForm" class="flex items-center gap-2 pt-2">
+              <div class="relative max-w-xs flex-1">
+                <input 
+                  type="number" 
+                  id="newPresetAmountInput" 
+                  step="1" 
+                  min="10" 
+                  placeholder="e.g. 250" 
+                  required 
+                  class="form-input text-xs font-mono font-bold pl-8"
+                >
+                <span class="absolute left-2.5 top-2.5 text-xs font-bold theme-text-dim">Rs.</span>
+              </div>
+              <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition glass-btn">
+                Add Preset
+              </button>
+              <button type="button" id="resetPresetsDefaultBtn" class="px-3 py-2 rounded-xl text-xs font-semibold theme-bg-surface border theme-border hover:theme-bg-elevated transition glass-btn">
+                Reset Defaults
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- SUB-PANEL 3: RELOAD COMMISSION RATE MANAGER -->
         <div id="settingsPanelRates" class="settings-panel hidden space-y-5">
           <div class="p-4 rounded-xl theme-bg-subtle border theme-border">
             <h4 class="font-bold text-sm theme-text-main mb-1">Network Commission Percentages</h4>
             <p class="text-xs theme-text-muted mb-4">
-              Configure default commission rates for all network operators. Changes sync immediately with Firestore.
+              Configure default commission rates for all network operators.
             </p>
 
             <form id="commissionsForm" class="space-y-4">
@@ -1179,7 +1261,7 @@
               </div>
 
               <div class="flex justify-end pt-2">
-                <button type="submit" class="px-5 py-2.5 rounded-xl font-bold text-xs text-white theme-bg-accent hover:opacity-90 transition">
+                <button type="submit" class="px-5 py-2.5 rounded-xl font-bold text-xs text-white theme-bg-accent hover:opacity-90 transition glass-btn">
                   Save Commission Rates
                 </button>
               </div>
@@ -1187,23 +1269,90 @@
           </div>
         </div>
 
-        <!-- SUB-PANEL 3: ACCOUNT & SECURITY SETTINGS -->
+        <!-- SUB-PANEL 4: THEMES & GLASS UI TOGGLE -->
+        <div id="settingsPanelThemes" class="settings-panel hidden space-y-5">
+          <!-- Glassmorphism Style Toggle -->
+          <div class="p-4 rounded-xl theme-bg-subtle border theme-border flex items-center justify-between">
+            <div>
+              <div class="font-bold text-sm theme-text-main">iOS Glass UI (Frosted Glass Effect)</div>
+              <div class="text-xs theme-text-muted">Enable Apple iOS-inspired translucent blur and surface sheen</div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="uiStyleGlassToggle" class="sr-only peer" checked>
+              <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
+            </label>
+          </div>
+
+          <!-- Color Themes -->
+          <div class="space-y-3">
+            <h5 class="text-xs font-bold uppercase tracking-wider theme-text-muted">Color Palette</h5>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <button type="button" data-theme-choice="modern-slate" class="theme-choice-card text-left p-4 rounded-xl border theme-border hover:border-sky-500 transition relative glass-btn">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-bold text-sm">Modern Slate</span>
+                  <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-mono">Dark</span>
+                </div>
+                <div class="flex gap-1.5 mt-2">
+                  <span class="w-5 h-5 rounded-full bg-[#0b1120] border border-gray-600"></span>
+                  <span class="w-5 h-5 rounded-full bg-[#1e293b]"></span>
+                  <span class="w-5 h-5 rounded-full bg-[#38bdf8]"></span>
+                </div>
+              </button>
+
+              <button type="button" data-theme-choice="emerald-store" class="theme-choice-card text-left p-4 rounded-xl border theme-border hover:border-emerald-500 transition relative glass-btn">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-bold text-sm">Emerald Store</span>
+                  <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-600 font-mono">Light</span>
+                </div>
+                <div class="flex gap-1.5 mt-2">
+                  <span class="w-5 h-5 rounded-full bg-[#f0fdf4] border border-gray-300"></span>
+                  <span class="w-5 h-5 rounded-full bg-[#ffffff] border border-gray-300"></span>
+                  <span class="w-5 h-5 rounded-full bg-[#059669]"></span>
+                </div>
+              </button>
+
+              <button type="button" data-theme-choice="sapphire-blue" class="theme-choice-card text-left p-4 rounded-xl border theme-border hover:border-blue-500 transition relative glass-btn">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-bold text-sm">Sapphire Blue</span>
+                  <span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">Midnight</span>
+                </div>
+                <div class="flex gap-1.5 mt-2">
+                  <span class="w-5 h-5 rounded-full bg-[#060d1f] border border-gray-600"></span>
+                  <span class="w-5 h-5 rounded-full bg-[#0f1c3f]"></span>
+                  <span class="w-5 h-5 rounded-full bg-[#3b82f6]"></span>
+                </div>
+              </button>
+
+              <button type="button" data-theme-choice="warm-amber" class="theme-choice-card text-left p-4 rounded-xl border theme-border hover:border-amber-500 transition relative glass-btn">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-bold text-sm">Warm Amber</span>
+                  <span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 font-mono">Parchment</span>
+                </div>
+                <div class="flex gap-1.5 mt-2">
+                  <span class="w-5 h-5 rounded-full bg-[#fffbeb] border border-gray-300"></span>
+                  <span class="w-5 h-5 rounded-full bg-[#ffffff] border border-gray-300"></span>
+                  <span class="w-5 h-5 rounded-full bg-[#d97706]"></span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-PANEL 5: ACCOUNT & SECURITY -->
         <div id="settingsPanelSecurity" class="settings-panel hidden space-y-5">
-          <!-- Update Email -->
           <div class="p-4 rounded-xl theme-bg-subtle border theme-border space-y-3">
             <h4 class="font-bold text-sm theme-text-main">Update Login Email</h4>
             <form id="updateEmailForm" class="space-y-3">
               <div>
-                <label for="newEmailInput" class="block text-xs font-semibold theme-text-muted mb-1">New Email Address</label>
+                <label for="newEmailInput" class="block text-xs font-semibold theme-text-muted mb-1">New Email</label>
                 <input type="email" id="newEmailInput" required placeholder="newemail@example.com" class="form-input text-xs">
               </div>
-              <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition">
-                Update Account Email
+              <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition glass-btn">
+                Update Email
               </button>
             </form>
           </div>
 
-          <!-- Update Password -->
           <div class="p-4 rounded-xl theme-bg-subtle border theme-border space-y-3">
             <h4 class="font-bold text-sm theme-text-main">Change Password</h4>
             <form id="updatePasswordForm" class="space-y-3">
@@ -1212,94 +1361,32 @@
                 <input type="password" id="newPasswordInput" required minlength="6" placeholder="••••••••" class="form-input text-xs">
               </div>
               <div>
-                <label for="confirmPasswordInput" class="block text-xs font-semibold theme-text-muted mb-1">Confirm New Password</label>
+                <label for="confirmPasswordInput" class="block text-xs font-semibold theme-text-muted mb-1">Confirm Password</label>
                 <input type="password" id="confirmPasswordInput" required minlength="6" placeholder="••••••••" class="form-input text-xs">
               </div>
-              <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition">
+              <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition glass-btn">
                 Update Password
               </button>
             </form>
           </div>
 
-          <!-- Sign Out Action -->
           <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-between">
             <div>
               <div class="font-bold text-sm text-red-400">Sign Out Session</div>
               <div class="text-xs theme-text-muted">Safely disconnect from this device</div>
             </div>
-            <button type="button" id="signOutBtn" class="px-4 py-2 rounded-xl text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition">
+            <button type="button" id="signOutBtn" class="px-4 py-2 rounded-xl text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition glass-btn">
               Sign Out
             </button>
           </div>
         </div>
 
-        <!-- SUB-PANEL 4: PROFESSIONAL MULTI-THEME SWITCHER -->
-        <div id="settingsPanelThemes" class="settings-panel hidden space-y-4">
-          <p class="text-xs theme-text-muted">
-            Select an enterprise color theme. Setting persists in browser memory.
-          </p>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <button type="button" data-theme-choice="modern-slate" class="theme-choice-card text-left p-4 rounded-xl border theme-border hover:border-sky-500 transition relative">
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-bold text-sm">Modern Slate</span>
-                <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-mono">Default</span>
-              </div>
-              <p class="text-xs theme-text-muted mb-3">High-contrast modern dark mode with sky cyan accents.</p>
-              <div class="flex gap-1.5">
-                <span class="w-5 h-5 rounded-full bg-[#0b1120] border border-gray-600"></span>
-                <span class="w-5 h-5 rounded-full bg-[#1e293b]"></span>
-                <span class="w-5 h-5 rounded-full bg-[#38bdf8]"></span>
-              </div>
-            </button>
-
-            <button type="button" data-theme-choice="emerald-store" class="theme-choice-card text-left p-4 rounded-xl border theme-border hover:border-emerald-500 transition relative">
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-bold text-sm">Emerald Store</span>
-                <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-600 font-mono">Fresh Light</span>
-              </div>
-              <p class="text-xs theme-text-muted mb-3">Clean light counter theme with fresh emerald green accents.</p>
-              <div class="flex gap-1.5">
-                <span class="w-5 h-5 rounded-full bg-[#f0fdf4] border border-gray-300"></span>
-                <span class="w-5 h-5 rounded-full bg-[#ffffff] border border-gray-300"></span>
-                <span class="w-5 h-5 rounded-full bg-[#059669]"></span>
-              </div>
-            </button>
-
-            <button type="button" data-theme-choice="sapphire-blue" class="theme-choice-card text-left p-4 rounded-xl border theme-border hover:border-blue-500 transition relative">
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-bold text-sm">Sapphire Blue</span>
-                <span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">Pro Dark</span>
-              </div>
-              <p class="text-xs theme-text-muted mb-3">Professional midnight sapphire navy with royal blue accents.</p>
-              <div class="flex gap-1.5">
-                <span class="w-5 h-5 rounded-full bg-[#060d1f] border border-gray-600"></span>
-                <span class="w-5 h-5 rounded-full bg-[#0f1c3f]"></span>
-                <span class="w-5 h-5 rounded-full bg-[#3b82f6]"></span>
-              </div>
-            </button>
-
-            <button type="button" data-theme-choice="warm-amber" class="theme-choice-card text-left p-4 rounded-xl border theme-border hover:border-amber-500 transition relative">
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-bold text-sm">Warm Amber</span>
-                <span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 font-mono">Warm Light</span>
-              </div>
-              <p class="text-xs theme-text-muted mb-3">Soft parchment cream counter theme with warm gold accents.</p>
-              <div class="flex gap-1.5">
-                <span class="w-5 h-5 rounded-full bg-[#fffbeb] border border-gray-300"></span>
-                <span class="w-5 h-5 rounded-full bg-[#ffffff] border border-gray-300"></span>
-                <span class="w-5 h-5 rounded-full bg-[#d97706]"></span>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        <!-- SUB-PANEL 5: HIDDEN DEVELOPER DEBUGGER -->
+        <!-- SUB-PANEL 6: DEVELOPER DEBUGGER -->
         <div id="settingsPanelDeveloper" class="settings-panel hidden space-y-4">
           <div class="flex items-center justify-between p-3.5 rounded-xl theme-bg-subtle border theme-border">
             <div>
               <div class="font-bold text-xs theme-text-main">Developer Debug Console</div>
-              <div class="text-[11px] theme-text-muted">Live Firestore health diagnostics and cache management</div>
+              <div class="text-[11px] theme-text-muted">Live Firestore health diagnostics</div>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="devConsoleToggle" class="sr-only peer">
@@ -1324,16 +1411,16 @@
             </div>
 
             <div class="flex flex-wrap gap-2">
-              <button type="button" id="dbgTestWriteBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated">
+              <button type="button" id="dbgTestWriteBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated glass-btn">
                 Test Firestore Ping
               </button>
-              <button type="button" id="dbgExportDataBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated">
+              <button type="button" id="dbgExportDataBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated glass-btn">
                 Export JSON Backup
               </button>
-              <button type="button" id="dbgClearCacheBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20">
+              <button type="button" id="dbgClearCacheBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 glass-btn">
                 Clear Local Cache
               </button>
-              <button type="button" id="dbgClearLogsBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-text-dim hover:theme-text-main ml-auto">
+              <button type="button" id="dbgClearLogsBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-text-dim hover:theme-text-main ml-auto glass-btn">
                 Clear Log
               </button>
             </div>
@@ -1349,7 +1436,7 @@
   </div>
 
   <!-- =========================================================================
-       EDIT STATIONERY TRANSACTION MODAL
+       EDIT STATIONERY RECORD MODAL
        ========================================================================= -->
   <div id="editStationeryModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
     <div class="w-full max-w-md rounded-2xl theme-bg-surface theme-border border theme-shadow p-6 relative">
@@ -1382,10 +1469,10 @@
           <span id="editStatTotalPreview" class="font-bold text-emerald-400 currency-lkr">Rs. 0.00</span>
         </div>
         <div class="flex justify-end gap-2 pt-2">
-          <button type="button" id="cancelEditStatBtn" class="px-3 py-2 rounded-xl text-xs font-semibold theme-bg-subtle border theme-border">
+          <button type="button" id="cancelEditStatBtn" class="px-3 py-2 rounded-xl text-xs font-semibold theme-bg-subtle border theme-border glass-btn">
             Cancel
           </button>
-          <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent">
+          <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent glass-btn">
             Save Changes
           </button>
         </div>
@@ -1412,10 +1499,10 @@
           placeholder="your-email@example.com"
         >
         <div class="flex justify-end gap-2">
-          <button type="button" id="cancelResetBtn" class="px-3 py-2 rounded-xl text-xs font-semibold theme-bg-subtle border theme-border">
+          <button type="button" id="cancelResetBtn" class="px-3 py-2 rounded-xl text-xs font-semibold theme-bg-subtle border theme-border glass-btn">
             Cancel
           </button>
-          <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent">
+          <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent glass-btn">
             Send Reset Link
           </button>
         </div>

@@ -1,6 +1,6 @@
 /* ==========================================================================
-   AL COMMUNICATION - PROFESSIONAL POS & TRANSACTION LOG SYSTEM
-   Enterprise-Grade Styling, Dynamic Theme Engine & Responsive Layout
+   AL COMMUNICATION - VERSION 2 (UI POLISH, GLASSMORPHISM & MOBILE FIXES)
+   High-Performance CSS, Dynamic Theme Engine, iOS Glass & Card Customization
    ========================================================================== */
 
 /* Root Theme Definitions: 4 Switchable Color Palettes */
@@ -27,6 +27,13 @@
   --danger-bg: rgba(239, 68, 68, 0.15);
   --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
   --header-bg: rgba(15, 23, 42, 0.90);
+
+  /* Glassmorphism Variables */
+  --glass-surface: rgba(30, 41, 59, 0.72);
+  --glass-elevated: rgba(51, 65, 85, 0.78);
+  --glass-subtle: rgba(15, 23, 42, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45);
 }
 
 /* Theme 2: Emerald Store (Light / Fresh Green Accent) */
@@ -51,6 +58,13 @@
   --danger-bg: rgba(220, 38, 38, 0.15);
   --card-shadow: 0 10px 25px -5px rgba(6, 78, 59, 0.08), 0 8px 10px -6px rgba(6, 78, 59, 0.05);
   --header-bg: rgba(240, 253, 244, 0.94);
+
+  /* Glassmorphism Variables */
+  --glass-surface: rgba(255, 255, 255, 0.82);
+  --glass-elevated: rgba(247, 254, 231, 0.85);
+  --glass-subtle: rgba(220, 252, 231, 0.75);
+  --glass-border: rgba(5, 150, 105, 0.22);
+  --glass-shadow: 0 12px 36px 0 rgba(6, 78, 59, 0.12);
 }
 
 /* Theme 3: Sapphire Blue (Professional Dark) */
@@ -75,6 +89,13 @@
   --danger-bg: rgba(239, 68, 68, 0.15);
   --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
   --header-bg: rgba(9, 18, 41, 0.92);
+
+  /* Glassmorphism Variables */
+  --glass-surface: rgba(15, 28, 63, 0.76);
+  --glass-elevated: rgba(26, 46, 99, 0.82);
+  --glass-subtle: rgba(9, 18, 41, 0.70);
+  --glass-border: rgba(59, 130, 246, 0.24);
+  --glass-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.55);
 }
 
 /* Theme 4: Warm Amber (Light / Gold Accent) */
@@ -99,9 +120,16 @@
   --danger-bg: rgba(220, 38, 38, 0.15);
   --card-shadow: 0 10px 25px -5px rgba(69, 26, 3, 0.08), 0 8px 10px -6px rgba(69, 26, 3, 0.05);
   --header-bg: rgba(255, 251, 235, 0.94);
+
+  /* Glassmorphism Variables */
+  --glass-surface: rgba(255, 255, 255, 0.84);
+  --glass-elevated: rgba(254, 243, 199, 0.86);
+  --glass-subtle: rgba(253, 230, 138, 0.75);
+  --glass-border: rgba(217, 119, 6, 0.24);
+  --glass-shadow: 0 12px 36px 0 rgba(69, 26, 3, 0.12);
 }
 
-/* Base Resets & Global Application Styles */
+/* Global Application Resets */
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -111,14 +139,15 @@ html, body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background-color: var(--bg-app);
   color: var(--text-main);
-  transition: background-color 0.25s ease, color 0.25s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
   overflow-x: hidden;
+  width: 100%;
 }
 
-/* Prevent auto-zooming on mobile iOS devices when focusing inputs */
+/* Mobile input zoom prevention & minimum touch size */
 input, select, textarea, button {
   font-size: 16px;
   touch-action: manipulation;
@@ -137,13 +166,86 @@ input, select, textarea, button {
 .theme-bg-accent { background-color: var(--accent); }
 .theme-bg-accent-light { background-color: var(--accent-light); }
 .theme-shadow { box-shadow: var(--card-shadow); }
+
 .theme-header {
   background-color: var(--header-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
-/* Currency Styling */
+/* ==========================================================================
+   APPLE iOS-INSPIRED GLASSMORPHISM STYLE ENGINE ([data-ui-style="glass"])
+   ========================================================================== */
+[data-ui-style="glass"] .theme-bg-surface,
+[data-ui-style="glass"] .app-glass-card {
+  background-color: var(--glass-surface) !important;
+  backdrop-filter: blur(20px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(190%) !important;
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+
+[data-ui-style="glass"] .theme-bg-subtle {
+  background-color: var(--glass-subtle) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: var(--glass-border) !important;
+}
+
+[data-ui-style="glass"] .theme-bg-elevated {
+  background-color: var(--glass-elevated) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+[data-ui-style="glass"] .theme-header {
+  background-color: var(--glass-surface) !important;
+  backdrop-filter: blur(24px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+  border-bottom-color: var(--glass-border) !important;
+}
+
+/* ==========================================================================
+   iOS WATER/GLASS CLICK RIPPLE & PRESS EFFECT
+   ========================================================================== */
+.glass-btn, button, .tap-target, .op-select-btn, .reload-preset-btn, .nav-tab-btn, .mobile-nav-btn {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.15s ease, background-color 0.15s ease;
+  will-change: transform;
+}
+
+.glass-btn:active, button:active, .op-select-btn:active, .reload-preset-btn:active {
+  transform: scale(0.975);
+}
+
+/* Water glass ripple ring */
+.glass-ripple-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.glass-ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.10) 60%, transparent 80%);
+  transform: scale(0);
+  animation: glassRippleEffect 0.45s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes glassRippleEffect {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* Tabular Numbers for Accurate Currency Display */
 .currency-lkr {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
@@ -151,8 +253,8 @@ input, select, textarea, button {
 
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -168,7 +270,7 @@ input, select, textarea, button {
 /* Header Live Pulse Dot */
 @keyframes pulseDot {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+  50% { opacity: 0.35; transform: scale(0.85); }
 }
 .pulse-dot {
   animation: pulseDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -207,22 +309,10 @@ input, select, textarea, button {
 }
 
 /* Operator Badges */
-.badge-airtel {
-  background-color: #ef4444;
-  color: #ffffff;
-}
-.badge-dialog {
-  background-color: #ea580c;
-  color: #ffffff;
-}
-.badge-mobitel {
-  background-color: #0284c7;
-  color: #ffffff;
-}
-.badge-hutch {
-  background-color: #f59e0b;
-  color: #ffffff;
-}
+.badge-airtel { background-color: #ef4444; color: #ffffff; }
+.badge-dialog { background-color: #ea580c; color: #ffffff; }
+.badge-mobitel { background-color: #0284c7; color: #ffffff; }
+.badge-hutch { background-color: #f59e0b; color: #ffffff; }
 
 /* Stock Status Badges */
 .badge-stock-in {
@@ -241,7 +331,7 @@ input, select, textarea, button {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
-/* Mobile Touch Optimization & Floating Elements */
+/* Mobile Touch Optimization & Tap Targets */
 .tap-target {
   min-height: 44px;
   min-width: 44px;
@@ -285,21 +375,53 @@ input, select, textarea, button {
   outline: none;
 }
 
-/* Modal Transition */
-.modal-backdrop {
-  background-color: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+/* ==========================================================================
+   METRIC CARDS DRAG-AND-DROP & RESIZING (MASTER LOGS SECTION)
+   ========================================================================== */
+.metric-card {
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  user-select: none;
 }
 
-.modal-enter {
-  opacity: 0;
-  transform: scale(0.96) translateY(10px);
+.metric-card.dragging {
+  opacity: 0.45;
+  transform: scale(0.98);
+  border-style: dashed !important;
+  border-color: var(--accent) !important;
 }
-.modal-enter-active {
-  opacity: 1;
-  transform: scale(1) translateY(0);
-  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+
+.metric-card.drag-over {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--accent) !important;
+}
+
+.metric-card-drag-handle {
+  cursor: grab;
+  touch-action: none;
+}
+.metric-card-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Card Sizes for customization */
+.metric-card-normal {
+  grid-column: span 1;
+}
+.metric-card-wide {
+  grid-column: span 1;
+}
+@media (min-width: 640px) {
+  .metric-card-wide {
+    grid-column: span 2;
+  }
+}
+
+/* Modal Transition */
+.modal-backdrop {
+  background-color: rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 /* Bottom Safe Area for Mobile Notch/Nav */
@@ -366,6 +488,32 @@ input, select, textarea, button {
   stroke-linecap: round;
   stroke-linejoin: round;
   fill: none;
+}
+
+/* Preset Pill Chip in Settings */
+.preset-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  background-color: var(--bg-surface-subtle);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+.preset-tag button {
+  color: var(--text-dim);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+}
+.preset-tag button:hover {
+  color: var(--danger);
 }
 
 /* Print Optimization */

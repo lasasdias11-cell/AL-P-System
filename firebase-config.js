@@ -1,5 +1,5 @@
 // Firebase SDK v11 Modular Configuration
-// AL Communication - Sri Lankan Retail & Mobile Reload System
+// AL Communication - Version 2 (Mobile Persistence & High-Reliability SDK)
 // Target Project: al-p1-fb432 | Auth Domain: al-p1-fb432.firebaseapp.com
 
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
@@ -12,7 +12,9 @@ import {
   updatePassword, 
   sendPasswordResetEmail,
   reauthenticateWithCredential,
-  EmailAuthProvider
+  EmailAuthProvider,
+  setPersistence,
+  browserLocalPersistence
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import { 
   getFirestore, 
@@ -37,7 +39,6 @@ import {
 
 // Retrieve saved API Key if custom, or default to configured environment key
 const storedApiKey = localStorage.getItem('al_firebase_api_key');
-const DEFAULT_API_KEY = storedApiKey || "AIzaSy" + "DummyPlaceholderReplaceInSettingsOrLocalStorage";
 
 export const firebaseConfig = {
   apiKey: storedApiKey || window.__FIREBASE_API_KEY__ || "AIzaSyB_REPLACE_WITH_FIREBASE_CONSOLE_API_KEY",
@@ -61,6 +62,12 @@ try {
     app = getApp();
   }
   auth = getAuth(app);
+  // Ensure local persistence is active across mobile and desktop sessions
+  try {
+    setPersistence(auth, browserLocalPersistence);
+  } catch (persErr) {
+    console.warn("Auth persistence configuration notice:", persErr);
+  }
   db = getFirestore(app);
   isFirebaseInitialized = true;
 } catch (error) {
@@ -91,6 +98,8 @@ export {
   sendPasswordResetEmail,
   reauthenticateWithCredential,
   EmailAuthProvider,
+  setPersistence,
+  browserLocalPersistence,
   // Firestore Exports
   collection,
   doc,
