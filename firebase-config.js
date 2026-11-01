@@ -1,6 +1,8 @@
-// Firebase SDK v11 Modular Configuration
-// AL Communication - Version 2 (Mobile Persistence & High-Reliability SDK)
-// Target Project: al-p1-fb432 | Auth Domain: al-p1-fb432.firebaseapp.com
+// =============================================================================
+// AL COMMUNICATION — FIREBASE SDK v11 MODULAR CONFIGURATION
+// Project ID: al-p1-fb432 | Auth Domain: al-p1-fb432.firebaseapp.com
+// High-Reliability Mobile Session Persistence & Real-time Cloud Sync
+// =============================================================================
 
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { 
@@ -37,7 +39,7 @@ import {
   runTransaction
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
-// Retrieve saved API Key if custom, or default to configured environment key
+// Retrieve custom API key if stored, or fallback to configured key
 const storedApiKey = localStorage.getItem('al_firebase_api_key');
 
 export const firebaseConfig = {
@@ -62,20 +64,24 @@ try {
     app = getApp();
   }
   auth = getAuth(app);
-  // Ensure local persistence is active across mobile and desktop sessions
-  try {
-    setPersistence(auth, browserLocalPersistence);
-  } catch (persErr) {
-    console.warn("Auth persistence configuration notice:", persErr);
-  }
+  
+  // Explicitly enforce IndexedDB/localStorage persistent auth across mobile and desktop
+  setPersistence(auth, browserLocalPersistence)
+    .then(() => {
+      console.log("[Firebase Auth] Local persistence successfully active.");
+    })
+    .catch((persErr) => {
+      console.warn("[Firebase Auth] Persistence setup notice:", persErr.message);
+    });
+
   db = getFirestore(app);
   isFirebaseInitialized = true;
 } catch (error) {
-  console.warn("Firebase initialization notice:", error);
+  console.warn("[Firebase Init Error]:", error);
   initError = error;
 }
 
-// Function to update API key dynamically and reinitialize
+// Function to update API key dynamically and reload
 export function updateFirebaseApiKey(newApiKey) {
   if (!newApiKey) return false;
   localStorage.setItem('al_firebase_api_key', newApiKey.trim());

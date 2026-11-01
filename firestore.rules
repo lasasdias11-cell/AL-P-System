@@ -8,7 +8,6 @@ service cloud.firestore {
     }
 
     // Helper: Verify authorized store owner email
-    // Supports the designated email and any authenticated admin session
     function isAuthorizedUser() {
       return isAuthenticated() && (
         request.auth.token.email == 'lasasdias11@gmail.com' ||
@@ -16,27 +15,73 @@ service cloud.firestore {
       );
     }
 
-    // Master Inventory Catalog
+    // Helper: Validation functions for numeric precision
+    function isValidPrice(val) {
+      return val is number && val >= 0;
+    }
+
+    function isValidQuantity(val) {
+      return val is number && val >= 0;
+    }
+
+    // 1. Master Inventory Catalog Collection
     match /inventory/{itemId} {
-      allow read, write: if isAuthorizedUser();
+      allow read: if isAuthorizedUser();
+      allow create, update: if isAuthorizedUser() &&
+        request.resource.data.itemCode is string &&
+        request.resource.data.itemCode.size() > 0 &&
+        request.resource.data.itemName is string &&
+        request.resource.data.itemName.size() > 0 &&
+        isValidPrice(request.resource.data.sellingPrice) &&
+        isValidPrice(request.resource.data.costPrice) &&
+        request.resource.data.stockQuantity is number;
+      allow delete: if isAuthorizedUser();
     }
 
-    // Stationery Daily Transactions
+    // 2. Stationery Daily Sales & Profit Logs
     match /stationery_transactions/{transactionId} {
-      allow read, write: if isAuthorizedUser();
+      allow read: if isAuthorizedUser();
+      allow create: if isAuthorizedUser() &&
+        request.resource.data.itemCode is string &&
+        request.resource.data.itemName is string &&
+        isValidPrice(request.resource.data.sellingPrice) &&
+        isValidPrice(request.resource.data.costPrice) &&
+        request.resource.data.profit is number &&
+        request.resource.data.quantity is number &&
+        request.resource.data.quantity > 0 &&
+        isValidPrice(request.resource.data.totalAmount) &&
+        request.resource.data.date is string;
+      allow update: if isAuthorizedUser() &&
+        isValidPrice(request.resource.data.sellingPrice) &&
+        isValidPrice(request.resource.data.costPrice) &&
+        request.resource.data.profit is number &&
+        request.resource.data.quantity is number;
+      allow delete: if isAuthorizedUser();
     }
 
-    // Mobile Reload & Commission Ledger
+    // 3. Mobile Reloads & Commission Logs
     match /reload_transactions/{reloadId} {
-      allow read, write: if isAuthorizedUser();
+      allow read: if isAuthorizedUser();
+      allow create: if isAuthorizedUser() &&
+        request.resource.data.operator in ['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH'] &&
+        isValidPrice(request.resource.data.amount) &&
+        request.resource.data.amount > 0 &&
+        request.resource.data.commissionRate is number &&
+        isValidPrice(request.resource.data.commissionAmount) &&
+        request.resource.data.date is string;
+      allow update, delete: if isAuthorizedUser();
     }
 
-    // System Settings & Commission Rates
+    // 4. System Settings & Custom Preferences (Rates, Presets, Card Order)
     match /settings/{settingDoc} {
       allow read, write: if isAuthorizedUser();
     }
 
-    // Developer Health Ping & Diagnostic collection
+    // 5. Diagnostics & System Health Testing
+    match /diagnostics/{diagId} {
+      allow read, write: if isAuthorizedUser();
+    }
+
     match /system_health/{healthDoc} {
       allow read, write: if isAuthorizedUser();
     }

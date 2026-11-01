@@ -1,6 +1,6 @@
 // =============================================================================
-// AL COMMUNICATION - SYSTEM LOGIC CORE (VERSION 2.0)
-// High-Performance Retail Stationery & Mobile Reload Counter Ledger
+// AL COMMUNICATION — SYSTEM LOGIC CORE (VERSION 3.1)
+// POS, Real-time Inventory, Mobile Reloads & Automated Profit Tracking System
 // GitHub Pages SPA | Firebase Cloud Firestore v11 | Auth Guard
 // Project ID: al-p1-fb432 | Primary Currency: LKR (Rs. 0.00 exact cent precision)
 // =============================================================================
@@ -38,10 +38,34 @@ import {
 } from './firebase-config.js';
 
 // =============================================================================
-// 1. APPLICATION STATE & SAMPLE DATA
+// 1. APPLICATION STATE & CONSTANTS
 // =============================================================================
 
-const DEFAULT_PRESETS = [50, 100, 200, 500, 1000, 2000];
+const DEFAULT_PRESETS = [100, 250, 500, 1000];
+
+const DEFAULT_DASHBOARD_CARDS = [
+  'card-dash-stationery',
+  'card-dash-reloads',
+  'card-dash-commission',
+  'card-dash-profit-today',
+  'card-dash-profit-month',
+  'card-dash-profit-year',
+  'card-dash-catalog',
+  'card-dash-tile-stationery',
+  'card-dash-tile-reloads',
+  'card-dash-tile-stock',
+  'card-dash-tile-logs'
+];
+
+const DEFAULT_LOG_METRIC_CARDS = [
+  'card-today-stationery',
+  'card-today-reloads',
+  'card-combined-revenue',
+  'card-today-profit',
+  'card-monthly-analytics',
+  'card-yearly-analytics',
+  'card-operator-breakdown'
+];
 
 const APP_STATE = {
   currentUser: null,
@@ -59,14 +83,14 @@ const APP_STATE = {
   inventoryCatalog: [],
   selectedCatalogItem: null,
   activeReloadOperator: 'MOBITEL',
-  
+
   // Real-time feeds for today
   todayStationeryTransactions: [],
   todayReloadTransactions: [],
 
   // Master Logs Filter State
   logCategoryFilter: 'ALL', // 'ALL' | 'STATIONERY' | 'RELOAD'
-  logDateMode: 'TODAY',     // 'TODAY' | 'YESTERDAY' | 'THIS_MONTH' | 'RANGE'
+  logDateMode: 'TODAY',     // 'TODAY' | 'YESTERDAY' | 'THIS_MONTH' | 'SPECIFIC' | 'RANGE'
   logDateFrom: '',
   logDateTo: '',
   masterStationeryRecords: [],
@@ -78,6 +102,11 @@ const APP_STATE = {
   // Analytics Month (YYYY-MM)
   analyticsMonth: '',
 
+  // Dashboard & Metrics Layouts
+  dashboardCardOrder: [...DEFAULT_DASHBOARD_CARDS],
+  metricsCardOrder: [...DEFAULT_LOG_METRIC_CARDS],
+  metricsCardSizes: {},
+
   unsubscribers: {
     commissions: null,
     presets: null,
@@ -85,28 +114,29 @@ const APP_STATE = {
     todayStationery: null,
     todayReloads: null,
     masterStationery: null,
-    masterReloads: null
+    masterReloads: null,
+    userSettings: null
   },
   devLogs: []
 };
 
-// Standard Sri Lankan Stationery Catalog - Strictly Selling Price & Initial Stock
+// Standard Sri Lankan Stationery Catalog with Getting (Cost) Prices & Selling Prices
 const SAMPLE_SRI_LANKAN_CATALOG = [
-  { code: 'ST-001', name: 'Atlas CR Book 80 Pages (Single Rule)', sellingPrice: 200.00, stockQuantity: 50 },
-  { code: 'ST-002', name: 'Atlas CR Book 120 Pages (Single Rule)', sellingPrice: 280.00, stockQuantity: 40 },
-  { code: 'ST-003', name: 'Atlas CR Book 160 Pages (Single Rule)', sellingPrice: 370.00, stockQuantity: 35 },
-  { code: 'ST-004', name: 'CR Book 80 Pages (Square Rule)', sellingPrice: 200.00, stockQuantity: 45 },
-  { code: 'ST-005', name: 'Atlas Chooty Pen Blue (0.5mm)', sellingPrice: 30.00, stockQuantity: 200 },
-  { code: 'ST-006', name: 'Atlas Chooty Pen Black (0.5mm)', sellingPrice: 30.00, stockQuantity: 150 },
-  { code: 'ST-007', name: 'Atlas Chooty Pen Red (0.5mm)', sellingPrice: 30.00, stockQuantity: 100 },
-  { code: 'ST-008', name: 'Nataraj 2B Pencil Pack (10s)', sellingPrice: 260.00, stockQuantity: 30 },
-  { code: 'ST-009', name: 'A4 Photocopy Paper 80gsm (Pack 500)', sellingPrice: 1600.00, stockQuantity: 20 },
-  { code: 'ST-010', name: 'A4 Photocopy Single Page (B/W)', sellingPrice: 10.00, stockQuantity: 1000 },
-  { code: 'ST-011', name: 'A4 Colour Print Single Page', sellingPrice: 40.00, stockQuantity: 500 },
-  { code: 'ST-012', name: 'Bristol Board Sheet (White/Colours)', sellingPrice: 60.00, stockQuantity: 80 },
-  { code: 'ST-013', name: 'Atlas Colour Pastels (12 Shades)', sellingPrice: 230.00, stockQuantity: 25 },
-  { code: 'ST-014', name: 'Clear Display File Folder (A4)', sellingPrice: 170.00, stockQuantity: 40 },
-  { code: 'ST-015', name: 'UHU / Atlas Glue Stick 15g', sellingPrice: 150.00, stockQuantity: 30 }
+  { code: 'ST-001', name: 'Atlas CR Book 80 Pages (Single Rule)', category: 'Exercise Books', costPrice: 155.00, sellingPrice: 200.00, stockQuantity: 50, lowStockThreshold: 10 },
+  { code: 'ST-002', name: 'Atlas CR Book 120 Pages (Single Rule)', category: 'Exercise Books', costPrice: 215.00, sellingPrice: 280.00, stockQuantity: 40, lowStockThreshold: 10 },
+  { code: 'ST-003', name: 'Atlas CR Book 160 Pages (Single Rule)', category: 'Exercise Books', costPrice: 290.00, sellingPrice: 370.00, stockQuantity: 35, lowStockThreshold: 10 },
+  { code: 'ST-004', name: 'Atlas CR Book 80 Pages (Square Rule)', category: 'Exercise Books', costPrice: 155.00, sellingPrice: 200.00, stockQuantity: 45, lowStockThreshold: 10 },
+  { code: 'ST-005', name: 'Atlas Chooty Pen Blue (0.5mm)', category: 'Pens & Pencils', costPrice: 22.00, sellingPrice: 30.00, stockQuantity: 200, lowStockThreshold: 25 },
+  { code: 'ST-006', name: 'Atlas Chooty Pen Black (0.5mm)', category: 'Pens & Pencils', costPrice: 22.00, sellingPrice: 30.00, stockQuantity: 150, lowStockThreshold: 25 },
+  { code: 'ST-007', name: 'Atlas Chooty Pen Red (0.5mm)', category: 'Pens & Pencils', costPrice: 22.00, sellingPrice: 30.00, stockQuantity: 100, lowStockThreshold: 20 },
+  { code: 'ST-008', name: 'Nataraj 2B Pencil Pack (10s)', category: 'Pens & Pencils', costPrice: 200.00, sellingPrice: 260.00, stockQuantity: 30, lowStockThreshold: 8 },
+  { code: 'ST-009', name: 'A4 Photocopy Paper 80gsm (Pack 500)', category: 'Paper & Files', costPrice: 1380.00, sellingPrice: 1600.00, stockQuantity: 25, lowStockThreshold: 5 },
+  { code: 'ST-010', name: 'A4 Photocopy Single Page (B/W)', category: 'Photocopy & Print', costPrice: 3.50, sellingPrice: 10.00, stockQuantity: 1000, lowStockThreshold: 100 },
+  { code: 'ST-011', name: 'A4 Colour Print Single Page', category: 'Photocopy & Print', costPrice: 15.00, sellingPrice: 40.00, stockQuantity: 500, lowStockThreshold: 50 },
+  { code: 'ST-012', name: 'Bristol Board Sheet (White/Colours)', category: 'Art & Craft', costPrice: 42.00, sellingPrice: 60.00, stockQuantity: 80, lowStockThreshold: 15 },
+  { code: 'ST-013', name: 'Atlas Colour Pastels (12 Shades)', category: 'Art & Craft', costPrice: 175.00, sellingPrice: 230.00, stockQuantity: 25, lowStockThreshold: 5 },
+  { code: 'ST-014', name: 'Clear Display File Folder (A4)', category: 'Paper & Files', costPrice: 125.00, sellingPrice: 170.00, stockQuantity: 40, lowStockThreshold: 10 },
+  { code: 'ST-015', name: 'UHU / Atlas Glue Stick 15g', category: 'Adhesives', costPrice: 110.00, sellingPrice: 150.00, stockQuantity: 30, lowStockThreshold: 8 }
 ];
 
 // =============================================================================
@@ -155,7 +185,7 @@ export function getCurrentTimeString() {
 }
 
 // =============================================================================
-// 3. LOGGING, TOAST ALERTS & GLASS RIPPLE FEEDBACK
+// 3. LOGGING, TOASTS & GLASS RIPPLE ENGINE
 // =============================================================================
 
 function logDebug(message, type = 'INFO') {
@@ -189,7 +219,7 @@ export function showToast(message, type = 'info') {
   };
 
   toast.className = `px-4 py-3 rounded-xl shadow-xl text-xs sm:text-sm font-semibold border pointer-events-auto flex items-center gap-2 transform transition-all duration-200 translate-y-2 opacity-0 ${colors[type] || colors.info}`;
-  
+
   let iconSvg = '';
   if (type === 'success') {
     iconSvg = '<svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>';
@@ -212,7 +242,6 @@ export function showToast(message, type = 'info') {
   }, 3500);
 }
 
-// Subtle iOS Glass Ripple Feedback on Button Click
 function initGlassRippleFeedback() {
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('.glass-btn');
@@ -233,8 +262,19 @@ function initGlassRippleFeedback() {
   });
 }
 
+function pulseCard(elementId) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const card = el.closest('.dash-card, .metric-card');
+  if (card) {
+    card.classList.remove('updated');
+    void card.offsetWidth; // Trigger reflow
+    card.classList.add('updated');
+  }
+}
+
 // =============================================================================
-// 4. THEME & UI STYLE ENGINE (Color Palettes & iOS Frosted Glass Toggle)
+// 4. THEME & UI STYLE ENGINE
 // =============================================================================
 
 export function setTheme(themeName) {
@@ -244,6 +284,15 @@ export function setTheme(themeName) {
   document.documentElement.setAttribute('data-theme', themeName);
   APP_STATE.activeTheme = themeName;
   localStorage.setItem('al_theme', themeName);
+
+  const isLight = (themeName === 'emerald-store' || themeName === 'warm-amber');
+  if (isLight) {
+    document.body?.classList.add('light-theme');
+    document.documentElement.classList.add('light-theme');
+  } else {
+    document.body?.classList.remove('light-theme');
+    document.documentElement.classList.remove('light-theme');
+  }
 
   const metaTheme = document.querySelector('meta[name="theme-color"]');
   if (metaTheme) {
@@ -276,6 +325,14 @@ export function setUiStyle(uiStyle) {
   APP_STATE.activeUiStyle = uiStyle;
   localStorage.setItem('al_ui_style', uiStyle);
 
+  if (uiStyle === 'glass') {
+    document.body?.classList.add('glass-ui-active');
+    document.documentElement.classList.add('glass-ui-active');
+  } else {
+    document.body?.classList.remove('glass-ui-active');
+    document.documentElement.classList.remove('glass-ui-active');
+  }
+
   const toggle = document.getElementById('uiStyleGlassToggle');
   if (toggle) {
     toggle.checked = (uiStyle === 'glass');
@@ -295,7 +352,7 @@ function initThemeAndStyle() {
     button.addEventListener('click', () => {
       const choice = button.getAttribute('data-theme-choice');
       setTheme(choice);
-      showToast(`Switched theme to ${button.querySelector('.font-bold')?.textContent || choice}`, 'info');
+      showToast(`Theme switched to ${button.querySelector('.font-bold')?.textContent || choice}`, 'info');
     });
   });
 
@@ -304,7 +361,7 @@ function initThemeAndStyle() {
     uiStyleToggle.addEventListener('change', (e) => {
       const newStyle = e.target.checked ? 'glass' : 'default';
       setUiStyle(newStyle);
-      showToast(`UI style switched to ${newStyle === 'glass' ? 'iOS Glass' : 'Clean Solid'}`, 'info');
+      showToast(`Switched to ${newStyle === 'glass' ? 'iOS Glass UI' : 'Clean Solid UI'}`, 'info');
     });
   }
 }
@@ -321,7 +378,7 @@ function startLiveClock() {
     const now = new Date();
     const tzOffset = 5.5 * 60;
     const lkTime = new Date(now.getTime() + (tzOffset + now.getTimezoneOffset()) * 60000);
-    
+
     const timeStr = lkTime.toTimeString().split(' ')[0] + ' LK';
     const dateStr = lkTime.toISOString().split('T')[0];
 
@@ -356,7 +413,7 @@ function initNetworkMonitor() {
       if (mobileSyncBadge) {
         mobileSyncBadge.className = 'sm:hidden flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20';
       }
-      logDebug('Network offline: Local offline persistence engaged', 'WARN');
+      logDebug('Network offline: Local offline cache engaged', 'WARN');
     }
   }
 
@@ -366,7 +423,7 @@ function initNetworkMonitor() {
 }
 
 // =============================================================================
-// 6. AUTH GATE SCREEN & AUTHENTICATION GUARD
+// 6. AUTH GATE & SESSION RESOLUTION (Flash Suppression)
 // =============================================================================
 
 let authGateDismissed = false;
@@ -380,7 +437,7 @@ function dismissAuthGate(isAuthenticated) {
   const appShell = document.getElementById('appShell');
 
   if (authGate) {
-    authGate.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+    authGate.classList.add('opacity-0');
     setTimeout(() => {
       authGate.classList.add('hidden');
       authGate.classList.remove('opacity-0');
@@ -414,7 +471,7 @@ function setupAuth() {
     });
   }
 
-  // Handle Custom Firebase API Key
+  // Custom Firebase API Key Handler
   const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
   const customApiKeyInput = document.getElementById('customApiKeyInput');
   const savedKey = localStorage.getItem('al_firebase_api_key');
@@ -435,7 +492,7 @@ function setupAuth() {
   // Safety Fallback Timer for Auth Gate (~2.2s transition window)
   setTimeout(() => {
     if (!authGateDismissed) {
-      logDebug('Auth gate check timeout. Showing view based on current session.');
+      logDebug('Auth check resolution fallback engaged.');
       dismissAuthGate(Boolean(APP_STATE.currentUser));
     }
   }, 2200);
@@ -448,6 +505,7 @@ function setupAuth() {
         logDebug(`Authenticated as: ${user.email}`, 'SUCCESS');
         dismissAuthGate(true);
         initRealtimeListeners();
+        loadSavedDashboardOrder();
       } else {
         APP_STATE.currentUser = null;
         logDebug('No active session. Presenting Login Screen.');
@@ -485,7 +543,7 @@ function setupAuth() {
       } catch (error) {
         logDebug(`Authentication failed: ${error.code}`, 'ERROR');
         loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-red-500/10 text-red-400 border border-red-500/20 block';
-        
+
         let errorMsg = 'Failed to sign in. Please verify your email and password.';
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
           errorMsg = 'Invalid email or password.';
@@ -547,7 +605,6 @@ function setupAuth() {
     });
   }
 
-  // Account Security inside Settings
   setupAccountSecurity();
 }
 
@@ -620,7 +677,7 @@ async function promptReauthAndRetry(actionCallback) {
 }
 
 // =============================================================================
-// 7. NAVIGATION & VIEW SWITCHING
+// 7. NAVIGATION & VIEW ROUTING
 // =============================================================================
 
 export function switchView(viewName) {
@@ -654,7 +711,6 @@ export function switchView(viewName) {
     }
   });
 
-  // View specific triggers
   if (viewName === 'stock') {
     renderStockTable();
   } else if (viewName === 'logs') {
@@ -680,7 +736,7 @@ function initNavigation() {
     headerHomeBtn.addEventListener('click', () => switchView('dashboard'));
   }
 
-  // Dashboard Operational Shortcut Tiles
+  // Dashboard Shortcut Tiles
   const dashTileStationery = document.getElementById('dashTileStationery');
   if (dashTileStationery) {
     dashTileStationery.addEventListener('click', () => switchView('stationery'));
@@ -718,7 +774,6 @@ function initNavigation() {
     });
   }
 
-  // Open Presets Tab directly from Reloads View
   const openPresetConfigBtn = document.getElementById('openPresetConfigBtn');
   if (openPresetConfigBtn) {
     openPresetConfigBtn.addEventListener('click', () => {
@@ -727,7 +782,6 @@ function initNavigation() {
     });
   }
 
-  // Settings Sub-panel Tabs
   document.querySelectorAll('[data-settings-tab]').forEach(tabBtn => {
     tabBtn.addEventListener('click', () => switchSettingsTab(tabBtn.getAttribute('data-settings-tab')));
   });
@@ -773,7 +827,7 @@ function switchSettingsTab(tabName) {
 }
 
 // =============================================================================
-// 8. FIRESTORE REAL-TIME LISTENERS & DATA SYNC
+// 8. FIRESTORE REAL-TIME LISTENERS
 // =============================================================================
 
 function detachAllListeners() {
@@ -791,13 +845,11 @@ function initRealtimeListeners() {
   const today = getTodayDateString();
   APP_STATE.currentDate = today;
 
-  // Set default analytics month to current (YYYY-MM)
   const currentMonth = today.substring(0, 7);
   APP_STATE.analyticsMonth = currentMonth;
   const monthPicker = document.getElementById('logAnalyticsMonthPicker');
   if (monthPicker) monthPicker.value = currentMonth;
 
-  // Set default log dates
   APP_STATE.logDateFrom = today;
   APP_STATE.logDateTo = today;
   const logFrom = document.getElementById('logDateFrom');
@@ -805,22 +857,11 @@ function initRealtimeListeners() {
   if (logFrom) logFrom.value = today;
   if (logTo) logTo.value = today;
 
-  // 1. Commission Rates Listener
   listenToCommissions();
-
-  // 2. Dynamic Reload Presets Listener
   listenToPresets();
-
-  // 3. Master Inventory Catalog Listener
   listenToInventory();
-
-  // 4. Today's Stationery Feed Listener
   listenToTodayStationery(today);
-
-  // 5. Today's Reload Feed Listener
   listenToTodayReloads(today);
-
-  // 6. Master Stationery & Reload Collections for Logs and Centralized Analytics
   listenToMasterLogs();
 }
 
@@ -889,15 +930,17 @@ function listenToInventory() {
         id: docSnap.id,
         code: data.code || '',
         name: data.name || '',
+        category: data.category || 'General',
+        costPrice: Number(data.costPrice ?? 0),
         sellingPrice: Number(data.sellingPrice || 0),
-        stockQuantity: Number(data.stockQuantity || 0)
+        stockQuantity: Number(data.stockQuantity || 0),
+        lowStockThreshold: Number(data.lowStockThreshold ?? 5)
       });
     });
 
     items.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
     APP_STATE.inventoryCatalog = items;
 
-    // Refresh previews, stock table, catalog table, and dashboard KPIs
     updateStockPreviews();
     renderStockTable();
     renderCatalogTable();
@@ -923,7 +966,7 @@ function listenToTodayStationery(todayDate) {
     APP_STATE.todayStationeryTransactions = list;
 
     renderStationeryRecentFeed();
-    updateDashboardFinancialKPIs();
+    updateDashboardOverviewKPIs();
     updateMasterLogsTodayCards();
   }, (err) => {
     logDebug(`Today stationery listener error: ${err.message}`, 'ERROR');
@@ -944,7 +987,7 @@ function listenToTodayReloads(todayDate) {
     list.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
     APP_STATE.todayReloadTransactions = list;
 
-    updateDashboardFinancialKPIs();
+    updateDashboardOverviewKPIs();
     updateMasterLogsTodayCards();
   }, (err) => {
     logDebug(`Today reloads listener error: ${err.message}`, 'ERROR');
@@ -954,7 +997,6 @@ function listenToTodayReloads(todayDate) {
 function listenToMasterLogs() {
   if (!db) return;
 
-  // Listen to all stationery transactions
   const statColRef = collection(db, 'stationery_transactions');
   APP_STATE.unsubscribers.masterStationery = onSnapshot(statColRef, (snap) => {
     const list = [];
@@ -966,7 +1008,6 @@ function listenToMasterLogs() {
     calculateFinancialAnalytics();
   });
 
-  // Listen to all reload transactions
   const reloadColRef = collection(db, 'reload_transactions');
   APP_STATE.unsubscribers.masterReloads = onSnapshot(reloadColRef, (snap) => {
     const list = [];
@@ -980,8 +1021,786 @@ function listenToMasterLogs() {
 }
 
 // =============================================================================
-// 9. DYNAMIC PRESET MANAGEMENT (Reloads Section & Settings Modal)
+// 9. DASHBOARD DRAG-AND-DROP REORDERABLE GRID (MOUSE & TOUCH SUPPORT)
 // =============================================================================
+
+function setupDashboardDragAndDrop() {
+  const grid = document.getElementById('dashboardGrid');
+  const resetBtn = document.getElementById('resetDashboardLayoutSettingsBtn');
+  if (!grid) return;
+
+  let draggedItem = null;
+  let touchStartY = 0;
+  let touchStartX = 0;
+  let isTouchDragging = false;
+
+  // --- Desktop Mouse Drag ---
+  grid.querySelectorAll('.dash-card').forEach(card => {
+    card.addEventListener('dragstart', (e) => {
+      draggedItem = card;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', card.getAttribute('data-card-id'));
+    });
+
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      grid.querySelectorAll('.dash-card').forEach(c => c.classList.remove('drag-over'));
+      saveDashboardLayout();
+    });
+
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const targetCard = card;
+      if (draggedItem && targetCard !== draggedItem) {
+        const bounding = targetCard.getBoundingClientRect();
+        const offset = e.clientY - bounding.top - (bounding.height / 2);
+        if (offset > 0) {
+          targetCard.after(draggedItem);
+        } else {
+          targetCard.before(draggedItem);
+        }
+      }
+    });
+
+    // --- Mobile Touch Drag via .drag-handle ---
+    const handle = card.querySelector('.drag-handle');
+    if (handle) {
+      handle.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        touchStartY = touch.clientY;
+        touchStartX = touch.clientX;
+        draggedItem = card;
+        isTouchDragging = true;
+        card.classList.add('dragging');
+        // Prevent window scrolling while dragging card
+        e.stopPropagation();
+      }, { passive: false });
+
+      handle.addEventListener('touchmove', (e) => {
+        if (!isTouchDragging || !draggedItem) return;
+        e.preventDefault(); // Prevent page scroll while dragging
+
+        const touch = e.touches[0];
+        const elemUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (!elemUnder) return;
+
+        const targetCard = elemUnder.closest('.dash-card');
+        if (targetCard && targetCard !== draggedItem && targetCard.parentNode === grid) {
+          const bounding = targetCard.getBoundingClientRect();
+          const offset = touch.clientY - bounding.top - (bounding.height / 2);
+          if (offset > 0) {
+            targetCard.after(draggedItem);
+          } else {
+            targetCard.before(draggedItem);
+          }
+        }
+      }, { passive: false });
+
+      const endTouch = () => {
+        if (isTouchDragging && draggedItem) {
+          draggedItem.classList.remove('dragging');
+          grid.querySelectorAll('.dash-card').forEach(c => c.classList.remove('drag-over'));
+          saveDashboardLayout();
+          draggedItem = null;
+          isTouchDragging = false;
+        }
+      };
+
+      handle.addEventListener('touchend', endTouch);
+      handle.addEventListener('touchcancel', endTouch);
+    }
+  });
+
+  // Settings Reset Button
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      localStorage.removeItem('al_dashboard_order');
+      if (db && auth.currentUser) {
+        setDoc(doc(db, 'settings', 'dashboard'), {
+          order: DEFAULT_DASHBOARD_CARDS,
+          updatedAt: serverTimestamp()
+        }).catch(e => console.warn(e));
+      }
+
+      DEFAULT_DASHBOARD_CARDS.forEach(id => {
+        const c = grid.querySelector(`[data-card-id="${id}"]`);
+        if (c) grid.appendChild(c);
+      });
+      showToast('Dashboard card order restored to default', 'success');
+    });
+  }
+}
+
+function saveDashboardLayout() {
+  const grid = document.getElementById('dashboardGrid');
+  if (!grid) return;
+
+  const order = [];
+  grid.querySelectorAll('.dash-card').forEach(card => {
+    const id = card.getAttribute('data-card-id');
+    if (id) order.push(id);
+  });
+
+  APP_STATE.dashboardCardOrder = order;
+  localStorage.setItem('al_dashboard_order', JSON.stringify(order));
+
+  // Sync to Firestore settings document
+  if (db && auth?.currentUser) {
+    setDoc(doc(db, 'settings', 'dashboard'), {
+      order: order,
+      updatedAt: serverTimestamp()
+    }).catch(err => console.warn('Sync dashboard order failed:', err.message));
+  }
+}
+
+function loadSavedDashboardOrder() {
+  const grid = document.getElementById('dashboardGrid');
+  if (!grid) return;
+
+  // 1. Try local storage first for instant layout without network hop
+  const localOrder = localStorage.getItem('al_dashboard_order');
+  if (localOrder) {
+    try {
+      const order = JSON.parse(localOrder);
+      if (Array.isArray(order) && order.length > 0) {
+        order.forEach(id => {
+          const card = grid.querySelector(`[data-card-id="${id}"]`);
+          if (card) grid.appendChild(card);
+        });
+      }
+    } catch (e) {
+      console.warn('Error parsing local dashboard order', e);
+    }
+  }
+
+  // 2. Fetch from Firestore for cross-device sync
+  if (db) {
+    getDoc(doc(db, 'settings', 'dashboard')).then(snap => {
+      if (snap.exists() && Array.isArray(snap.data().order)) {
+        const firestoreOrder = snap.data().order;
+        APP_STATE.dashboardCardOrder = firestoreOrder;
+        localStorage.setItem('al_dashboard_order', JSON.stringify(firestoreOrder));
+        firestoreOrder.forEach(id => {
+          const card = grid.querySelector(`[data-card-id="${id}"]`);
+          if (card) grid.appendChild(card);
+        });
+      }
+    }).catch(e => console.warn('Fetch cloud dashboard order failed:', e));
+  }
+}
+
+// =============================================================================
+// 10. REAL-TIME PROFIT TRACKING & DASHBOARD KPIS
+// =============================================================================
+
+function updateDashboardOverviewKPIs() {
+  // 1. Today's Stationery Sales & Profit
+  let statSales = 0;
+  let statUnits = 0;
+  let statProfitToday = 0;
+
+  APP_STATE.todayStationeryTransactions.forEach(t => {
+    const total = Number(t.totalAmount || t.sellingPrice || 0);
+    const qty = Number(t.quantity || 1);
+    statSales += total;
+    statUnits += qty;
+
+    // Use stored profit, or compute dynamically if missing
+    if (t.profit !== undefined) {
+      statProfitToday += Number(t.profit);
+    } else {
+      const cost = Number(t.costPrice || 0);
+      const sell = Number(t.sellingPrice || 0);
+      statProfitToday += (sell - cost) * qty;
+    }
+  });
+
+  // 2. Today's Reloads & Commission (Reload commission = reload profit)
+  let reloadVolume = 0;
+  let reloadCommission = 0;
+
+  APP_STATE.todayReloadTransactions.forEach(r => {
+    reloadVolume += Number(r.amount || 0);
+    reloadCommission += Number(r.commissionAmount || 0);
+  });
+
+  const totalRevenue = roundCurrency(statSales + reloadCommission);
+  const totalProfitToday = roundCurrency(statProfitToday + reloadCommission);
+
+  // Update DOM Elements
+  const dashCombined = document.getElementById('dashTodayCombinedRevenue');
+  const dashStat = document.getElementById('dashStationerySales');
+  const dashStatUnits = document.getElementById('dashStationeryUnits');
+  const dashReloadVol = document.getElementById('dashReloadVolume');
+  const dashReloadComm = document.getElementById('dashReloadCommission');
+  const dashProfitToday = document.getElementById('dashProfitToday');
+
+  if (dashCombined) dashCombined.textContent = formatLKR(totalRevenue);
+  if (dashStat) dashStat.textContent = formatLKR(roundCurrency(statSales));
+  if (dashStatUnits) dashStatUnits.textContent = statUnits.toLocaleString();
+  if (dashReloadVol) dashReloadVol.textContent = formatLKR(roundCurrency(reloadVolume));
+  // Clean currency format: Strictly NO "Comm." text
+  if (dashReloadComm) dashReloadComm.textContent = `+${formatLKR(roundCurrency(reloadCommission))}`;
+  if (dashProfitToday) dashProfitToday.textContent = formatLKR(totalProfitToday);
+
+  // Trigger subtle pulse animations on updated KPI cards
+  pulseCard('dashTodayCombinedRevenue');
+  pulseCard('dashProfitToday');
+
+  // Compute Month and Year Profits
+  calculateProfitOverview();
+}
+
+function calculateProfitOverview() {
+  const currentMonth = getTodayDateString().substring(0, 7);
+  const currentYear = currentMonth.substring(0, 4);
+
+  let monthProfit = 0;
+  let yearProfit = 0;
+
+  // Monthly & Yearly Stationery Profit
+  APP_STATE.masterStationeryRecords.forEach(s => {
+    if (!s.date) return;
+    const qty = Number(s.quantity || 1);
+    let p = 0;
+    if (s.profit !== undefined) {
+      p = Number(s.profit);
+    } else {
+      const cost = Number(s.costPrice || 0);
+      const sell = Number(s.sellingPrice || 0);
+      p = (sell - cost) * qty;
+    }
+
+    if (s.date.startsWith(currentMonth)) monthProfit += p;
+    if (s.date.startsWith(currentYear)) yearProfit += p;
+  });
+
+  // Monthly & Yearly Reload Commissions (Treated as Profit)
+  APP_STATE.masterReloadRecords.forEach(r => {
+    if (!r.date) return;
+    const comm = Number(r.commissionAmount || 0);
+    if (r.date.startsWith(currentMonth)) monthProfit += comm;
+    if (r.date.startsWith(currentYear)) yearProfit += comm;
+  });
+
+  const elMonth = document.getElementById('dashProfitMonth');
+  const elYear = document.getElementById('dashProfitYear');
+
+  if (elMonth) elMonth.textContent = formatLKR(roundCurrency(monthProfit));
+  if (elYear) elYear.textContent = formatLKR(roundCurrency(yearProfit));
+}
+
+function updateDashboardCatalogKPIs() {
+  const dashCatalogCount = document.getElementById('dashCatalogCount');
+  if (dashCatalogCount) {
+    dashCatalogCount.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
+  }
+}
+
+// =============================================================================
+// 11. STATIONERY POS ENTRY (WITH ENTER-KEY AUTO-FLOW)
+// =============================================================================
+
+function setupStationeryModule() {
+  const posItemInput = document.getElementById('posItemInput');
+  const posAutocompleteList = document.getElementById('posAutocompleteList');
+  const posSellingPrice = document.getElementById('posSellingPrice');
+  const posQuantity = document.getElementById('posQuantity');
+  const posTotalAmountPreview = document.getElementById('posTotalAmountPreview');
+  const posStockStatusBadge = document.getElementById('posStockStatusBadge');
+  const posItemBadge = document.getElementById('posItemBadge');
+  const stationeryEntryForm = document.getElementById('stationeryEntryForm');
+  const posQtyDecBtn = document.getElementById('posQtyDecBtn');
+  const posQtyIncBtn = document.getElementById('posQtyIncBtn');
+
+  // Quantity Stepper Handlers
+  if (posQtyDecBtn && posQuantity) {
+    posQtyDecBtn.addEventListener('click', () => {
+      const current = Math.max(1, (parseInt(posQuantity.value, 10) || 1) - 1);
+      posQuantity.value = current;
+      calculatePosTotal();
+    });
+  }
+
+  if (posQtyIncBtn && posQuantity) {
+    posQtyIncBtn.addEventListener('click', () => {
+      const current = (parseInt(posQuantity.value, 10) || 1) + 1;
+      posQuantity.value = current;
+      calculatePosTotal();
+    });
+  }
+
+  // Quick Quantity Presets
+  document.querySelectorAll('[data-qty-pill]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const qty = parseInt(btn.getAttribute('data-qty-pill'), 10) || 1;
+      if (posQuantity) {
+        posQuantity.value = qty;
+        calculatePosTotal();
+      }
+    });
+  });
+
+  function calculatePosTotal() {
+    const price = Number(posSellingPrice?.value) || 0;
+    const qty = Math.max(1, parseInt(posQuantity?.value, 10) || 1);
+    const total = roundCurrency(price * qty);
+    if (posTotalAmountPreview) posTotalAmountPreview.textContent = formatLKR(total);
+  }
+
+  if (posSellingPrice) posSellingPrice.addEventListener('input', calculatePosTotal);
+  if (posQuantity) posQuantity.addEventListener('input', calculatePosTotal);
+
+  // Autocomplete Filtering & Enter-Key Flow
+  let highlightedIndex = -1;
+  let currentMatches = [];
+
+  function updateAutocompleteHighlight() {
+    const items = posAutocompleteList.querySelectorAll('.autocomplete-item');
+    items.forEach((itemEl, idx) => {
+      if (idx === highlightedIndex) {
+        itemEl.classList.add('bg-sky-500/20');
+        itemEl.scrollIntoView({ block: 'nearest' });
+      } else {
+        itemEl.classList.remove('bg-sky-500/20');
+      }
+    });
+  }
+
+  function selectCatalogItem(item) {
+    posItemInput.value = item.name;
+    posSellingPrice.value = Number(item.sellingPrice).toFixed(2);
+    APP_STATE.selectedCatalogItem = item;
+
+    if (posItemBadge) {
+      posItemBadge.textContent = item.code;
+      posItemBadge.classList.remove('hidden');
+    }
+
+    renderPosStockBadge(item.stockQuantity);
+    posAutocompleteList.classList.add('hidden');
+    calculatePosTotal();
+  }
+
+  function renderPosStockBadge(stockQty) {
+    if (!posStockStatusBadge) return;
+    posStockStatusBadge.classList.remove('hidden');
+
+    if (stockQty > 5) {
+      posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-in';
+      posStockStatusBadge.textContent = `In Stock: ${stockQty} units`;
+    } else if (stockQty > 0) {
+      posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-low';
+      posStockStatusBadge.textContent = `Low Stock: ${stockQty} units left`;
+    } else {
+      posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-out';
+      posStockStatusBadge.textContent = `Out of Stock (0 units)`;
+    }
+  }
+
+  if (posItemInput && posAutocompleteList) {
+    posItemInput.addEventListener('input', () => {
+      const queryStr = posItemInput.value.trim().toLowerCase();
+      highlightedIndex = -1;
+
+      if (!queryStr) {
+        posAutocompleteList.classList.add('hidden');
+        posAutocompleteList.innerHTML = '';
+        currentMatches = [];
+        if (posItemBadge) posItemBadge.classList.add('hidden');
+        if (posStockStatusBadge) posStockStatusBadge.classList.add('hidden');
+        APP_STATE.selectedCatalogItem = null;
+        return;
+      }
+
+      currentMatches = APP_STATE.inventoryCatalog.filter(item => {
+        const cMatch = (item.code || '').toLowerCase().includes(queryStr);
+        const nMatch = (item.name || '').toLowerCase().includes(queryStr);
+        return cMatch || nMatch;
+      }).slice(0, 8);
+
+      if (currentMatches.length === 0) {
+        posAutocompleteList.innerHTML = `
+          <div class="p-3 text-xs theme-text-dim text-center">
+            No matching item in catalog. Custom item entry.
+          </div>
+        `;
+        posAutocompleteList.classList.remove('hidden');
+        if (posStockStatusBadge) {
+          posStockStatusBadge.className = 'text-xs font-semibold px-2 py-0.5 rounded-full theme-bg-subtle theme-text-dim';
+          posStockStatusBadge.textContent = 'Custom Item';
+          posStockStatusBadge.classList.remove('hidden');
+        }
+        return;
+      }
+
+      posAutocompleteList.innerHTML = '';
+      currentMatches.forEach((item) => {
+        const itemRow = document.createElement('div');
+        itemRow.className = 'autocomplete-item flex items-center justify-between gap-2';
+
+        let stockPill = item.stockQuantity > 5
+          ? `<span class="badge-stock-in px-1.5 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} in stock</span>`
+          : (item.stockQuantity > 0
+              ? `<span class="badge-stock-low px-1.5 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} left</span>`
+              : `<span class="badge-stock-out px-1.5 py-0.5 rounded text-[10px] font-bold">Out of stock</span>`);
+
+        itemRow.innerHTML = `
+          <div>
+            <div class="font-bold text-xs theme-text-main">${item.name}</div>
+            <div class="text-[11px] font-mono theme-text-muted">Code: <span class="text-sky-400 font-bold">${item.code}</span></div>
+          </div>
+          <div class="text-right flex flex-col items-end gap-1">
+            <div class="text-xs font-mono font-bold text-emerald-400">${formatLKR(item.sellingPrice)}</div>
+            ${stockPill}
+          </div>
+        `;
+
+        itemRow.addEventListener('click', () => {
+          selectCatalogItem(item);
+          posQuantity.focus();
+          posQuantity.select();
+        });
+        posAutocompleteList.appendChild(itemRow);
+      });
+
+      posAutocompleteList.classList.remove('hidden');
+    });
+
+    // Enter-Key Rapid Checkout Flow:
+    // 1. Select matching item
+    // 2. Update price and total
+    // 3. Move focus to quantity
+    // 4. Pressing Enter in quantity posts transaction
+    posItemInput.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') {
+        if (!posAutocompleteList.classList.contains('hidden') && currentMatches.length > 0) {
+          e.preventDefault();
+          highlightedIndex = (highlightedIndex + 1) % currentMatches.length;
+          updateAutocompleteHighlight();
+        }
+      } else if (e.key === 'ArrowUp') {
+        if (!posAutocompleteList.classList.contains('hidden') && currentMatches.length > 0) {
+          e.preventDefault();
+          highlightedIndex = (highlightedIndex - 1 + currentMatches.length) % currentMatches.length;
+          updateAutocompleteHighlight();
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+
+        // If an item in dropdown is highlighted, select it
+        if (!posAutocompleteList.classList.contains('hidden') && highlightedIndex >= 0 && currentMatches[highlightedIndex]) {
+          selectCatalogItem(currentMatches[highlightedIndex]);
+          posAutocompleteList.classList.add('hidden');
+          posQuantity.focus();
+          posQuantity.select();
+          return;
+        }
+
+        // Exact match check
+        const inputVal = posItemInput.value.trim().toLowerCase();
+        const exactMatch = APP_STATE.inventoryCatalog.find(i =>
+          (i.code || '').toLowerCase() === inputVal ||
+          (i.name || '').toLowerCase() === inputVal
+        );
+
+        if (exactMatch) {
+          selectCatalogItem(exactMatch);
+          posAutocompleteList.classList.add('hidden');
+          posQuantity.focus();
+          posQuantity.select();
+          return;
+        }
+
+        // Auto-select top match if available
+        if (currentMatches.length > 0) {
+          selectCatalogItem(currentMatches[0]);
+          posAutocompleteList.classList.add('hidden');
+          posQuantity.focus();
+          posQuantity.select();
+          return;
+        }
+
+        // If item name & price are already valid, advance focus to quantity
+        if (posItemInput.value.trim() && Number(posSellingPrice.value) > 0) {
+          posQuantity.focus();
+          posQuantity.select();
+        }
+      } else if (e.key === 'Escape') {
+        posAutocompleteList.classList.add('hidden');
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!posItemInput.contains(e.target) && !posAutocompleteList.contains(e.target)) {
+        posAutocompleteList.classList.add('hidden');
+      }
+    });
+  }
+
+  // Pressing Enter inside quantity input directly submits sale
+  if (posQuantity) {
+    posQuantity.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        stationeryEntryForm.dispatchEvent(new Event('submit', { cancelable: true }));
+      }
+    });
+  }
+
+  // Stationery Sale Submission & Real-Time Stock & Profit Logging
+  if (stationeryEntryForm) {
+    stationeryEntryForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const itemName = posItemInput.value.trim();
+      const sellingPrice = roundCurrency(posSellingPrice.value);
+      const quantity = Math.max(1, parseInt(posQuantity.value, 10) || 1);
+      const totalAmount = roundCurrency(sellingPrice * quantity);
+
+      const matchedItem = APP_STATE.selectedCatalogItem;
+      const itemCode = matchedItem ? matchedItem.code : 'CUSTOM';
+      const category = matchedItem ? (matchedItem.category || 'General') : 'Custom';
+      // Getting (Cost) Price snapshot
+      const costPrice = matchedItem ? roundCurrency(matchedItem.costPrice || 0) : 0;
+      const unitProfit = roundCurrency(sellingPrice - costPrice);
+      const lineProfit = roundCurrency(unitProfit * quantity);
+
+      if (!itemName) {
+        showToast('Please specify an item name or code', 'error');
+        return;
+      }
+      if (sellingPrice <= 0) {
+        showToast('Please enter a valid selling price', 'error');
+        return;
+      }
+
+      // Stock check warning
+      if (matchedItem && matchedItem.stockQuantity < quantity) {
+        if (!confirm(`Warning: Only ${matchedItem.stockQuantity} units in stock for "${matchedItem.name}". Proceed with logging sale of ${quantity} units?`)) {
+          return;
+        }
+      }
+
+      const transactionPayload = {
+        date: getTodayDateString(),
+        time: getCurrentTimeString(),
+        itemCode: itemCode,
+        itemName: itemName,
+        category: category,
+        costPrice: costPrice,
+        sellingPrice: sellingPrice,
+        unitProfit: unitProfit,
+        profit: lineProfit,
+        quantity: quantity,
+        totalAmount: totalAmount,
+        timestamp: serverTimestamp()
+      };
+
+      try {
+        // 1. Add Stationery Transaction Record to Firestore
+        await addDoc(collection(db, 'stationery_transactions'), transactionPayload);
+
+        // 2. Automatically Deduct Sold Quantity in Firestore
+        if (matchedItem && matchedItem.id) {
+          const itemDocRef = doc(db, 'inventory', matchedItem.id);
+          await updateDoc(itemDocRef, {
+            stockQuantity: increment(-quantity),
+            updatedAt: serverTimestamp()
+          });
+          const remainingStock = Math.max(0, matchedItem.stockQuantity - quantity);
+          showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) • Stock left: ${remainingStock}`, 'success');
+        } else {
+          showToast(`Logged custom sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)})`, 'success');
+        }
+
+        // Reset Entry Form
+        stationeryEntryForm.reset();
+        APP_STATE.selectedCatalogItem = null;
+        if (posItemBadge) posItemBadge.classList.add('hidden');
+        if (posStockStatusBadge) posStockStatusBadge.classList.add('hidden');
+        if (posQuantity) posQuantity.value = '1';
+        if (posTotalAmountPreview) posTotalAmountPreview.textContent = 'Rs. 0.00';
+        posItemInput.focus();
+      } catch (err) {
+        logDebug(`Error recording stationery sale: ${err.message}`, 'ERROR');
+        showToast(`Failed to log sale: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  setupEditStationeryModal();
+}
+
+function updateStockPreviews() {
+  if (APP_STATE.selectedCatalogItem) {
+    const updated = APP_STATE.inventoryCatalog.find(i => i.id === APP_STATE.selectedCatalogItem.id);
+    if (updated) {
+      APP_STATE.selectedCatalogItem = updated;
+      const posStockStatusBadge = document.getElementById('posStockStatusBadge');
+      if (posStockStatusBadge) {
+        if (updated.stockQuantity > 5) {
+          posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-in';
+          posStockStatusBadge.textContent = `In Stock: ${updated.stockQuantity} units`;
+        } else if (updated.stockQuantity > 0) {
+          posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-low';
+          posStockStatusBadge.textContent = `Low Stock: ${updated.stockQuantity} units`;
+        } else {
+          posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-out';
+          posStockStatusBadge.textContent = `Out of Stock (0 units)`;
+        }
+      }
+    }
+  }
+}
+
+function renderStationeryRecentFeed() {
+  const feed = document.getElementById('statRecentFeed');
+  if (!feed) return;
+
+  const count = APP_STATE.todayStationeryTransactions.length;
+  if (count === 0) {
+    feed.innerHTML = `
+      <div class="p-3 text-xs text-center theme-text-dim rounded-xl border theme-border">
+        No stationery sales recorded yet today.
+      </div>
+    `;
+    return;
+  }
+
+  feed.innerHTML = '';
+  APP_STATE.todayStationeryTransactions.slice(0, 5).forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'p-2.5 rounded-xl theme-bg-subtle border theme-border flex items-center justify-between text-xs';
+    const profitDisplay = item.profit !== undefined ? ` • Profit: +${formatLKR(item.profit)}` : '';
+
+    row.innerHTML = `
+      <div>
+        <div class="font-bold theme-text-main">${item.itemName}</div>
+        <div class="text-[11px] theme-text-dim font-mono">${item.time || '--:--'} • Code: ${item.itemCode || 'ST'} • Qty: ${item.quantity || 1}${profitDisplay}</div>
+      </div>
+      <div class="font-mono font-bold text-emerald-400">
+        ${formatLKR(item.totalAmount || item.sellingPrice)}
+      </div>
+    `;
+    feed.appendChild(row);
+  });
+}
+
+// =============================================================================
+// 12. MOBILE RELOADS MODULE & CLEAN COMMISSION
+// =============================================================================
+
+function setupReloadModule() {
+  const reloadEntryForm = document.getElementById('reloadEntryForm');
+  const reloadMobileInput = document.getElementById('reloadMobileInput');
+  const reloadAmountInput = document.getElementById('reloadAmountInput');
+
+  // Operator Select Buttons
+  document.querySelectorAll('[data-select-op]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const op = btn.getAttribute('data-select-op');
+      APP_STATE.activeReloadOperator = op;
+
+      document.querySelectorAll('[data-select-op]').forEach(b => {
+        b.classList.remove('ring-2', 'ring-sky-400', 'theme-bg-elevated');
+      });
+      btn.classList.add('ring-2', 'ring-sky-400', 'theme-bg-elevated');
+
+      updateReloadRatePreview();
+    });
+  });
+
+  if (reloadAmountInput) {
+    reloadAmountInput.addEventListener('input', updateReloadRatePreview);
+  }
+
+  // Submit Reload
+  if (reloadEntryForm) {
+    reloadEntryForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const amount = roundCurrency(reloadAmountInput.value);
+      if (amount <= 0) {
+        showToast('Please enter a valid reload amount', 'error');
+        return;
+      }
+
+      const mobileNumber = (reloadMobileInput?.value || '').trim() || '-';
+      const op = APP_STATE.activeReloadOperator;
+      const rate = Number(APP_STATE.commissionRates[op]) || 0;
+      const commissionAmount = roundCurrency((amount * rate) / 100);
+
+      const reloadPayload = {
+        date: getTodayDateString(),
+        time: getCurrentTimeString(),
+        operator: op,
+        mobileNumber: mobileNumber,
+        amount: amount,
+        commissionRate: rate,
+        commissionAmount: commissionAmount,
+        profit: commissionAmount, // Reload commission is treated as profit
+        timestamp: serverTimestamp()
+      };
+
+      try {
+        await addDoc(collection(db, 'reload_transactions'), reloadPayload);
+        const mobileTag = mobileNumber !== '-' ? ` to ${mobileNumber}` : '';
+        // Zero occurrences of "Comm." text: clean currency output
+        showToast(`Recorded ${op} Reload ${formatLKR(amount)}${mobileTag} (+${formatLKR(commissionAmount)})`, 'success');
+
+        reloadAmountInput.value = '';
+        if (reloadMobileInput) reloadMobileInput.value = '';
+        updateReloadRatePreview();
+        reloadMobileInput ? reloadMobileInput.focus() : reloadAmountInput.focus();
+      } catch (err) {
+        logDebug(`Error recording reload: ${err.message}`, 'ERROR');
+        showToast(`Failed to record reload: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  updateReloadRatePreview();
+}
+
+function updateReloadRatePreview() {
+  const reloadAmountInput = document.getElementById('reloadAmountInput');
+  const reloadCommissionPreview = document.getElementById('reloadCommissionPreview');
+  const reloadActiveRatePreview = document.getElementById('reloadActiveRatePreview');
+
+  const op = APP_STATE.activeReloadOperator;
+  const rate = Number(APP_STATE.commissionRates[op]) || 0;
+  const amount = Number(reloadAmountInput?.value) || 0;
+  const earned = roundCurrency((amount * rate) / 100);
+
+  if (reloadActiveRatePreview) reloadActiveRatePreview.textContent = `${rate.toFixed(2)}%`;
+  // Clean currency only: NO "Comm." text
+  if (reloadCommissionPreview) reloadCommissionPreview.textContent = formatLKR(earned);
+}
+
+function updateCommissionUI() {
+  const formAirtel = document.getElementById('formRateAirtel');
+  const formDialog = document.getElementById('formRateDialog');
+  const formMobitel = document.getElementById('formRateMobitel');
+  const formHutch = document.getElementById('formRateHutch');
+
+  if (formAirtel) formAirtel.textContent = `${APP_STATE.commissionRates.AIRTEL.toFixed(2)}%`;
+  if (formDialog) formDialog.textContent = `${APP_STATE.commissionRates.DIALOG.toFixed(2)}%`;
+  if (formMobitel) formMobitel.textContent = `${APP_STATE.commissionRates.MOBITEL.toFixed(2)}%`;
+  if (formHutch) formHutch.textContent = `${APP_STATE.commissionRates.HUTCH.toFixed(2)}%`;
+
+  const inputAirtel = document.getElementById('rateAirtelInput');
+  const inputDialog = document.getElementById('rateDialogInput');
+  const inputMobitel = document.getElementById('rateMobitelInput');
+  const inputHutch = document.getElementById('rateHutchInput');
+
+  if (inputAirtel) inputAirtel.value = APP_STATE.commissionRates.AIRTEL.toFixed(2);
+  if (inputDialog) inputDialog.value = APP_STATE.commissionRates.DIALOG.toFixed(2);
+  if (inputMobitel) inputMobitel.value = APP_STATE.commissionRates.MOBITEL.toFixed(2);
+  if (inputHutch) inputHutch.value = APP_STATE.commissionRates.HUTCH.toFixed(2);
+
+  updateReloadRatePreview();
+}
 
 function renderReloadPresets() {
   const container = document.getElementById('reloadPresetsContainer');
@@ -993,7 +1812,7 @@ function renderReloadPresets() {
   APP_STATE.reloadPresets.forEach(amount => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'preset-btn px-3 py-2 rounded-xl theme-bg-subtle border theme-border font-mono font-bold text-xs hover:theme-bg-elevated transition glass-btn';
+    btn.className = 'preset-btn px-3.5 py-2 rounded-xl theme-bg-subtle border theme-border font-mono font-bold text-xs hover:theme-bg-elevated transition glass-btn';
     btn.textContent = `Rs. ${amount}`;
     btn.addEventListener('click', () => {
       if (reloadAmountInput) {
@@ -1084,7 +1903,7 @@ function setupPresetControls() {
 
   if (resetPresetsBtn) {
     resetPresetsBtn.addEventListener('click', async () => {
-      if (!confirm('Reset quick preset amounts back to defaults (Rs. 50, 100, 200, 500, 1000, 2000)?')) return;
+      if (!confirm('Reset quick presets back to defaults (Rs. 100, 250, 500, 1000)?')) return;
       try {
         await setDoc(doc(db, 'settings', 'presets'), {
           amounts: DEFAULT_PRESETS,
@@ -1099,514 +1918,7 @@ function setupPresetControls() {
 }
 
 // =============================================================================
-// 10. DASHBOARD FINANCIAL KPIS & CATALOG KPI
-// =============================================================================
-
-function updateDashboardFinancialKPIs() {
-  let statSales = 0;
-  APP_STATE.todayStationeryTransactions.forEach(t => {
-    statSales += Number(t.totalAmount || t.sellingPrice || 0);
-  });
-
-  let reloadVolume = 0;
-  let reloadCommission = 0;
-  APP_STATE.todayReloadTransactions.forEach(r => {
-    reloadVolume += Number(r.amount || 0);
-    reloadCommission += Number(r.commissionAmount || 0);
-  });
-
-  const totalRevenue = roundCurrency(statSales + reloadCommission);
-
-  const dashCombined = document.getElementById('dashTodayCombinedRevenue');
-  const dashStat = document.getElementById('dashStationerySales');
-  const dashReloadVol = document.getElementById('dashReloadVolume');
-  const dashReloadComm = document.getElementById('dashReloadCommission');
-
-  if (dashCombined) dashCombined.textContent = formatLKR(totalRevenue);
-  if (dashStat) dashStat.textContent = formatLKR(roundCurrency(statSales));
-  if (dashReloadVol) dashReloadVol.textContent = formatLKR(roundCurrency(reloadVolume));
-  if (dashReloadComm) dashReloadComm.textContent = `+${formatLKR(roundCurrency(reloadCommission))} Comm.`;
-}
-
-function updateDashboardCatalogKPIs() {
-  const dashCatalogCount = document.getElementById('dashCatalogCount');
-  if (dashCatalogCount) {
-    dashCatalogCount.textContent = APP_STATE.inventoryCatalog.length.toLocaleString();
-  }
-}
-
-// =============================================================================
-// 11. MODULE 2: STATIONERY ENTRY & REAL-TIME STOCK DEDUCTION
-// =============================================================================
-
-function setupStationeryModule() {
-  const posItemInput = document.getElementById('posItemInput');
-  const posAutocompleteList = document.getElementById('posAutocompleteList');
-  const posSellingPrice = document.getElementById('posSellingPrice');
-  const posQuantity = document.getElementById('posQuantity');
-  const posTotalAmountPreview = document.getElementById('posTotalAmountPreview');
-  const posStockStatusBadge = document.getElementById('posStockStatusBadge');
-  const posItemBadge = document.getElementById('posItemBadge');
-  const stationeryEntryForm = document.getElementById('stationeryEntryForm');
-  const posQtyDecBtn = document.getElementById('posQtyDecBtn');
-  const posQtyIncBtn = document.getElementById('posQtyIncBtn');
-
-  // Stepper Handlers
-  if (posQtyDecBtn && posQuantity) {
-    posQtyDecBtn.addEventListener('click', () => {
-      const current = Math.max(1, (parseInt(posQuantity.value, 10) || 1) - 1);
-      posQuantity.value = current;
-      calculatePosTotal();
-    });
-  }
-
-  if (posQtyIncBtn && posQuantity) {
-    posQtyIncBtn.addEventListener('click', () => {
-      const current = (parseInt(posQuantity.value, 10) || 1) + 1;
-      posQuantity.value = current;
-      calculatePosTotal();
-    });
-  }
-
-  // Quick Quantity Pills (1, 2, 5, 10)
-  document.querySelectorAll('[data-qty-pill]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const qty = parseInt(btn.getAttribute('data-qty-pill'), 10) || 1;
-      if (posQuantity) {
-        posQuantity.value = qty;
-        calculatePosTotal();
-      }
-    });
-  });
-
-  function calculatePosTotal() {
-    const price = Number(posSellingPrice.value) || 0;
-    const qty = Math.max(1, parseInt(posQuantity.value, 10) || 1);
-    const total = roundCurrency(price * qty);
-    if (posTotalAmountPreview) posTotalAmountPreview.textContent = formatLKR(total);
-  }
-
-  if (posSellingPrice) posSellingPrice.addEventListener('input', calculatePosTotal);
-  if (posQuantity) posQuantity.addEventListener('input', calculatePosTotal);
-
-  // Autocomplete Filtering
-  let highlightedIndex = -1;
-  let currentMatches = [];
-
-  function updateAutocompleteHighlight() {
-    const items = posAutocompleteList.querySelectorAll('.autocomplete-item');
-    items.forEach((itemEl, idx) => {
-      if (idx === highlightedIndex) {
-        itemEl.classList.add('bg-sky-500/20');
-        itemEl.scrollIntoView({ block: 'nearest' });
-      } else {
-        itemEl.classList.remove('bg-sky-500/20');
-      }
-    });
-  }
-
-  function selectCatalogItem(item) {
-    posItemInput.value = item.name;
-    posSellingPrice.value = Number(item.sellingPrice).toFixed(2);
-    APP_STATE.selectedCatalogItem = item;
-
-    if (posItemBadge) {
-      posItemBadge.textContent = item.code;
-      posItemBadge.classList.remove('hidden');
-    }
-
-    renderPosStockBadge(item.stockQuantity);
-    posAutocompleteList.classList.add('hidden');
-    calculatePosTotal();
-  }
-
-  function renderPosStockBadge(stockQty) {
-    if (!posStockStatusBadge) return;
-    posStockStatusBadge.classList.remove('hidden');
-
-    if (stockQty > 5) {
-      posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-in';
-      posStockStatusBadge.textContent = `In Stock: ${stockQty} units`;
-    } else if (stockQty > 0) {
-      posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-low';
-      posStockStatusBadge.textContent = `Low Stock: ${stockQty} units`;
-    } else {
-      posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-out';
-      posStockStatusBadge.textContent = `Out of Stock (0 units)`;
-    }
-  }
-
-  if (posItemInput && posAutocompleteList) {
-    posItemInput.addEventListener('input', () => {
-      const queryStr = posItemInput.value.trim().toLowerCase();
-      highlightedIndex = -1;
-
-      if (!queryStr) {
-        posAutocompleteList.classList.add('hidden');
-        posAutocompleteList.innerHTML = '';
-        currentMatches = [];
-        if (posItemBadge) posItemBadge.classList.add('hidden');
-        if (posStockStatusBadge) posStockStatusBadge.classList.add('hidden');
-        APP_STATE.selectedCatalogItem = null;
-        return;
-      }
-
-      currentMatches = APP_STATE.inventoryCatalog.filter(item => {
-        const cMatch = (item.code || '').toLowerCase().includes(queryStr);
-        const nMatch = (item.name || '').toLowerCase().includes(queryStr);
-        return cMatch || nMatch;
-      }).slice(0, 8);
-
-      if (currentMatches.length === 0) {
-        posAutocompleteList.innerHTML = `
-          <div class="p-3 text-xs theme-text-dim text-center">
-            No matching inventory item found. Custom sale entry.
-          </div>
-        `;
-        posAutocompleteList.classList.remove('hidden');
-        if (posStockStatusBadge) {
-          posStockStatusBadge.className = 'text-xs font-semibold px-2 py-0.5 rounded-full theme-bg-subtle theme-text-dim';
-          posStockStatusBadge.textContent = 'Custom Item';
-          posStockStatusBadge.classList.remove('hidden');
-        }
-        return;
-      }
-
-      posAutocompleteList.innerHTML = '';
-      currentMatches.forEach((item) => {
-        const itemRow = document.createElement('div');
-        itemRow.className = 'autocomplete-item flex items-center justify-between gap-2';
-
-        let stockPill = item.stockQuantity > 5 
-          ? `<span class="badge-stock-in px-1.5 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} in stock</span>`
-          : (item.stockQuantity > 0 
-              ? `<span class="badge-stock-low px-1.5 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} left</span>`
-              : `<span class="badge-stock-out px-1.5 py-0.5 rounded text-[10px] font-bold">Out of stock</span>`);
-
-        itemRow.innerHTML = `
-          <div>
-            <div class="font-bold text-xs theme-text-main">${item.name}</div>
-            <div class="text-[11px] font-mono theme-text-muted">Code: <span class="text-sky-400 font-bold">${item.code}</span></div>
-          </div>
-          <div class="text-right flex flex-col items-end gap-1">
-            <div class="text-xs font-mono font-bold text-emerald-400">${formatLKR(item.sellingPrice)}</div>
-            ${stockPill}
-          </div>
-        `;
-
-        itemRow.addEventListener('click', () => {
-          selectCatalogItem(item);
-          posSellingPrice.focus();
-        });
-        posAutocompleteList.appendChild(itemRow);
-      });
-
-      posAutocompleteList.classList.remove('hidden');
-    });
-
-    // Enter-Key Auto-Add Bug Fix & Keyboard Stepping
-    posItemInput.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown') {
-        if (!posAutocompleteList.classList.contains('hidden') && currentMatches.length > 0) {
-          e.preventDefault();
-          highlightedIndex = (highlightedIndex + 1) % currentMatches.length;
-          updateAutocompleteHighlight();
-        }
-      } else if (e.key === 'ArrowUp') {
-        if (!posAutocompleteList.classList.contains('hidden') && currentMatches.length > 0) {
-          e.preventDefault();
-          highlightedIndex = (highlightedIndex - 1 + currentMatches.length) % currentMatches.length;
-          updateAutocompleteHighlight();
-        }
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        
-        // 1. If dropdown open & highlighted, select it
-        if (!posAutocompleteList.classList.contains('hidden') && highlightedIndex >= 0 && currentMatches[highlightedIndex]) {
-          selectCatalogItem(currentMatches[highlightedIndex]);
-          posAutocompleteList.classList.add('hidden');
-          return;
-        }
-
-        // 2. Check exact match
-        const inputVal = posItemInput.value.trim().toLowerCase();
-        const exactMatch = APP_STATE.inventoryCatalog.find(i => 
-          (i.code || '').toLowerCase() === inputVal || 
-          (i.name || '').toLowerCase() === inputVal
-        );
-
-        if (exactMatch && (!APP_STATE.selectedCatalogItem || APP_STATE.selectedCatalogItem.code !== exactMatch.code)) {
-          selectCatalogItem(exactMatch);
-          posAutocompleteList.classList.add('hidden');
-          return;
-        }
-
-        // 3. If first match exists in autocomplete list, auto-select it
-        if (!APP_STATE.selectedCatalogItem && currentMatches.length > 0) {
-          selectCatalogItem(currentMatches[0]);
-          posAutocompleteList.classList.add('hidden');
-          return;
-        }
-
-        // 4. Submit directly if valid
-        if (posItemInput.value.trim() && Number(posSellingPrice.value) > 0) {
-          posAutocompleteList.classList.add('hidden');
-          stationeryEntryForm.dispatchEvent(new Event('submit', { cancelable: true }));
-        }
-      } else if (e.key === 'Escape') {
-        posAutocompleteList.classList.add('hidden');
-      }
-    });
-
-    document.addEventListener('click', (e) => {
-      if (!posItemInput.contains(e.target) && !posAutocompleteList.contains(e.target)) {
-        posAutocompleteList.classList.add('hidden');
-      }
-    });
-  }
-
-  // Stationery Sale Submission & Real-Time Stock Deduction
-  if (stationeryEntryForm) {
-    stationeryEntryForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const itemName = posItemInput.value.trim();
-      const sellingPrice = roundCurrency(posSellingPrice.value);
-      const quantity = Math.max(1, parseInt(posQuantity.value, 10) || 1);
-      const totalAmount = roundCurrency(sellingPrice * quantity);
-      const matchedItem = APP_STATE.selectedCatalogItem;
-      const itemCode = matchedItem ? matchedItem.code : 'CUSTOM';
-
-      if (!itemName) {
-        showToast('Please specify an item name or code', 'error');
-        return;
-      }
-      if (sellingPrice <= 0) {
-        showToast('Please enter a valid selling price', 'error');
-        return;
-      }
-
-      // Check stock level if matched to catalog item
-      if (matchedItem && matchedItem.stockQuantity < quantity) {
-        if (!confirm(`Warning: Only ${matchedItem.stockQuantity} units available in stock for "${matchedItem.name}". Proceed with logging sale of ${quantity} units?`)) {
-          return;
-        }
-      }
-
-      const transactionPayload = {
-        date: getTodayDateString(),
-        time: getCurrentTimeString(),
-        itemCode: itemCode,
-        itemName: itemName,
-        quantity: quantity,
-        sellingPrice: sellingPrice,
-        totalAmount: totalAmount,
-        timestamp: serverTimestamp()
-      };
-
-      try {
-        // 1. Add Stationery Transaction Record to Firestore
-        await addDoc(collection(db, 'stationery_transactions'), transactionPayload);
-
-        // 2. Automatically Deduct Sold Quantity from Inventory in Firestore
-        if (matchedItem && matchedItem.id) {
-          const itemDocRef = doc(db, 'inventory', matchedItem.id);
-          await updateDoc(itemDocRef, {
-            stockQuantity: increment(-quantity),
-            updatedAt: serverTimestamp()
-          });
-          const remainingStock = Math.max(0, matchedItem.stockQuantity - quantity);
-          showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) • Stock: ${remainingStock}`, 'success');
-        } else {
-          showToast(`Logged custom sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)})`, 'success');
-        }
-
-        // Reset Entry Form
-        stationeryEntryForm.reset();
-        APP_STATE.selectedCatalogItem = null;
-        if (posItemBadge) posItemBadge.classList.add('hidden');
-        if (posStockStatusBadge) posStockStatusBadge.classList.add('hidden');
-        if (posQuantity) posQuantity.value = '1';
-        if (posTotalAmountPreview) posTotalAmountPreview.textContent = 'Rs. 0.00';
-        posItemInput.focus();
-      } catch (err) {
-        logDebug(`Error recording stationery sale: ${err.message}`, 'ERROR');
-        showToast(`Failed to log sale: ${err.message}`, 'error');
-      }
-    });
-  }
-
-  // Setup Edit Stationery Transaction Modal
-  setupEditStationeryModal();
-}
-
-function updateStockPreviews() {
-  if (APP_STATE.selectedCatalogItem) {
-    const updated = APP_STATE.inventoryCatalog.find(i => i.id === APP_STATE.selectedCatalogItem.id);
-    if (updated) {
-      APP_STATE.selectedCatalogItem = updated;
-      const posStockStatusBadge = document.getElementById('posStockStatusBadge');
-      if (posStockStatusBadge) {
-        if (updated.stockQuantity > 5) {
-          posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-in';
-          posStockStatusBadge.textContent = `In Stock: ${updated.stockQuantity} units`;
-        } else if (updated.stockQuantity > 0) {
-          posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-low';
-          posStockStatusBadge.textContent = `Low Stock: ${updated.stockQuantity} units`;
-        } else {
-          posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-out';
-          posStockStatusBadge.textContent = `Out of Stock (0 units)`;
-        }
-      }
-    }
-  }
-}
-
-function renderStationeryRecentFeed() {
-  const feed = document.getElementById('statRecentFeed');
-  if (!feed) return;
-
-  const count = APP_STATE.todayStationeryTransactions.length;
-  if (count === 0) {
-    feed.innerHTML = `
-      <div class="p-3 text-xs text-center theme-text-dim rounded-xl border theme-border">
-        No stationery sales recorded yet today.
-      </div>
-    `;
-    return;
-  }
-
-  feed.innerHTML = '';
-  APP_STATE.todayStationeryTransactions.slice(0, 5).forEach(item => {
-    const row = document.createElement('div');
-    row.className = 'p-2.5 rounded-xl theme-bg-subtle border theme-border flex items-center justify-between text-xs';
-    row.innerHTML = `
-      <div>
-        <div class="font-bold theme-text-main">${item.itemName}</div>
-        <div class="text-[11px] theme-text-dim font-mono">${item.time || '--:--'} • Code: ${item.itemCode || 'ST'} • Qty: ${item.quantity || 1}</div>
-      </div>
-      <div class="font-mono font-bold text-emerald-400">
-        ${formatLKR(item.totalAmount || item.sellingPrice)}
-      </div>
-    `;
-    feed.appendChild(row);
-  });
-}
-
-// =============================================================================
-// 12. MODULE 3: MOBILE RELOADS & NUMBER LOGGING
-// =============================================================================
-
-function setupReloadModule() {
-  const reloadEntryForm = document.getElementById('reloadEntryForm');
-  const reloadMobileInput = document.getElementById('reloadMobileInput');
-  const reloadAmountInput = document.getElementById('reloadAmountInput');
-  const reloadCommissionPreview = document.getElementById('reloadCommissionPreview');
-  const reloadActiveRatePreview = document.getElementById('reloadActiveRatePreview');
-
-  // Operator Select Buttons
-  document.querySelectorAll('[data-select-op]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const op = btn.getAttribute('data-select-op');
-      APP_STATE.activeReloadOperator = op;
-
-      document.querySelectorAll('[data-select-op]').forEach(b => {
-        b.classList.remove('ring-2', 'ring-sky-400', 'theme-bg-elevated');
-      });
-      btn.classList.add('ring-2', 'ring-sky-400', 'theme-bg-elevated');
-
-      updateReloadRatePreview();
-    });
-  });
-
-  if (reloadAmountInput) {
-    reloadAmountInput.addEventListener('input', updateReloadRatePreview);
-  }
-
-  // Submit Reload
-  if (reloadEntryForm) {
-    reloadEntryForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const amount = roundCurrency(reloadAmountInput.value);
-      if (amount <= 0) {
-        showToast('Please enter a valid reload amount', 'error');
-        return;
-      }
-
-      const mobileNumber = (reloadMobileInput?.value || '').trim() || '-';
-      const op = APP_STATE.activeReloadOperator;
-      const rate = Number(APP_STATE.commissionRates[op]) || 0;
-      const commissionAmount = roundCurrency((amount * rate) / 100);
-
-      const reloadPayload = {
-        date: getTodayDateString(),
-        time: getCurrentTimeString(),
-        operator: op,
-        mobileNumber: mobileNumber,
-        amount: amount,
-        commissionRate: rate,
-        commissionAmount: commissionAmount,
-        timestamp: serverTimestamp()
-      };
-
-      try {
-        await addDoc(collection(db, 'reload_transactions'), reloadPayload);
-        const mobileTag = mobileNumber !== '-' ? ` to ${mobileNumber}` : '';
-        showToast(`Recorded ${op} Reload ${formatLKR(amount)}${mobileTag} (Comm: ${formatLKR(commissionAmount)})`, 'success');
-
-        reloadAmountInput.value = '';
-        if (reloadMobileInput) reloadMobileInput.value = '';
-        updateReloadRatePreview();
-        reloadMobileInput ? reloadMobileInput.focus() : reloadAmountInput.focus();
-      } catch (err) {
-        logDebug(`Error recording reload: ${err.message}`, 'ERROR');
-        showToast(`Failed to record reload: ${err.message}`, 'error');
-      }
-    });
-  }
-
-  updateReloadRatePreview();
-}
-
-function updateReloadRatePreview() {
-  const reloadAmountInput = document.getElementById('reloadAmountInput');
-  const reloadCommissionPreview = document.getElementById('reloadCommissionPreview');
-  const reloadActiveRatePreview = document.getElementById('reloadActiveRatePreview');
-
-  const op = APP_STATE.activeReloadOperator;
-  const rate = Number(APP_STATE.commissionRates[op]) || 0;
-  const amount = Number(reloadAmountInput?.value) || 0;
-  const earned = roundCurrency((amount * rate) / 100);
-
-  if (reloadActiveRatePreview) reloadActiveRatePreview.textContent = `${rate.toFixed(2)}%`;
-  if (reloadCommissionPreview) reloadCommissionPreview.textContent = formatLKR(earned);
-}
-
-function updateCommissionUI() {
-  const formAirtel = document.getElementById('formRateAirtel');
-  const formDialog = document.getElementById('formRateDialog');
-  const formMobitel = document.getElementById('formRateMobitel');
-  const formHutch = document.getElementById('formRateHutch');
-
-  if (formAirtel) formAirtel.textContent = `${APP_STATE.commissionRates.AIRTEL.toFixed(2)}%`;
-  if (formDialog) formDialog.textContent = `${APP_STATE.commissionRates.DIALOG.toFixed(2)}%`;
-  if (formMobitel) formMobitel.textContent = `${APP_STATE.commissionRates.MOBITEL.toFixed(2)}%`;
-  if (formHutch) formHutch.textContent = `${APP_STATE.commissionRates.HUTCH.toFixed(2)}%`;
-
-  const inputAirtel = document.getElementById('rateAirtelInput');
-  const inputDialog = document.getElementById('rateDialogInput');
-  const inputMobitel = document.getElementById('rateMobitelInput');
-  const inputHutch = document.getElementById('rateHutchInput');
-
-  if (inputAirtel) inputAirtel.value = APP_STATE.commissionRates.AIRTEL.toFixed(2);
-  if (inputDialog) inputDialog.value = APP_STATE.commissionRates.DIALOG.toFixed(2);
-  if (inputMobitel) inputMobitel.value = APP_STATE.commissionRates.MOBITEL.toFixed(2);
-  if (inputHutch) inputHutch.value = APP_STATE.commissionRates.HUTCH.toFixed(2);
-
-  updateReloadRatePreview();
-}
-
-// =============================================================================
-// 13. MODULE 4: STOCK INVENTORY LEVELS VIEW
+// 13. STOCK INVENTORY VIEW
 // =============================================================================
 
 function setupStockModule() {
@@ -1641,11 +1953,12 @@ function renderStockTable() {
   let filtered = APP_STATE.inventoryCatalog.filter(item => {
     if (!queryStr) return true;
     return (item.code || '').toLowerCase().includes(queryStr) ||
-           (item.name || '').toLowerCase().includes(queryStr);
+           (item.name || '').toLowerCase().includes(queryStr) ||
+           (item.category || '').toLowerCase().includes(queryStr);
   });
 
   if (APP_STATE.stockFilter === 'LOW') {
-    filtered = filtered.filter(item => item.stockQuantity > 0 && item.stockQuantity <= 5);
+    filtered = filtered.filter(item => item.stockQuantity > 0 && item.stockQuantity <= item.lowStockThreshold);
   } else if (APP_STATE.stockFilter === 'OUT') {
     filtered = filtered.filter(item => item.stockQuantity <= 0);
   }
@@ -1654,7 +1967,7 @@ function renderStockTable() {
     tbody.innerHTML = `
       <tr>
         <td colspan="5" class="py-10 text-center theme-text-dim text-xs">
-          No inventory items match the current filter.
+          No inventory items match the current query/filter.
         </td>
       </tr>
     `;
@@ -1666,22 +1979,25 @@ function renderStockTable() {
     tr.className = 'hover:theme-bg-subtle transition';
 
     let badgeHtml = '';
-    if (item.stockQuantity > 5) {
-      badgeHtml = `<span class="badge-stock-in px-2 py-0.5 rounded text-[11px] font-bold">${item.stockQuantity} units</span>`;
+    if (item.stockQuantity > item.lowStockThreshold) {
+      badgeHtml = `<span class="badge-stock-in px-2.5 py-0.5 rounded text-[11px] font-bold">${item.stockQuantity} units</span>`;
     } else if (item.stockQuantity > 0) {
-      badgeHtml = `<span class="badge-stock-low px-2 py-0.5 rounded text-[11px] font-bold">Low (${item.stockQuantity})</span>`;
+      badgeHtml = `<span class="badge-stock-low px-2.5 py-0.5 rounded text-[11px] font-bold">Low (${item.stockQuantity})</span>`;
     } else {
-      badgeHtml = `<span class="badge-stock-out px-2 py-0.5 rounded text-[11px] font-bold">Out of Stock</span>`;
+      badgeHtml = `<span class="badge-stock-out px-2.5 py-0.5 rounded text-[11px] font-bold">Out of Stock</span>`;
     }
 
     tr.innerHTML = `
       <td class="py-3 px-3 sm:px-4 font-mono font-bold text-sky-400 whitespace-nowrap text-xs">${item.code}</td>
-      <td class="py-3 px-3 sm:px-4 font-medium theme-text-main text-xs">${item.name}</td>
+      <td class="py-3 px-3 sm:px-4 font-medium theme-text-main text-xs">
+        <div>${item.name}</div>
+        <div class="text-[10px] theme-text-dim">${item.category || 'General'}</div>
+      </td>
       <td class="py-3 px-3 sm:px-4 text-right font-mono font-bold text-xs theme-text-main">${formatLKR(item.sellingPrice)}</td>
       <td class="py-3 px-3 sm:px-4 text-center whitespace-nowrap">${badgeHtml}</td>
       <td class="py-3 px-3 sm:px-4 text-center whitespace-nowrap">
-        <button type="button" data-pos-quick="${item.id}" class="px-2.5 py-1 rounded-lg text-xs font-semibold theme-bg-accent text-white hover:opacity-90 transition glass-btn">
-          Sell Item
+        <button type="button" data-pos-quick="${item.id}" class="px-3 py-1 rounded-lg text-xs font-semibold theme-bg-accent text-white hover:opacity-90 transition glass-btn">
+          Sell
         </button>
       </td>
     `;
@@ -1703,7 +2019,7 @@ function renderStockTable() {
 }
 
 // =============================================================================
-// 14. MODULE 5: CONSOLIDATED MASTER LOGS & PERFORMANCE OVERVIEW
+// 14. MASTER LOGS, CONSOLIDATED METRICS & PROFIT FILTERING
 // =============================================================================
 
 function setupMasterLogsModule() {
@@ -1726,6 +2042,7 @@ function setupMasterLogsModule() {
   const btnToday = document.getElementById('logFilterTodayBtn');
   const btnYesterday = document.getElementById('logFilterYesterdayBtn');
   const btnMonth = document.getElementById('logFilterThisMonthBtn');
+  const inputSpecificDate = document.getElementById('logFilterSpecificDate');
   const logFrom = document.getElementById('logDateFrom');
   const logTo = document.getElementById('logDateTo');
   const btnApplyRange = document.getElementById('applyLogDateRangeBtn');
@@ -1735,6 +2052,7 @@ function setupMasterLogsModule() {
       const today = getTodayDateString();
       if (logFrom) logFrom.value = today;
       if (logTo) logTo.value = today;
+      if (inputSpecificDate) inputSpecificDate.value = '';
       APP_STATE.logDateFrom = today;
       APP_STATE.logDateTo = today;
       applyMasterLogFilters();
@@ -1746,6 +2064,7 @@ function setupMasterLogsModule() {
       const yest = getYesterdayDateString();
       if (logFrom) logFrom.value = yest;
       if (logTo) logTo.value = yest;
+      if (inputSpecificDate) inputSpecificDate.value = '';
       APP_STATE.logDateFrom = yest;
       APP_STATE.logDateTo = yest;
       applyMasterLogFilters();
@@ -1758,8 +2077,21 @@ function setupMasterLogsModule() {
       const firstOfMonth = `${today.substring(0, 7)}-01`;
       if (logFrom) logFrom.value = firstOfMonth;
       if (logTo) logTo.value = today;
+      if (inputSpecificDate) inputSpecificDate.value = '';
       APP_STATE.logDateFrom = firstOfMonth;
       APP_STATE.logDateTo = today;
+      applyMasterLogFilters();
+    });
+  }
+
+  if (inputSpecificDate) {
+    inputSpecificDate.addEventListener('change', () => {
+      const pickedDate = inputSpecificDate.value;
+      if (!pickedDate) return;
+      if (logFrom) logFrom.value = pickedDate;
+      if (logTo) logTo.value = pickedDate;
+      APP_STATE.logDateFrom = pickedDate;
+      APP_STATE.logDateTo = pickedDate;
       applyMasterLogFilters();
     });
   }
@@ -1768,6 +2100,7 @@ function setupMasterLogsModule() {
     btnApplyRange.addEventListener('click', () => {
       APP_STATE.logDateFrom = logFrom.value || getTodayDateString();
       APP_STATE.logDateTo = logTo.value || logFrom.value || getTodayDateString();
+      if (inputSpecificDate) inputSpecificDate.value = '';
       applyMasterLogFilters();
     });
   }
@@ -1787,32 +2120,16 @@ function setupMasterLogsModule() {
     downloadPdfBtn.addEventListener('click', generateProfessionalPdfReport);
   }
 
-  // Metric Cards Drag & Drop + Sizing Customization
   initMetricCardsLayoutEngine();
 }
-
-// -----------------------------------------------------------------------------
-// METRIC CARDS LAYOUT ENGINE (Drag & Drop Reordering and Card Resizing)
-// -----------------------------------------------------------------------------
-
-const DEFAULT_CARD_ORDER = [
-  'card-today-stationery',
-  'card-today-reloads',
-  'card-combined-revenue',
-  'card-monthly-analytics',
-  'card-yearly-analytics',
-  'card-operator-breakdown'
-];
 
 function initMetricCardsLayoutEngine() {
   const grid = document.getElementById('masterLogsMetricsGrid');
   const resetBtn = document.getElementById('resetMetricCardsLayoutBtn');
   if (!grid) return;
 
-  // Restore Saved Order & Sizes
   applySavedCardLayout();
 
-  // Drag and Drop Event Listeners
   let draggedCard = null;
 
   grid.querySelectorAll('.metric-card').forEach(card => {
@@ -1865,13 +2182,12 @@ function initMetricCardsLayoutEngine() {
     });
   });
 
-  // Reset Layout Button
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
-      localStorage.removeItem('al_card_order');
-      localStorage.removeItem('al_card_sizes');
+      localStorage.removeItem('al_metrics_order');
+      localStorage.removeItem('al_metrics_sizes');
 
-      DEFAULT_CARD_ORDER.forEach(cardId => {
+      DEFAULT_LOG_METRIC_CARDS.forEach(cardId => {
         const card = grid.querySelector(`[data-card-id="${cardId}"]`);
         if (card) {
           card.classList.remove('metric-card-wide');
@@ -1879,7 +2195,7 @@ function initMetricCardsLayoutEngine() {
           grid.appendChild(card);
         }
       });
-      showToast('Card layout restored to default', 'success');
+      showToast('Master Logs card layout restored to default', 'success');
     });
   }
 }
@@ -1899,8 +2215,8 @@ function saveCardLayout() {
     }
   });
 
-  localStorage.setItem('al_card_order', JSON.stringify(order));
-  localStorage.setItem('al_card_sizes', JSON.stringify(sizes));
+  localStorage.setItem('al_metrics_order', JSON.stringify(order));
+  localStorage.setItem('al_metrics_sizes', JSON.stringify(sizes));
 }
 
 function applySavedCardLayout() {
@@ -1908,8 +2224,8 @@ function applySavedCardLayout() {
   if (!grid) return;
 
   try {
-    const savedOrder = JSON.parse(localStorage.getItem('al_card_order'));
-    const savedSizes = JSON.parse(localStorage.getItem('al_card_sizes'));
+    const savedOrder = JSON.parse(localStorage.getItem('al_metrics_order'));
+    const savedSizes = JSON.parse(localStorage.getItem('al_metrics_sizes'));
 
     if (savedSizes) {
       Object.keys(savedSizes).forEach(cardId => {
@@ -1933,22 +2249,30 @@ function applySavedCardLayout() {
       });
     }
   } catch (e) {
-    console.warn('Failed restoring card layout', e);
+    console.warn('Failed restoring metrics card layout', e);
   }
 }
-
-// -----------------------------------------------------------------------------
-// CENTRALIZED FINANCIAL ANALYTICS COMPUTATION
-// -----------------------------------------------------------------------------
 
 function updateMasterLogsTodayCards() {
   // Card 1: Today's Stationery
   let statSales = 0;
   let statUnits = 0;
+  let statProfit = 0;
   const statTx = APP_STATE.todayStationeryTransactions.length;
+
   APP_STATE.todayStationeryTransactions.forEach(t => {
-    statSales += Number(t.totalAmount || t.sellingPrice || 0);
-    statUnits += Number(t.quantity || 1);
+    const total = Number(t.totalAmount || t.sellingPrice || 0);
+    const qty = Number(t.quantity || 1);
+    statSales += total;
+    statUnits += qty;
+
+    if (t.profit !== undefined) {
+      statProfit += Number(t.profit);
+    } else {
+      const cost = Number(t.costPrice || 0);
+      const sell = Number(t.sellingPrice || 0);
+      statProfit += (sell - cost) * qty;
+    }
   });
 
   const cardStatSales = document.getElementById('logCardStatSales');
@@ -1978,14 +2302,25 @@ function updateMasterLogsTodayCards() {
   const cardReloadComm = document.getElementById('logCardReloadComm');
 
   if (cardReloadVol) cardReloadVol.textContent = formatLKR(roundCurrency(reloadVol));
-  if (cardReloadComm) cardReloadComm.textContent = `+${formatLKR(roundCurrency(reloadComm))} Comm.`;
+  // Clean currency only: NO "Comm." text
+  if (cardReloadComm) cardReloadComm.textContent = `+${formatLKR(roundCurrency(reloadComm))}`;
 
   // Card 3: Combined Store Revenue
   const combinedRev = roundCurrency(statSales + reloadComm);
   const cardCombinedRev = document.getElementById('logCardCombinedRevenue');
   if (cardCombinedRev) cardCombinedRev.textContent = formatLKR(combinedRev);
 
-  // Card 6: Operator Reload Breakdown (Today)
+  // Card 4: Today Net Profit (NEW)
+  const totalTodayProfit = roundCurrency(statProfit + reloadComm);
+  const cardTodayProfit = document.getElementById('logCardTodayProfit');
+  const cardTodayMargin = document.getElementById('logCardTodayMargin');
+  if (cardTodayProfit) cardTodayProfit.textContent = formatLKR(totalTodayProfit);
+  if (cardTodayMargin) {
+    const margin = combinedRev > 0 ? (totalTodayProfit / combinedRev) * 100 : 0;
+    cardTodayMargin.textContent = `${margin.toFixed(1)}%`;
+  }
+
+  // Card 7: Operator Reload Breakdown
   const opAirtel = document.getElementById('logCardAirtelVol');
   const opDialog = document.getElementById('logCardDialogVol');
   const opMobitel = document.getElementById('logCardMobitelVol');
@@ -2000,26 +2335,35 @@ function updateMasterLogsTodayCards() {
 function calculateFinancialAnalytics() {
   updateMasterLogsTodayCards();
 
-  // Card 4: Monthly Performance Statement
+  // Card 5: Monthly Performance Statement
   const activeMonth = APP_STATE.analyticsMonth || getTodayDateString().substring(0, 7);
   let monthStatSales = 0;
   let monthReloadVol = 0;
   let monthReloadComm = 0;
+  let monthProfit = 0;
 
   APP_STATE.masterStationeryRecords.forEach(s => {
     if (s.date && s.date.startsWith(activeMonth)) {
       monthStatSales += Number(s.totalAmount || s.sellingPrice || 0);
+      const qty = Number(s.quantity || 1);
+      if (s.profit !== undefined) {
+        monthProfit += Number(s.profit);
+      } else {
+        const cost = Number(s.costPrice || 0);
+        const sell = Number(s.sellingPrice || 0);
+        monthProfit += (sell - cost) * qty;
+      }
     }
   });
 
   APP_STATE.masterReloadRecords.forEach(r => {
     if (r.date && r.date.startsWith(activeMonth)) {
       monthReloadVol += Number(r.amount || 0);
-      monthReloadComm += Number(r.commissionAmount || 0);
+      const comm = Number(r.commissionAmount || 0);
+      monthReloadComm += comm;
+      monthProfit += comm; // Reload profit
     }
   });
-
-  const monthNet = roundCurrency(monthStatSales + monthReloadComm);
 
   const cardMSales = document.getElementById('logCardMonthSales');
   const cardMReload = document.getElementById('logCardMonthReload');
@@ -2029,9 +2373,9 @@ function calculateFinancialAnalytics() {
   if (cardMSales) cardMSales.textContent = formatLKR(roundCurrency(monthStatSales));
   if (cardMReload) cardMReload.textContent = formatLKR(roundCurrency(monthReloadVol));
   if (cardMComm) cardMComm.textContent = formatLKR(roundCurrency(monthReloadComm));
-  if (cardMNet) cardMNet.textContent = formatLKR(monthNet);
+  if (cardMNet) cardMNet.textContent = formatLKR(roundCurrency(monthProfit));
 
-  // Card 5: Annual YTD Statement
+  // Card 6: Annual YTD Statement
   const activeYear = activeMonth.substring(0, 4);
   const cardYearLabel = document.getElementById('logCardYearLabel');
   if (cardYearLabel) cardYearLabel.textContent = activeYear;
@@ -2039,21 +2383,30 @@ function calculateFinancialAnalytics() {
   let yearStatSales = 0;
   let yearReloadVol = 0;
   let yearReloadComm = 0;
+  let yearProfit = 0;
 
   APP_STATE.masterStationeryRecords.forEach(s => {
     if (s.date && s.date.startsWith(activeYear)) {
       yearStatSales += Number(s.totalAmount || s.sellingPrice || 0);
+      const qty = Number(s.quantity || 1);
+      if (s.profit !== undefined) {
+        yearProfit += Number(s.profit);
+      } else {
+        const cost = Number(s.costPrice || 0);
+        const sell = Number(s.sellingPrice || 0);
+        yearProfit += (sell - cost) * qty;
+      }
     }
   });
 
   APP_STATE.masterReloadRecords.forEach(r => {
     if (r.date && r.date.startsWith(activeYear)) {
       yearReloadVol += Number(r.amount || 0);
-      yearReloadComm += Number(r.commissionAmount || 0);
+      const comm = Number(r.commissionAmount || 0);
+      yearReloadComm += comm;
+      yearProfit += comm;
     }
   });
-
-  const yearNet = roundCurrency(yearStatSales + yearReloadComm);
 
   const cardYSales = document.getElementById('logCardYearSales');
   const cardYReload = document.getElementById('logCardYearReload');
@@ -2063,7 +2416,7 @@ function calculateFinancialAnalytics() {
   if (cardYSales) cardYSales.textContent = formatLKR(roundCurrency(yearStatSales));
   if (cardYReload) cardYReload.textContent = formatLKR(roundCurrency(yearReloadVol));
   if (cardYComm) cardYComm.textContent = formatLKR(roundCurrency(yearReloadComm));
-  if (cardYNet) cardYNet.textContent = formatLKR(yearNet);
+  if (cardYNet) cardYNet.textContent = formatLKR(roundCurrency(yearProfit));
 }
 
 // -----------------------------------------------------------------------------
@@ -2074,24 +2427,34 @@ function applyMasterLogFilters() {
   const fromDate = APP_STATE.logDateFrom || getTodayDateString();
   const toDate = APP_STATE.logDateTo || fromDate;
 
-  // Filter stationery
   const filteredStationery = APP_STATE.masterStationeryRecords.filter(s => {
     if (!s.date) return false;
     return s.date >= fromDate && s.date <= toDate;
   });
 
-  // Filter reloads
   const filteredReloads = APP_STATE.masterReloadRecords.filter(r => {
     if (!r.date) return false;
     return r.date >= fromDate && r.date <= toDate;
   });
 
-  // Summary Metrics Computation
+  // Calculate filtered summary KPIs & Profit
   let statSales = 0;
   let unitsSold = 0;
+  let statProfit = 0;
+
   filteredStationery.forEach(s => {
-    statSales += Number(s.totalAmount || s.sellingPrice || 0);
-    unitsSold += Number(s.quantity || 1);
+    const total = Number(s.totalAmount || s.sellingPrice || 0);
+    const qty = Number(s.quantity || 1);
+    statSales += total;
+    unitsSold += qty;
+
+    if (s.profit !== undefined) {
+      statProfit += Number(s.profit);
+    } else {
+      const cost = Number(s.costPrice || 0);
+      const sell = Number(s.sellingPrice || 0);
+      statProfit += (sell - cost) * qty;
+    }
   });
 
   let reloadVol = 0;
@@ -2102,13 +2465,15 @@ function applyMasterLogFilters() {
   });
 
   const totalPeriodRevenue = roundCurrency(statSales + reloadComm);
+  const totalPeriodProfit = roundCurrency(statProfit + reloadComm);
 
-  // Update Summary Bar
+  // Update Summary Bar Elements
   const sStatSales = document.getElementById('logSummaryStatSales');
   const sUnitsSold = document.getElementById('logSummaryUnitsSold');
   const sReloadVol = document.getElementById('logSummaryReloadVol');
   const sReloadComm = document.getElementById('logSummaryReloadComm');
   const sTotalRevenue = document.getElementById('logSummaryTotalRevenue');
+  const sTotalProfit = document.getElementById('logSummaryTotalProfit');
   const filterLabel = document.getElementById('masterLogFilterLabel');
 
   if (sStatSales) sStatSales.textContent = formatLKR(roundCurrency(statSales));
@@ -2116,16 +2481,27 @@ function applyMasterLogFilters() {
   if (sReloadVol) sReloadVol.textContent = formatLKR(roundCurrency(reloadVol));
   if (sReloadComm) sReloadComm.textContent = formatLKR(roundCurrency(reloadComm));
   if (sTotalRevenue) sTotalRevenue.textContent = formatLKR(totalPeriodRevenue);
+  if (sTotalProfit) sTotalProfit.textContent = formatLKR(totalPeriodProfit);
 
   if (filterLabel) {
     filterLabel.textContent = fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`;
   }
 
-  // Combine records chronologically
+  // Combine rows for table display
   let combinedRows = [];
 
   if (APP_STATE.logCategoryFilter === 'ALL' || APP_STATE.logCategoryFilter === 'STATIONERY') {
     filteredStationery.forEach(s => {
+      const qty = Number(s.quantity || 1);
+      const sell = Number(s.totalAmount || s.sellingPrice || 0);
+      let p = 0;
+      if (s.profit !== undefined) {
+        p = Number(s.profit);
+      } else {
+        const cost = Number(s.costPrice || 0);
+        p = (Number(s.sellingPrice || 0) - cost) * qty;
+      }
+
       combinedRows.push({
         id: s.id,
         category: 'STATIONERY',
@@ -2133,9 +2509,9 @@ function applyMasterLogFilters() {
         time: s.time || '',
         itemOrOp: `${s.itemName || ''} (${s.itemCode || 'ST'})`,
         mobileNumber: '-',
-        qtyOrRate: `${s.quantity || 1} units`,
-        amount: Number(s.totalAmount || s.sellingPrice || 0),
-        earnings: Number(s.totalAmount || s.sellingPrice || 0),
+        qtyOrRate: `${qty} units`,
+        amount: sell,
+        profit: p,
         rawRecord: s
       });
     });
@@ -2143,6 +2519,7 @@ function applyMasterLogFilters() {
 
   if (APP_STATE.logCategoryFilter === 'ALL' || APP_STATE.logCategoryFilter === 'RELOAD') {
     filteredReloads.forEach(r => {
+      const comm = Number(r.commissionAmount || 0);
       combinedRows.push({
         id: r.id,
         category: 'RELOAD',
@@ -2152,7 +2529,7 @@ function applyMasterLogFilters() {
         mobileNumber: r.mobileNumber || '-',
         qtyOrRate: `${Number(r.commissionRate || 0).toFixed(2)}%`,
         amount: Number(r.amount || 0),
-        earnings: Number(r.commissionAmount || 0),
+        profit: comm,
         rawRecord: r
       });
     });
@@ -2179,7 +2556,7 @@ function renderMasterLogTable(records) {
     tbody.innerHTML = `
       <tr>
         <td colspan="8" class="py-12 text-center theme-text-dim text-xs">
-          No records found for the selected date range and category.
+          No records found for the selected date filter and category.
         </td>
       </tr>
     `;
@@ -2194,7 +2571,7 @@ function renderMasterLogTable(records) {
       ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">Stationery</span>'
       : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Reload</span>';
 
-    let mobileDisplay = row.mobileNumber !== '-' 
+    let mobileDisplay = row.mobileNumber !== '-'
       ? `<span class="font-mono font-bold text-sky-400">${row.mobileNumber}</span>`
       : `<span class="theme-text-dim text-center block">-</span>`;
 
@@ -2208,9 +2585,9 @@ function renderMasterLogTable(records) {
       <td class="py-3 px-3 sm:px-4 whitespace-nowrap text-xs">${mobileDisplay}</td>
       <td class="py-3 px-3 sm:px-4 text-center font-mono text-xs theme-text-muted whitespace-nowrap">${row.qtyOrRate}</td>
       <td class="py-3 px-3 sm:px-4 text-right font-mono text-xs font-bold theme-text-main whitespace-nowrap">${formatLKR(row.amount)}</td>
-      <td class="py-3 px-3 sm:px-4 text-right font-mono text-xs font-bold text-emerald-400 whitespace-nowrap">${formatLKR(row.earnings)}</td>
+      <td class="py-3 px-3 sm:px-4 text-right font-mono text-xs font-bold text-emerald-400 whitespace-nowrap">+${formatLKR(row.profit)}</td>
       <td class="py-3 px-3 sm:px-4 text-center whitespace-nowrap space-x-1">
-        ${row.category === 'STATIONERY' 
+        ${row.category === 'STATIONERY'
           ? `<button type="button" data-edit-log="${row.id}" class="p-1 text-sky-400 hover:text-sky-300 transition" title="Edit Record">
               <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
              </button>`
@@ -2221,13 +2598,11 @@ function renderMasterLogTable(records) {
       </td>
     `;
 
-    // Edit button
     const editBtn = tr.querySelector(`[data-edit-log="${row.id}"]`);
     if (editBtn) {
       editBtn.addEventListener('click', () => openEditStationeryModal(row.rawRecord));
     }
 
-    // Delete button
     const delBtn = tr.querySelector(`[data-delete-log="${row.id}"]`);
     if (delBtn) {
       delBtn.addEventListener('click', () => deleteTransactionRecord(row.id, row.category, row.itemOrOp, row.rawRecord));
@@ -2244,7 +2619,7 @@ async function deleteTransactionRecord(id, category, title, rawRecord) {
   try {
     await deleteDoc(doc(db, collectionName, id));
 
-    // If stationery transaction, restore stock
+    // Restore stock if stationery transaction
     if (category === 'STATIONERY' && rawRecord && rawRecord.itemCode && rawRecord.itemCode !== 'CUSTOM') {
       const catalogItem = APP_STATE.inventoryCatalog.find(i => i.code === rawRecord.itemCode);
       if (catalogItem && catalogItem.id) {
@@ -2271,6 +2646,7 @@ function setupEditStationeryModal() {
   const cancelBtn = document.getElementById('cancelEditStatBtn');
   const form = document.getElementById('editStationeryForm');
   const priceInput = document.getElementById('editStatSelling');
+  const costInput = document.getElementById('editStatCost');
   const qtyInput = document.getElementById('editStatQty');
   const preview = document.getElementById('editStatTotalPreview');
 
@@ -2295,9 +2671,11 @@ function setupEditStationeryModal() {
 
       const newName = document.getElementById('editStatName').value.trim();
       const newCode = document.getElementById('editStatCode').value.trim();
+      const newCost = roundCurrency(costInput.value);
       const newSelling = roundCurrency(priceInput.value);
       const newQty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
       const newTotal = roundCurrency(newSelling * newQty);
+      const newProfit = roundCurrency((newSelling - newCost) * newQty);
 
       const oldQty = originalRecord.quantity || 1;
       const qtyDiff = newQty - oldQty;
@@ -2306,13 +2684,15 @@ function setupEditStationeryModal() {
         await updateDoc(doc(db, 'stationery_transactions', docId), {
           itemName: newName,
           itemCode: newCode,
+          costPrice: newCost,
           sellingPrice: newSelling,
           quantity: newQty,
           totalAmount: newTotal,
+          profit: newProfit,
+          unitProfit: roundCurrency(newSelling - newCost),
           updatedAt: serverTimestamp()
         });
 
-        // Adjust stock if catalog item matched
         if (newCode && newCode !== 'CUSTOM') {
           const catalogItem = APP_STATE.inventoryCatalog.find(i => i.code === newCode);
           if (catalogItem && catalogItem.id && qtyDiff !== 0) {
@@ -2339,6 +2719,7 @@ function openEditStationeryModal(record) {
   document.getElementById('editStatDocId').value = record.id;
   document.getElementById('editStatName').value = record.itemName || '';
   document.getElementById('editStatCode').value = record.itemCode || '';
+  document.getElementById('editStatCost').value = (record.costPrice || 0).toFixed(2);
   document.getElementById('editStatSelling').value = (record.sellingPrice || 0).toFixed(2);
   document.getElementById('editStatQty').value = record.quantity || 1;
 
@@ -2350,7 +2731,7 @@ function openEditStationeryModal(record) {
 }
 
 // =============================================================================
-// 15. PROFESSIONAL PDF REPORT ENGINE (jsPDF + autoTable)
+// 15. CLIENT-SIDE PDF REPORT ENGINE WITH PROFIT TOTALS
 // =============================================================================
 
 function generateProfessionalPdfReport() {
@@ -2370,7 +2751,6 @@ function generateProfessionalPdfReport() {
   const toDate = APP_STATE.logDateTo || fromDate;
   const dateRangeStr = fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`;
 
-  // Filter records
   const stationeryList = APP_STATE.masterStationeryRecords
     .filter(s => s.date >= fromDate && s.date <= toDate)
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
@@ -2379,21 +2759,33 @@ function generateProfessionalPdfReport() {
     .filter(r => r.date >= fromDate && r.date <= toDate)
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
 
-  // Compute Totals
+  // Compute Totals & Profit
   let totalStatSales = 0;
   let totalUnitsSold = 0;
+  let totalStatProfit = 0;
+
   stationeryList.forEach(s => {
-    totalStatSales += Number(s.totalAmount || s.sellingPrice || 0);
-    totalUnitsSold += Number(s.quantity || 1);
+    const total = Number(s.totalAmount || s.sellingPrice || 0);
+    const qty = Number(s.quantity || 1);
+    totalStatSales += total;
+    totalUnitsSold += qty;
+
+    if (s.profit !== undefined) {
+      totalStatProfit += Number(s.profit);
+    } else {
+      const cost = Number(s.costPrice || 0);
+      const sell = Number(s.sellingPrice || 0);
+      totalStatProfit += (sell - cost) * qty;
+    }
   });
 
   let totalReloadVolume = 0;
   let totalReloadCommission = 0;
-  const opBreakdown = { 
-    AIRTEL: { vol: 0, comm: 0 }, 
-    DIALOG: { vol: 0, comm: 0 }, 
-    MOBITEL: { vol: 0, comm: 0 }, 
-    HUTCH: { vol: 0, comm: 0 } 
+  const opBreakdown = {
+    AIRTEL: { vol: 0, comm: 0 },
+    DIALOG: { vol: 0, comm: 0 },
+    MOBITEL: { vol: 0, comm: 0 },
+    HUTCH: { vol: 0, comm: 0 }
   };
 
   reloadList.forEach(r => {
@@ -2409,6 +2801,7 @@ function generateProfessionalPdfReport() {
   });
 
   const totalStoreRevenue = roundCurrency(totalStatSales + totalReloadCommission);
+  const totalNetProfit = roundCurrency(totalStatProfit + totalReloadCommission);
 
   // 1. Header Banner
   pdfDoc.setFillColor(15, 23, 42); // Slate 900
@@ -2422,60 +2815,79 @@ function generateProfessionalPdfReport() {
   pdfDoc.setFont('helvetica', 'normal');
   pdfDoc.setFontSize(9);
   pdfDoc.setTextColor(203, 213, 225);
-  pdfDoc.text('Sri Lankan Retail Stationery & Mobile Reload POS System', 14, 22);
+  pdfDoc.text('Sri Lankan Retail Stationery POS, Mobile Reload Ledger & Profit Tracker', 14, 22);
   pdfDoc.text(`Statement Period: ${dateRangeStr} | Generated: ${new Date().toLocaleString()}`, 14, 28);
 
-  // 2. Financial Summary Box
+  // 2. Financial Summary Box (Including Net Profit)
   pdfDoc.setFillColor(248, 250, 252);
   pdfDoc.setDrawColor(226, 232, 240);
-  pdfDoc.roundedRect(14, 42, 182, 26, 3, 3, 'FD');
+  pdfDoc.roundedRect(14, 42, 182, 30, 3, 3, 'FD');
 
   pdfDoc.setTextColor(15, 23, 42);
   pdfDoc.setFont('helvetica', 'bold');
   pdfDoc.setFontSize(10);
-  pdfDoc.text('FINANCIAL STATEMENT SUMMARY', 18, 48);
+  pdfDoc.text('EXECUTIVE FINANCIAL & PROFIT SUMMARY', 18, 48);
 
   pdfDoc.setFont('helvetica', 'normal');
   pdfDoc.setFontSize(8.5);
   pdfDoc.setTextColor(71, 85, 105);
-  pdfDoc.text(`Stationery Sales: ${formatLKR(totalStatSales)} (${totalUnitsSold} units sold)`, 18, 55);
+  pdfDoc.text(`Stationery Sales: ${formatLKR(totalStatSales)} (${totalUnitsSold} items)`, 18, 55);
   pdfDoc.text(`Reload Volume: ${formatLKR(totalReloadVolume)}`, 18, 61);
+  pdfDoc.text(`Stationery Net Profit: ${formatLKR(totalStatProfit)}`, 18, 67);
 
   pdfDoc.text(`Earned Reload Commission: ${formatLKR(totalReloadCommission)}`, 105, 55);
-  pdfDoc.setFont('helvetica', 'bold');
-  pdfDoc.setTextColor(5, 150, 105); // Emerald Green
   pdfDoc.text(`Total Period Revenue: ${formatLKR(totalStoreRevenue)}`, 105, 61);
 
-  let currentY = 74;
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setTextColor(5, 150, 105); // Emerald Green
+  pdfDoc.text(`Total Period Net Profit: ${formatLKR(totalNetProfit)}`, 105, 67);
 
-  // 3. Stationery Sales Table
+  let currentY = 78;
+
+  // 3. Stationery Sales Table with Cost & Profit
   if (stationeryList.length > 0) {
     pdfDoc.setTextColor(15, 23, 42);
     pdfDoc.setFont('helvetica', 'bold');
     pdfDoc.setFontSize(11);
-    pdfDoc.text(`1. Stationery Sales Breakdown (${stationeryList.length} Transactions)`, 14, currentY);
+    pdfDoc.text(`1. Stationery Sales & Margin Breakdown (${stationeryList.length} Transactions)`, 14, currentY);
 
-    const statRows = stationeryList.map(s => [
-      s.date,
-      s.time,
-      s.itemCode || 'ST',
-      s.itemName,
-      String(s.quantity || 1),
-      formatLKR(s.sellingPrice),
-      formatLKR(s.totalAmount || s.sellingPrice)
-    ]);
+    const statRows = stationeryList.map(s => {
+      const qty = Number(s.quantity || 1);
+      const sell = Number(s.totalAmount || s.sellingPrice || 0);
+      let p = 0;
+      if (s.profit !== undefined) {
+        p = Number(s.profit);
+      } else {
+        const cost = Number(s.costPrice || 0);
+        p = (Number(s.sellingPrice || 0) - cost) * qty;
+      }
+
+      return [
+        s.date,
+        s.time,
+        s.itemCode || 'ST',
+        s.itemName,
+        String(qty),
+        formatLKR(s.costPrice || 0),
+        formatLKR(s.sellingPrice || 0),
+        formatLKR(sell),
+        `+${formatLKR(p)}`
+      ];
+    });
 
     pdfDoc.autoTable({
       startY: currentY + 3,
-      head: [['Date', 'Time', 'Code', 'Product / Item Name', 'Qty', 'Unit Price', 'Total Amount']],
+      head: [['Date', 'Time', 'Code', 'Item Name', 'Qty', 'Cost Price', 'Sell Price', 'Total Sales', 'Profit']],
       body: statRows,
       theme: 'grid',
-      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-      bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
+      bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
       columnStyles: {
         4: { halign: 'center' },
         5: { halign: 'right' },
-        6: { halign: 'right', fontStyle: 'bold' }
+        6: { halign: 'right' },
+        7: { halign: 'right', fontStyle: 'bold' },
+        8: { halign: 'right', fontStyle: 'bold', textColor: [5, 150, 105] }
       },
       margin: { left: 14, right: 14 }
     });
@@ -2483,7 +2895,7 @@ function generateProfessionalPdfReport() {
     currentY = pdfDoc.lastAutoTable.finalY + 12;
   }
 
-  // 4. Mobile Reload Table (with Mobile Number)
+  // 4. Mobile Reload Table
   if (reloadList.length > 0) {
     if (currentY > 235) {
       pdfDoc.addPage();
@@ -2493,7 +2905,7 @@ function generateProfessionalPdfReport() {
     pdfDoc.setTextColor(15, 23, 42);
     pdfDoc.setFont('helvetica', 'bold');
     pdfDoc.setFontSize(11);
-    pdfDoc.text(`2. Mobile Reload Log (${reloadList.length} Top-Ups)`, 14, currentY);
+    pdfDoc.text(`2. Mobile Reload Log & Commissions (${reloadList.length} Top-Ups)`, 14, currentY);
 
     const reloadRows = reloadList.map(r => [
       r.date,
@@ -2538,7 +2950,7 @@ function generateProfessionalPdfReport() {
 
     pdfDoc.autoTable({
       startY: currentY,
-      head: [['Network Operator', 'Applied Rate', 'Total Reload Volume', 'Total Earned Commission']],
+      head: [['Network Operator', 'Applied Rate', 'Total Reload Volume', 'Earned Commission']],
       body: opRows,
       theme: 'striped',
       headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
@@ -2552,7 +2964,7 @@ function generateProfessionalPdfReport() {
     });
   }
 
-  // 5. Page Numbering Footer
+  // Page Numbers
   const pageCount = pdfDoc.internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     pdfDoc.setPage(i);
@@ -2572,15 +2984,18 @@ function generateProfessionalPdfReport() {
 }
 
 // =============================================================================
-// 16. MODULE 6: MASTER INVENTORY CATALOG (SETTINGS CRUD)
+// 16. MASTER INVENTORY CATALOG & GETTING PRICE MANAGER
 // =============================================================================
 
 function setupCatalogManager() {
   const form = document.getElementById('catalogItemForm');
   const codeInput = document.getElementById('catalogCode');
   const nameInput = document.getElementById('catalogName');
-  const priceInput = document.getElementById('catalogSellingPrice');
+  const categoryInput = document.getElementById('catalogCategory');
+  const costPriceInput = document.getElementById('catalogCostPrice');
+  const sellingPriceInput = document.getElementById('catalogSellingPrice');
   const stockInput = document.getElementById('catalogStockQuantity');
+  const thresholdInput = document.getElementById('catalogLowStockThreshold');
   const docIdInput = document.getElementById('catalogDocId');
   const formTitle = document.getElementById('catalogFormTitle');
   const saveBtn = document.getElementById('catalogSaveBtn');
@@ -2595,6 +3010,7 @@ function setupCatalogManager() {
     if (saveBtn) saveBtn.textContent = 'Save Item to Catalog';
     if (resetBtn) resetBtn.classList.add('hidden');
     if (stockInput) stockInput.value = '50';
+    if (thresholdInput) thresholdInput.value = '5';
   }
 
   if (resetBtn) resetBtn.addEventListener('click', resetCatalogForm);
@@ -2604,12 +3020,19 @@ function setupCatalogManager() {
       e.preventDefault();
       const code = codeInput.value.trim().toUpperCase();
       const name = nameInput.value.trim();
-      const sellingPrice = roundCurrency(priceInput.value);
+      const category = categoryInput ? categoryInput.value.trim() || 'General' : 'General';
+      const costPrice = roundCurrency(costPriceInput.value);
+      const sellingPrice = roundCurrency(sellingPriceInput.value);
       const stockQuantity = Math.max(0, parseInt(stockInput.value, 10) || 0);
+      const lowStockThreshold = Math.max(0, parseInt(thresholdInput.value, 10) || 5);
       const editDocId = docIdInput.value;
 
       if (!code || !name) {
         showToast('Please provide both item code and name', 'error');
+        return;
+      }
+      if (costPrice < 0) {
+        showToast('Getting/Cost price cannot be negative', 'error');
         return;
       }
       if (sellingPrice <= 0) {
@@ -2625,24 +3048,24 @@ function setupCatalogManager() {
       }
 
       try {
+        const itemPayload = {
+          code,
+          name,
+          category,
+          costPrice,
+          sellingPrice,
+          stockQuantity,
+          lowStockThreshold,
+          updatedAt: serverTimestamp()
+        };
+
         if (editDocId) {
-          await updateDoc(doc(db, 'inventory', editDocId), {
-            code,
-            name,
-            sellingPrice,
-            stockQuantity,
-            updatedAt: serverTimestamp()
-          });
+          await updateDoc(doc(db, 'inventory', editDocId), itemPayload);
           showToast(`Updated item: ${name}`, 'success');
         } else {
-          await addDoc(collection(db, 'inventory'), {
-            code,
-            name,
-            sellingPrice,
-            stockQuantity,
-            createdAt: serverTimestamp()
-          });
-          showToast(`Added item: ${name} (Stock: ${stockQuantity})`, 'success');
+          itemPayload.createdAt = serverTimestamp();
+          await addDoc(collection(db, 'inventory'), itemPayload);
+          showToast(`Added item: ${name} (Cost: ${formatLKR(costPrice)} | Sell: ${formatLKR(sellingPrice)})`, 'success');
         }
         resetCatalogForm();
       } catch (err) {
@@ -2657,7 +3080,7 @@ function setupCatalogManager() {
 
   if (seedBtn) {
     seedBtn.addEventListener('click', async () => {
-      if (!confirm('Seed standard Sri Lankan retail stationery items into catalog? Existing items will not be overwritten.')) return;
+      if (!confirm('Seed standard Sri Lankan retail stationery items into catalog with costs & stock? Existing items will not be overwritten.')) return;
 
       let addedCount = 0;
       for (const item of SAMPLE_SRI_LANKAN_CATALOG) {
@@ -2666,7 +3089,8 @@ function setupCatalogManager() {
           try {
             await addDoc(collection(db, 'inventory'), {
               ...item,
-              createdAt: serverTimestamp()
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
             });
             addedCount++;
           } catch (e) {
@@ -2676,7 +3100,7 @@ function setupCatalogManager() {
       }
 
       if (addedCount > 0) {
-        showToast(`Successfully seeded ${addedCount} standard stationery items`, 'success');
+        showToast(`Successfully seeded ${addedCount} standard stationery products`, 'success');
       } else {
         showToast('Standard stationery items are already in catalog', 'info');
       }
@@ -2695,13 +3119,14 @@ function renderCatalogTable() {
   const filtered = APP_STATE.inventoryCatalog.filter(item => {
     if (!queryStr) return true;
     return (item.code || '').toLowerCase().includes(queryStr) ||
-           (item.name || '').toLowerCase().includes(queryStr);
+           (item.name || '').toLowerCase().includes(queryStr) ||
+           (item.category || '').toLowerCase().includes(queryStr);
   });
 
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="5" class="py-8 text-center theme-text-dim text-xs">
+        <td colspan="7" class="py-8 text-center theme-text-dim text-xs">
           No catalog records found.
         </td>
       </tr>
@@ -2713,10 +3138,22 @@ function renderCatalogTable() {
     const tr = document.createElement('tr');
     tr.className = 'hover:theme-bg-subtle transition';
 
+    const costDisplay = (item.costPrice !== undefined && item.costPrice > 0)
+      ? `<span class="font-mono font-bold text-amber-400">${formatLKR(item.costPrice)}</span>`
+      : `<span class="badge-cost-missing px-2 py-0.5 rounded text-[10px] font-bold" title="Cost price missing! Please edit to ensure accurate profit tracking.">Cost missing</span>`;
+
+    const unitProfit = roundCurrency(item.sellingPrice - (item.costPrice || 0));
+    const profitClass = unitProfit >= 0 ? 'text-emerald-400' : 'text-red-400';
+
     tr.innerHTML = `
       <td class="py-2.5 px-3 font-mono font-bold text-sky-400 text-xs">${item.code}</td>
-      <td class="py-2.5 px-3 font-medium theme-text-main text-xs">${item.name}</td>
+      <td class="py-2.5 px-3 font-medium theme-text-main text-xs">
+        <div>${item.name}</div>
+        <div class="text-[10px] theme-text-dim">${item.category || 'General'}</div>
+      </td>
+      <td class="py-2.5 px-3 text-right font-mono text-xs">${costDisplay}</td>
       <td class="py-2.5 px-3 text-right font-mono font-bold text-xs theme-text-main">${formatLKR(item.sellingPrice)}</td>
+      <td class="py-2.5 px-3 text-right font-mono font-bold text-xs ${profitClass}">+${formatLKR(unitProfit)}</td>
       <td class="py-2.5 px-3 text-center font-mono font-bold text-xs">${item.stockQuantity}</td>
       <td class="py-2.5 px-3 text-center whitespace-nowrap space-x-1">
         <button type="button" data-edit-catalog="${item.id}" class="p-1 text-sky-400 hover:text-sky-300 transition" title="Edit Catalog Item">
@@ -2735,8 +3172,11 @@ function renderCatalogTable() {
         document.getElementById('catalogDocId').value = item.id;
         document.getElementById('catalogCode').value = item.code;
         document.getElementById('catalogName').value = item.name;
+        document.getElementById('catalogCategory').value = item.category || 'General';
+        document.getElementById('catalogCostPrice').value = Number(item.costPrice || 0).toFixed(2);
         document.getElementById('catalogSellingPrice').value = Number(item.sellingPrice).toFixed(2);
         document.getElementById('catalogStockQuantity').value = item.stockQuantity;
+        document.getElementById('catalogLowStockThreshold').value = item.lowStockThreshold || 5;
 
         const formTitle = document.getElementById('catalogFormTitle');
         const saveBtn = document.getElementById('catalogSaveBtn');
@@ -2754,7 +3194,7 @@ function renderCatalogTable() {
     const delBtn = tr.querySelector(`[data-delete-catalog="${item.id}"]`);
     if (delBtn) {
       delBtn.addEventListener('click', async () => {
-        if (!confirm(`Delete catalog item "${item.name}" (${item.code})? Existing historical sale records will remain intact.`)) return;
+        if (!confirm(`Delete catalog item "${item.name}" (${item.code})? Historical transaction logs will remain preserved.`)) return;
         try {
           await deleteDoc(doc(db, 'inventory', item.id));
           showToast(`Deleted ${item.name}`, 'info');
@@ -2769,7 +3209,7 @@ function renderCatalogTable() {
 }
 
 // =============================================================================
-// 17. MODULE 7: SETTINGS COMMISSION RATES & DEVELOPER CONSOLE
+// 17. COMMISSION RATES & DEVELOPER DIAGNOSTICS
 // =============================================================================
 
 function setupRatesManager() {
@@ -2823,7 +3263,7 @@ function setupDeveloperConsole() {
         });
         await deleteDoc(testRef);
         const latency = Math.round(performance.now() - start);
-        showToast(`Write & Delete test successful (${latency}ms round-trip)`, 'success');
+        showToast(`Cloud round-trip test successful (${latency}ms)`, 'success');
         logDebug(`Diagnostic test write succeeded in ${latency}ms`, 'SUCCESS');
       } catch (err) {
         showToast(`Diagnostic test failed: ${err.message}`, 'error');
@@ -2836,12 +3276,13 @@ function setupDeveloperConsole() {
     exportDataBtn.addEventListener('click', () => {
       const exportObject = {
         exportedAt: new Date().toISOString(),
-        system: 'AL Communication Ledger',
+        system: 'AL Communication Ledger v3.1',
         catalog: APP_STATE.inventoryCatalog,
         stationeryTransactions: APP_STATE.masterStationeryRecords,
         reloadTransactions: APP_STATE.masterReloadRecords,
         commissionRates: APP_STATE.commissionRates,
-        reloadPresets: APP_STATE.reloadPresets
+        reloadPresets: APP_STATE.reloadPresets,
+        dashboardCardOrder: APP_STATE.dashboardCardOrder
       };
 
       const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportObject, null, 2));
@@ -2858,7 +3299,8 @@ function setupDeveloperConsole() {
 
   if (clearCacheBtn) {
     clearCacheBtn.addEventListener('click', () => {
-      if (confirm('Clear local app cache and storage preferences?')) {
+      if (confirm('Clear local application cache and layout preferences?')) {
+        localStorage.removeItem('al_dashboard_order');
         localStorage.removeItem('al_metrics_order');
         localStorage.removeItem('al_metrics_sizes');
         localStorage.removeItem('al_theme');
@@ -2893,7 +3335,7 @@ function updateCacheMetrics() {
 
   if (cacheEl) {
     const totalRecords = APP_STATE.masterStationeryRecords.length + APP_STATE.masterReloadRecords.length;
-    cacheEl.textContent = `${APP_STATE.inventoryCatalog.length} catalog items • ${totalRecords} cached transactions`;
+    cacheEl.textContent = `${APP_STATE.inventoryCatalog.length} catalog items • ${totalRecords} cached logs`;
   }
 }
 
@@ -2902,7 +3344,7 @@ function updateCacheMetrics() {
 // =============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  logDebug('AL Communication System Initializing (V2.0)...', 'INFO');
+  logDebug('AL Communication System Initializing (V3.1 Profit & Glass Engine)...', 'INFO');
 
   // 1. Theme and UI Style Setup
   initThemeAndStyle();
@@ -2920,7 +3362,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 5. Presets Management Controls
   setupPresetControls();
 
-  // 6. Stationery Entry Module
+  // 6. Stationery POS Module
   setupStationeryModule();
 
   // 7. Mobile Reloads Module
@@ -2929,16 +3371,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // 8. Stock Inventory Module
   setupStockModule();
 
-  // 9. Master Logs & Consolidated Overview
+  // 9. Dashboard Drag-and-Drop Controller
+  setupDashboardDragAndDrop();
+
+  // 10. Master Logs & Consolidated Financials
   setupMasterLogsModule();
 
-  // 10. Settings Managers (Catalog, Rates, Developer)
+  // 11. Settings Managers (Catalog, Rates, Developer)
   setupCatalogManager();
   setupRatesManager();
   setupDeveloperConsole();
 
-  // 11. Auth Setup & Flow Initiation
+  // 12. Auth Flow Initiation
   setupAuth();
 
-  logDebug('AL Communication System Bootstrap Complete.', 'SUCCESS');
+  logDebug('AL Communication System Bootstrap Complete (V3.1).', 'SUCCESS');
 });
