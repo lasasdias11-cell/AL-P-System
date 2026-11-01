@@ -1,5 +1,5 @@
 // =============================================================================
-// AL COMMUNICATION — FIREBASE SDK v11 MODULAR CONFIGURATION (VERSION 4.0)
+// AL COMMUNICATION — FIREBASE SDK v11 MODULAR CONFIGURATION
 // Project ID: al-p1-fb432 | Auth Domain: al-p1-fb432.firebaseapp.com
 // High-Reliability Mobile Session Persistence & Real-time Cloud Sync
 // =============================================================================

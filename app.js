@@ -1,8 +1,7 @@
 // =============================================================================
-// AL COMMUNICATION — SYSTEM LOGIC CORE (VERSION 4.0)
-// High-End Retail Stationery & Mobile Reload POS, Inventory & Profit Engine
-// GitHub Pages SPA | Three.js WebGL | Lenis Smooth Scroll | GSAP Motion Engine
-// Firebase Cloud Firestore v11 | Auth Guard (lasasdias11@gmail.com)
+// AL COMMUNICATION — SYSTEM LOGIC CORE (VERSION 3.1)
+// POS, Real-time Inventory, Mobile Reloads & Automated Profit Tracking System
+// GitHub Pages SPA | Firebase Cloud Firestore v11 | Auth Guard
 // Project ID: al-p1-fb432 | Primary Currency: LKR (Rs. 0.00 exact cent precision)
 // =============================================================================
 
@@ -275,318 +274,6 @@ function pulseCard(elementId) {
 }
 
 // =============================================================================
-// 3A. THREE.JS INTERACTIVE ANTI-GRAVITY CANVAS BACKGROUND
-// =============================================================================
-
-let threeScene, threeCamera, threeRenderer, threeParticlesGeometry, threeParticlesMaterial, threePoints;
-let threeAnimId = null;
-let threeMouseX = 0;
-let threeMouseY = 0;
-let threeParticlePositions, threeParticleVelocities, threeParticlePhases;
-const THREE_PARTICLE_COUNT = 380;
-
-function createSoftGlowTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 64;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-  gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.7)');
-  gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.15)');
-  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 64, 64);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  return texture;
-}
-
-function getThemeParticleColor(themeName) {
-  switch (themeName) {
-    case 'emerald-store':
-      return 0x10b981; // Emerald green
-    case 'sapphire-blue':
-      return 0x3b82f6; // Sapphire blue
-    case 'warm-amber':
-      return 0xf59e0b; // Warm amber gold
-    case 'modern-slate':
-    default:
-      return 0x38bdf8; // Sky cyan
-  }
-}
-
-export function initThreeBackground() {
-  if (typeof THREE === 'undefined') {
-    logDebug('Three.js not available; background canvas omitted', 'INFO');
-    return;
-  }
-
-  const canvas = document.getElementById('webglCanvas');
-  if (!canvas) return;
-
-  try {
-    threeScene = new THREE.Scene();
-    const aspect = window.innerWidth / window.innerHeight;
-    threeCamera = new THREE.PerspectiveCamera(60, aspect, 1, 1000);
-    threeCamera.position.z = 160;
-
-    threeRenderer = new THREE.WebGLRenderer({
-      canvas: canvas,
-      alpha: true,
-      antialias: true,
-      powerPreference: 'high-performance'
-    });
-    threeRenderer.setSize(window.innerWidth, window.innerHeight);
-    threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-
-    threeParticlesGeometry = new THREE.BufferGeometry();
-    threeParticlePositions = new Float32Array(THREE_PARTICLE_COUNT * 3);
-    threeParticleVelocities = new Float32Array(THREE_PARTICLE_COUNT * 3);
-    threeParticlePhases = new Float32Array(THREE_PARTICLE_COUNT);
-
-    for (let i = 0; i < THREE_PARTICLE_COUNT; i++) {
-      const i3 = i * 3;
-      threeParticlePositions[i3] = (Math.random() - 0.5) * 360;      // x
-      threeParticlePositions[i3 + 1] = (Math.random() - 0.5) * 280;  // y
-      threeParticlePositions[i3 + 2] = (Math.random() - 0.5) * 240;  // z
-
-      // Anti-gravity upward drift: positive vy
-      threeParticleVelocities[i3] = (Math.random() - 0.5) * 0.08;     // vx
-      threeParticleVelocities[i3 + 1] = 0.12 + Math.random() * 0.28;  // vy (upward float!)
-      threeParticleVelocities[i3 + 2] = (Math.random() - 0.5) * 0.08; // vz
-
-      threeParticlePhases[i] = Math.random() * Math.PI * 2;
-    }
-
-    threeParticlesGeometry.setAttribute('position', new THREE.BufferAttribute(threeParticlePositions, 3));
-
-    const glowTex = createSoftGlowTexture();
-    const initColor = getThemeParticleColor(APP_STATE.activeTheme);
-
-    threeParticlesMaterial = new THREE.PointsMaterial({
-      size: 5.2,
-      map: glowTex,
-      color: initColor,
-      transparent: true,
-      opacity: 0.72,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-
-    threePoints = new THREE.Points(threeParticlesGeometry, threeParticlesMaterial);
-    threeScene.add(threePoints);
-
-    // Mouse & Touch Tracking
-    const onPointerMove = (e) => {
-      const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-      const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
-      threeMouseX = (clientX / window.innerWidth - 0.5) * 2;
-      threeMouseY = (clientY / window.innerHeight - 0.5) * 2;
-    };
-    window.addEventListener('pointermove', onPointerMove, { passive: true });
-    window.addEventListener('touchmove', onPointerMove, { passive: true });
-
-    // Window Resize Handler
-    const onWindowResize = () => {
-      if (!threeCamera || !threeRenderer) return;
-      threeCamera.aspect = window.innerWidth / window.innerHeight;
-      threeCamera.updateProjectionMatrix();
-      threeRenderer.setSize(window.innerWidth, window.innerHeight);
-    };
-    window.addEventListener('resize', onWindowResize);
-
-    // Visibility Listener to save battery when tab is backgrounded
-    let isVisible = true;
-    document.addEventListener('visibilitychange', () => {
-      isVisible = (document.visibilityState === 'visible');
-    });
-
-    // Animation Render Loop
-    let clock = 0;
-    const animateThree = () => {
-      threeAnimId = requestAnimationFrame(animateThree);
-      if (!isVisible) return;
-
-      clock += 0.015;
-      const positions = threeParticlesGeometry.attributes.position.array;
-
-      for (let i = 0; i < THREE_PARTICLE_COUNT; i++) {
-        const i3 = i * 3;
-        // Apply anti-gravity upward movement
-        positions[i3 + 1] += threeParticleVelocities[i3 + 1];
-        positions[i3] += Math.sin(threeParticlePhases[i] + clock) * 0.05 + threeParticleVelocities[i3];
-        positions[i3 + 2] += Math.cos(threeParticlePhases[i] + clock) * 0.04;
-
-        // Reset if drifted above top bound
-        if (positions[i3 + 1] > 150) {
-          positions[i3 + 1] = -150;
-          positions[i3] = (Math.random() - 0.5) * 360;
-          positions[i3 + 2] = (Math.random() - 0.5) * 240;
-        }
-      }
-
-      threeParticlesGeometry.attributes.position.needsUpdate = true;
-
-      // Subtle camera tilt following pointer
-      threeCamera.position.x += (threeMouseX * 12 - threeCamera.position.x) * 0.03;
-      threeCamera.position.y += (-threeMouseY * 10 - threeCamera.position.y) * 0.03;
-      threeCamera.lookAt(0, 0, 0);
-
-      threeRenderer.render(threeScene, threeCamera);
-    };
-
-    animateThree();
-    logDebug('Three.js interactive anti-gravity particle engine initialized', 'SUCCESS');
-  } catch (err) {
-    console.warn('Three.js WebGL initialization caught:', err);
-    logDebug(`Three.js initialization notice: ${err.message}`, 'WARN');
-  }
-}
-
-export function updateThreeTheme(themeName) {
-  if (!threeParticlesMaterial) return;
-  const newColor = getThemeParticleColor(themeName);
-  if (typeof gsap !== 'undefined') {
-    const currentColor = threeParticlesMaterial.color;
-    const targetColor = new THREE.Color(newColor);
-    gsap.to(currentColor, {
-      r: targetColor.r,
-      g: targetColor.g,
-      b: targetColor.b,
-      duration: 0.6,
-      ease: 'power2.out',
-      onUpdate: () => {
-        threeParticlesMaterial.needsUpdate = true;
-      }
-    });
-  } else {
-    threeParticlesMaterial.color.setHex(newColor);
-  }
-}
-
-// =============================================================================
-// 3B. LENIS MOMENTUM SMOOTH SCROLL ENGINE
-// =============================================================================
-
-let lenisInstance = null;
-
-export function initLenisScroll() {
-  if (typeof Lenis === 'undefined') {
-    logDebug('Lenis smooth scroll library not present; using standard scroll', 'INFO');
-    return;
-  }
-
-  try {
-    lenisInstance = new Lenis({
-      duration: 1.15,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      orientation: 'vertical',
-      gestureOrientation: 'vertical',
-      smoothWheel: true,
-      wheelMultiplier: 1.0,
-      touchMultiplier: 1.8
-    });
-
-    if (typeof gsap !== 'undefined' && typeof ScrollTrigger !== 'undefined') {
-      gsap.registerPlugin(ScrollTrigger);
-      lenisInstance.on('scroll', ScrollTrigger.update);
-      gsap.ticker.add((time) => {
-        lenisInstance.raf(time * 1000);
-      });
-      gsap.ticker.lagSmoothing(0);
-    } else {
-      function raf(time) {
-        lenisInstance.raf(time);
-        requestAnimationFrame(raf);
-      }
-      requestAnimationFrame(raf);
-    }
-
-    window.lenis = lenisInstance;
-    logDebug('Lenis momentum smooth scrolling engine initialized', 'SUCCESS');
-  } catch (lenisErr) {
-    console.warn('Lenis initialization notice:', lenisErr);
-  }
-}
-
-// =============================================================================
-// 3C. GSAP MOTION & COUNTERS ENGINE
-// =============================================================================
-
-export function animateMetricValue(element, targetVal, isCurrency = true, prefix = '', suffix = '') {
-  if (!element) return;
-  const numTarget = Number(targetVal) || 0;
-
-  if (typeof gsap === 'undefined') {
-    element.textContent = isCurrency 
-      ? (prefix + formatLKR(roundCurrency(numTarget)) + suffix) 
-      : (prefix + Math.round(numTarget).toLocaleString('en-US') + suffix);
-    element.setAttribute('data-numeric-val', numTarget);
-    return;
-  }
-
-  const prevVal = parseFloat(element.getAttribute('data-numeric-val') || '0');
-  if (prevVal === numTarget && element.textContent) {
-    return;
-  }
-
-  const tweenObj = { val: prevVal };
-  gsap.to(tweenObj, {
-    val: numTarget,
-    duration: 0.7,
-    ease: 'power2.out',
-    onUpdate: () => {
-      element.textContent = isCurrency 
-        ? (prefix + formatLKR(roundCurrency(tweenObj.val)) + suffix) 
-        : (prefix + Math.round(tweenObj.val).toLocaleString('en-US') + suffix);
-    },
-    onComplete: () => {
-      element.setAttribute('data-numeric-val', numTarget);
-      element.textContent = isCurrency 
-        ? (prefix + formatLKR(roundCurrency(numTarget)) + suffix) 
-        : (prefix + Math.round(numTarget).toLocaleString('en-US') + suffix);
-    }
-  });
-}
-
-export function animateViewTransition(targetView) {
-  if (typeof gsap === 'undefined' || !targetView) return;
-  gsap.fromTo(targetView, 
-    { opacity: 0, y: 16 }, 
-    { opacity: 1, y: 0, duration: 0.38, ease: 'power2.out' }
-  );
-  const cards = targetView.querySelectorAll('.dash-card, .kpi-card, .stationery-form-card, .reload-form-card');
-  if (cards.length > 0) {
-    gsap.fromTo(cards, 
-      { opacity: 0, y: 12 }, 
-      { opacity: 1, y: 0, duration: 0.32, stagger: 0.04, ease: 'power2.out', clearProps: 'transform,opacity' }
-    );
-  }
-}
-
-export function animateModalOpen(modalEl) {
-  if (!modalEl) return;
-  modalEl.classList.remove('hidden');
-  const content = modalEl.querySelector('.modal-content') || modalEl.firstElementChild;
-  if (content && typeof gsap !== 'undefined') {
-    gsap.fromTo(content,
-      { opacity: 0, scale: 0.93, y: 14 },
-      { opacity: 1, scale: 1, y: 0, duration: 0.28, ease: 'back.out(1.5)', clearProps: 'transform' }
-    );
-  }
-}
-
-export function animateButtonPress(btn) {
-  if (!btn || typeof gsap === 'undefined') return;
-  gsap.fromTo(btn,
-    { scale: 0.94 },
-    { scale: 1, duration: 0.24, ease: 'back.out(2)' }
-  );
-}
-
-// =============================================================================
 // 4. THEME & UI STYLE ENGINE
 // =============================================================================
 
@@ -626,9 +313,6 @@ export function setTheme(themeName) {
       card.classList.remove('ring-2', 'ring-sky-400');
     }
   });
-
-  // Synchronize Three.js particle color with the chosen theme
-  updateThreeTheme(themeName);
 
   logDebug(`Theme applied: ${themeName}`);
 }
@@ -897,33 +581,15 @@ function setupAuth() {
   const cancelResetBtn = document.getElementById('cancelResetBtn');
   const passwordResetForm = document.getElementById('passwordResetForm');
 
-  const closeResetModal = () => {
-    if (!passwordResetModal) return;
-    const content = passwordResetModal.querySelector('.modal-content');
-    if (content && typeof gsap !== 'undefined') {
-      gsap.to(content, {
-        opacity: 0,
-        scale: 0.94,
-        y: 8,
-        duration: 0.18,
-        ease: 'power2.in',
-        onComplete: () => {
-          passwordResetModal.classList.add('hidden');
-          gsap.set(content, { opacity: 1, scale: 1, y: 0 });
-        }
-      });
-    } else {
-      passwordResetModal.classList.add('hidden');
-    }
-  };
-
   if (forgotPasswordBtn && passwordResetModal) {
     forgotPasswordBtn.addEventListener('click', () => {
-      animateModalOpen(passwordResetModal);
+      passwordResetModal.classList.remove('hidden');
     });
   }
   if (cancelResetBtn && passwordResetModal) {
-    cancelResetBtn.addEventListener('click', closeResetModal);
+    cancelResetBtn.addEventListener('click', () => {
+      passwordResetModal.classList.add('hidden');
+    });
   }
   if (passwordResetForm) {
     passwordResetForm.addEventListener('submit', async (e) => {
@@ -932,7 +598,7 @@ function setupAuth() {
       try {
         await sendPasswordResetEmail(auth, email);
         showToast(`Password reset link sent to ${email}`, 'success');
-        closeResetModal();
+        passwordResetModal.classList.add('hidden');
       } catch (err) {
         showToast(`Reset error: ${err.message}`, 'error');
       }
@@ -1025,10 +691,7 @@ export function switchView(viewName) {
   });
 
   const targetView = document.getElementById(`view${viewName.charAt(0).toUpperCase() + viewName.slice(1)}`);
-  if (targetView) {
-    targetView.classList.remove('hidden');
-    animateViewTransition(targetView);
-  }
+  if (targetView) targetView.classList.remove('hidden');
 
   // Desktop Header Nav buttons
   document.querySelectorAll('.nav-tab-btn').forEach(btn => {
@@ -1055,11 +718,7 @@ export function switchView(viewName) {
     calculateFinancialAnalytics();
   }
 
-  if (window.lenis) {
-    window.lenis.scrollTo(0, { immediate: true });
-  } else {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
   logDebug(`Switched view to: ${viewName}`);
 }
 
@@ -1138,31 +797,14 @@ function initNavigation() {
 function openSettingsModal() {
   const modal = document.getElementById('settingsModal');
   if (modal) {
-    animateModalOpen(modal);
+    modal.classList.remove('hidden');
     updateCacheMetrics();
   }
 }
 
 function closeSettingsModal() {
   const modal = document.getElementById('settingsModal');
-  if (modal) {
-    const content = modal.querySelector('.modal-content');
-    if (content && typeof gsap !== 'undefined') {
-      gsap.to(content, {
-        opacity: 0,
-        scale: 0.94,
-        y: 8,
-        duration: 0.18,
-        ease: 'power2.in',
-        onComplete: () => {
-          modal.classList.add('hidden');
-          gsap.set(content, { opacity: 1, scale: 1, y: 0 });
-        }
-      });
-    } else {
-      modal.classList.add('hidden');
-    }
-  }
+  if (modal) modal.classList.add('hidden');
 }
 
 function switchSettingsTab(tabName) {
@@ -1173,12 +815,7 @@ function switchSettingsTab(tabName) {
     panel.classList.add('hidden');
   });
   const targetPanel = document.getElementById(`settingsPanel${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`);
-  if (targetPanel) {
-    targetPanel.classList.remove('hidden');
-    if (typeof gsap !== 'undefined') {
-      gsap.fromTo(targetPanel, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.25, ease: 'power2.out' });
-    }
-  }
+  if (targetPanel) targetPanel.classList.remove('hidden');
 
   document.querySelectorAll('.settings-tab-btn').forEach(btn => {
     if (btn.getAttribute('data-settings-tab') === tabName) {
@@ -1600,13 +1237,13 @@ function updateDashboardOverviewKPIs() {
   const dashReloadComm = document.getElementById('dashReloadCommission');
   const dashProfitToday = document.getElementById('dashProfitToday');
 
-  if (dashCombined) animateMetricValue(dashCombined, totalRevenue, true);
-  if (dashStat) animateMetricValue(dashStat, roundCurrency(statSales), true);
-  if (dashStatUnits) animateMetricValue(dashStatUnits, statUnits, false);
-  if (dashReloadVol) animateMetricValue(dashReloadVol, roundCurrency(reloadVolume), true);
+  if (dashCombined) dashCombined.textContent = formatLKR(totalRevenue);
+  if (dashStat) dashStat.textContent = formatLKR(roundCurrency(statSales));
+  if (dashStatUnits) dashStatUnits.textContent = statUnits.toLocaleString();
+  if (dashReloadVol) dashReloadVol.textContent = formatLKR(roundCurrency(reloadVolume));
   // Clean currency format: Strictly NO "Comm." text
-  if (dashReloadComm) animateMetricValue(dashReloadComm, roundCurrency(reloadCommission), true, '+');
-  if (dashProfitToday) animateMetricValue(dashProfitToday, totalProfitToday, true);
+  if (dashReloadComm) dashReloadComm.textContent = `+${formatLKR(roundCurrency(reloadCommission))}`;
+  if (dashProfitToday) dashProfitToday.textContent = formatLKR(totalProfitToday);
 
   // Trigger subtle pulse animations on updated KPI cards
   pulseCard('dashTodayCombinedRevenue');
@@ -1651,14 +1288,14 @@ function calculateProfitOverview() {
   const elMonth = document.getElementById('dashProfitMonth');
   const elYear = document.getElementById('dashProfitYear');
 
-  if (elMonth) animateMetricValue(elMonth, roundCurrency(monthProfit), true);
-  if (elYear) animateMetricValue(elYear, roundCurrency(yearProfit), true);
+  if (elMonth) elMonth.textContent = formatLKR(roundCurrency(monthProfit));
+  if (elYear) elYear.textContent = formatLKR(roundCurrency(yearProfit));
 }
 
 function updateDashboardCatalogKPIs() {
   const dashCatalogCount = document.getElementById('dashCatalogCount');
   if (dashCatalogCount) {
-    animateMetricValue(dashCatalogCount, APP_STATE.inventoryCatalog.length, false, '', ' Items');
+    dashCatalogCount.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
   }
 }
 
@@ -1681,7 +1318,6 @@ function setupStationeryModule() {
   // Quantity Stepper Handlers
   if (posQtyDecBtn && posQuantity) {
     posQtyDecBtn.addEventListener('click', () => {
-      animateButtonPress(posQtyDecBtn);
       const current = Math.max(1, (parseInt(posQuantity.value, 10) || 1) - 1);
       posQuantity.value = current;
       calculatePosTotal();
@@ -1690,7 +1326,6 @@ function setupStationeryModule() {
 
   if (posQtyIncBtn && posQuantity) {
     posQtyIncBtn.addEventListener('click', () => {
-      animateButtonPress(posQtyIncBtn);
       const current = (parseInt(posQuantity.value, 10) || 1) + 1;
       posQuantity.value = current;
       calculatePosTotal();
@@ -1700,7 +1335,6 @@ function setupStationeryModule() {
   // Quick Quantity Presets
   document.querySelectorAll('[data-qty-pill]').forEach(btn => {
     btn.addEventListener('click', () => {
-      animateButtonPress(btn);
       const qty = parseInt(btn.getAttribute('data-qty-pill'), 10) || 1;
       if (posQuantity) {
         posQuantity.value = qty;
@@ -2066,7 +1700,6 @@ function setupReloadModule() {
   // Operator Select Buttons
   document.querySelectorAll('[data-select-op]').forEach(btn => {
     btn.addEventListener('click', () => {
-      animateButtonPress(btn);
       const op = btn.getAttribute('data-select-op');
       APP_STATE.activeReloadOperator = op;
 
@@ -2182,7 +1815,6 @@ function renderReloadPresets() {
     btn.className = 'preset-btn px-3.5 py-2 rounded-xl theme-bg-subtle border theme-border font-mono font-bold text-xs hover:theme-bg-elevated transition glass-btn';
     btn.textContent = `Rs. ${amount}`;
     btn.addEventListener('click', () => {
-      animateButtonPress(btn);
       if (reloadAmountInput) {
         reloadAmountInput.value = amount;
         updateReloadRatePreview();
@@ -2647,9 +2279,9 @@ function updateMasterLogsTodayCards() {
   const cardStatUnits = document.getElementById('logCardStatUnits');
   const cardStatTx = document.getElementById('logCardStatTx');
 
-  if (cardStatSales) animateMetricValue(cardStatSales, roundCurrency(statSales), true);
-  if (cardStatUnits) animateMetricValue(cardStatUnits, statUnits, false);
-  if (cardStatTx) animateMetricValue(cardStatTx, statTx, false);
+  if (cardStatSales) cardStatSales.textContent = formatLKR(roundCurrency(statSales));
+  if (cardStatUnits) cardStatUnits.textContent = statUnits.toLocaleString();
+  if (cardStatTx) cardStatTx.textContent = statTx.toLocaleString();
 
   // Card 2: Today's Reloads
   let reloadVol = 0;
@@ -2669,20 +2301,20 @@ function updateMasterLogsTodayCards() {
   const cardReloadVol = document.getElementById('logCardReloadVol');
   const cardReloadComm = document.getElementById('logCardReloadComm');
 
-  if (cardReloadVol) animateMetricValue(cardReloadVol, roundCurrency(reloadVol), true);
+  if (cardReloadVol) cardReloadVol.textContent = formatLKR(roundCurrency(reloadVol));
   // Clean currency only: NO "Comm." text
-  if (cardReloadComm) animateMetricValue(cardReloadComm, roundCurrency(reloadComm), true, '+');
+  if (cardReloadComm) cardReloadComm.textContent = `+${formatLKR(roundCurrency(reloadComm))}`;
 
   // Card 3: Combined Store Revenue
   const combinedRev = roundCurrency(statSales + reloadComm);
   const cardCombinedRev = document.getElementById('logCardCombinedRevenue');
-  if (cardCombinedRev) animateMetricValue(cardCombinedRev, combinedRev, true);
+  if (cardCombinedRev) cardCombinedRev.textContent = formatLKR(combinedRev);
 
   // Card 4: Today Net Profit (NEW)
   const totalTodayProfit = roundCurrency(statProfit + reloadComm);
   const cardTodayProfit = document.getElementById('logCardTodayProfit');
   const cardTodayMargin = document.getElementById('logCardTodayMargin');
-  if (cardTodayProfit) animateMetricValue(cardTodayProfit, totalTodayProfit, true);
+  if (cardTodayProfit) cardTodayProfit.textContent = formatLKR(totalTodayProfit);
   if (cardTodayMargin) {
     const margin = combinedRev > 0 ? (totalTodayProfit / combinedRev) * 100 : 0;
     cardTodayMargin.textContent = `${margin.toFixed(1)}%`;
@@ -2694,10 +2326,10 @@ function updateMasterLogsTodayCards() {
   const opMobitel = document.getElementById('logCardMobitelVol');
   const opHutch = document.getElementById('logCardHutchVol');
 
-  if (opAirtel) animateMetricValue(opAirtel, roundCurrency(opTotals.AIRTEL), true);
-  if (opDialog) animateMetricValue(opDialog, roundCurrency(opTotals.DIALOG), true);
-  if (opMobitel) animateMetricValue(opMobitel, roundCurrency(opTotals.MOBITEL), true);
-  if (opHutch) animateMetricValue(opHutch, roundCurrency(opTotals.HUTCH), true);
+  if (opAirtel) opAirtel.textContent = formatLKR(roundCurrency(opTotals.AIRTEL));
+  if (opDialog) opDialog.textContent = formatLKR(roundCurrency(opTotals.DIALOG));
+  if (opMobitel) opMobitel.textContent = formatLKR(roundCurrency(opTotals.MOBITEL));
+  if (opHutch) opHutch.textContent = formatLKR(roundCurrency(opTotals.HUTCH));
 }
 
 function calculateFinancialAnalytics() {
@@ -2738,10 +2370,10 @@ function calculateFinancialAnalytics() {
   const cardMComm = document.getElementById('logCardMonthComm');
   const cardMNet = document.getElementById('logCardMonthNet');
 
-  if (cardMSales) animateMetricValue(cardMSales, roundCurrency(monthStatSales), true);
-  if (cardMReload) animateMetricValue(cardMReload, roundCurrency(monthReloadVol), true);
-  if (cardMComm) animateMetricValue(cardMComm, roundCurrency(monthReloadComm), true);
-  if (cardMNet) animateMetricValue(cardMNet, roundCurrency(monthProfit), true);
+  if (cardMSales) cardMSales.textContent = formatLKR(roundCurrency(monthStatSales));
+  if (cardMReload) cardMReload.textContent = formatLKR(roundCurrency(monthReloadVol));
+  if (cardMComm) cardMComm.textContent = formatLKR(roundCurrency(monthReloadComm));
+  if (cardMNet) cardMNet.textContent = formatLKR(roundCurrency(monthProfit));
 
   // Card 6: Annual YTD Statement
   const activeYear = activeMonth.substring(0, 4);
@@ -2781,10 +2413,10 @@ function calculateFinancialAnalytics() {
   const cardYComm = document.getElementById('logCardYearComm');
   const cardYNet = document.getElementById('logCardYearNet');
 
-  if (cardYSales) animateMetricValue(cardYSales, roundCurrency(yearStatSales), true);
-  if (cardYReload) animateMetricValue(cardYReload, roundCurrency(yearReloadVol), true);
-  if (cardYComm) animateMetricValue(cardYComm, roundCurrency(yearReloadComm), true);
-  if (cardYNet) animateMetricValue(cardYNet, roundCurrency(yearProfit), true);
+  if (cardYSales) cardYSales.textContent = formatLKR(roundCurrency(yearStatSales));
+  if (cardYReload) cardYReload.textContent = formatLKR(roundCurrency(yearReloadVol));
+  if (cardYComm) cardYComm.textContent = formatLKR(roundCurrency(yearReloadComm));
+  if (cardYNet) cardYNet.textContent = formatLKR(roundCurrency(yearProfit));
 }
 
 // -----------------------------------------------------------------------------
@@ -2844,12 +2476,12 @@ function applyMasterLogFilters() {
   const sTotalProfit = document.getElementById('logSummaryTotalProfit');
   const filterLabel = document.getElementById('masterLogFilterLabel');
 
-  if (sStatSales) animateMetricValue(sStatSales, roundCurrency(statSales), true);
-  if (sUnitsSold) animateMetricValue(sUnitsSold, unitsSold, false);
-  if (sReloadVol) animateMetricValue(sReloadVol, roundCurrency(reloadVol), true);
-  if (sReloadComm) animateMetricValue(sReloadComm, roundCurrency(reloadComm), true);
-  if (sTotalRevenue) animateMetricValue(sTotalRevenue, totalPeriodRevenue, true);
-  if (sTotalProfit) animateMetricValue(sTotalProfit, totalPeriodProfit, true);
+  if (sStatSales) sStatSales.textContent = formatLKR(roundCurrency(statSales));
+  if (sUnitsSold) sUnitsSold.textContent = unitsSold.toLocaleString();
+  if (sReloadVol) sReloadVol.textContent = formatLKR(roundCurrency(reloadVol));
+  if (sReloadComm) sReloadComm.textContent = formatLKR(roundCurrency(reloadComm));
+  if (sTotalRevenue) sTotalRevenue.textContent = formatLKR(totalPeriodRevenue);
+  if (sTotalProfit) sTotalProfit.textContent = formatLKR(totalPeriodProfit);
 
   if (filterLabel) {
     filterLabel.textContent = fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`;
@@ -3027,28 +2659,8 @@ function setupEditStationeryModal() {
   if (priceInput) priceInput.addEventListener('input', calculateEditTotal);
   if (qtyInput) qtyInput.addEventListener('input', calculateEditTotal);
 
-  const closeModal = () => {
-    if (!modal) return;
-    const content = modal.querySelector('.modal-content');
-    if (content && typeof gsap !== 'undefined') {
-      gsap.to(content, {
-        opacity: 0,
-        scale: 0.94,
-        y: 8,
-        duration: 0.18,
-        ease: 'power2.in',
-        onComplete: () => {
-          modal.classList.add('hidden');
-          gsap.set(content, { opacity: 1, scale: 1, y: 0 });
-        }
-      });
-    } else {
-      modal.classList.add('hidden');
-    }
-  };
-
-  if (closeBtn && modal) closeBtn.addEventListener('click', closeModal);
-  if (cancelBtn && modal) cancelBtn.addEventListener('click', closeModal);
+  if (closeBtn && modal) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  if (cancelBtn && modal) cancelBtn.addEventListener('click', () => modal.classList.add('hidden'));
 
   if (form) {
     form.addEventListener('submit', async (e) => {
@@ -3091,7 +2703,7 @@ function setupEditStationeryModal() {
           }
         }
 
-        closeModal();
+        modal.classList.add('hidden');
         showToast('Stationery transaction updated', 'success');
       } catch (err) {
         showToast(`Update failed: ${err.message}`, 'error');
@@ -3115,7 +2727,7 @@ function openEditStationeryModal(record) {
   const preview = document.getElementById('editStatTotalPreview');
   if (preview) preview.textContent = formatLKR(total);
 
-  animateModalOpen(modal);
+  modal.classList.remove('hidden');
 }
 
 // =============================================================================
@@ -3732,13 +3344,7 @@ function updateCacheMetrics() {
 // =============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  logDebug('AL Communication System Initializing (V4.0 Three.js, Lenis, GSAP & Glass)...', 'INFO');
-
-  // 0A. Three.js Interactive Anti-Gravity Particle Background
-  initThreeBackground();
-
-  // 0B. Lenis Momentum Smooth Scrolling Engine
-  initLenisScroll();
+  logDebug('AL Communication System Initializing (V3.1 Profit & Glass Engine)...', 'INFO');
 
   // 1. Theme and UI Style Setup
   initThemeAndStyle();
@@ -3779,5 +3385,5 @@ document.addEventListener('DOMContentLoaded', () => {
   // 12. Auth Flow Initiation
   setupAuth();
 
-  logDebug('AL Communication System Bootstrap Complete (V4.0).', 'SUCCESS');
+  logDebug('AL Communication System Bootstrap Complete (V3.1).', 'SUCCESS');
 });
