@@ -33,6 +33,13 @@
     };
   </script>
 
+  <!-- Lenis Smooth Scroll -->
+  <script src="https://unpkg.com/lenis@1.1.18/dist/lenis.min.js"></script>
+  <!-- GSAP + ScrollTrigger -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <!-- Three.js WebGL -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <!-- jsPDF & jsPDF-AutoTable for Client-Side PDF Generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -40,7 +47,10 @@
   <!-- Custom Styles & Advanced Glass UI Engine -->
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="glass-ui-active theme-bg-app theme-text-main antialiased selection:bg-sky-500 selection:text-white pb-24 md:pb-6">
+<body class="glass-ui-active theme-bg-app theme-text-main antialiased selection:bg-sky-500 selection:text-white pb-24 md:pb-6 relative overflow-x-hidden min-h-screen">
+
+  <!-- Interactive Anti-Gravity WebGL Canvas (Three.js) -->
+  <canvas id="webglCanvas" class="fixed inset-0 pointer-events-none z-0 w-full h-full"></canvas>
 
   <!-- =========================================================================
        0. INITIAL AUTH TRANSITION GATE (Smooth session check; suppresses flash)
@@ -62,7 +72,7 @@
   <!-- =========================================================================
        1. AUTHENTICATION / LOGIN SCREEN (Visible only if unauthenticated)
        ========================================================================= -->
-  <section id="loginScreen" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 theme-bg-app overflow-y-auto">
+  <section id="loginScreen" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 theme-bg-app overflow-y-auto" data-lenis-prevent>
     <div class="w-full max-w-md p-6 sm:p-8 rounded-2xl theme-bg-surface theme-border border theme-shadow relative">
       
       <!-- Logo & Clean Shop Branding -->
@@ -166,7 +176,7 @@
   <!-- =========================================================================
        2. MAIN APPLICATION SHELL (Visible strictly after authentication)
        ========================================================================= -->
-  <div id="appShell" class="hidden min-h-screen flex flex-col">
+  <div id="appShell" class="hidden min-h-screen flex flex-col relative z-10">
 
     <!-- FLOATING TOP HEADER -->
     <header class="sticky top-0 z-40 theme-header border-b theme-border px-3 sm:px-6 py-2.5 shadow-sm">
@@ -792,7 +802,7 @@
             </div>
           </div>
 
-          <div class="overflow-x-auto rounded-xl border theme-border">
+          <div class="overflow-x-auto rounded-xl border theme-border" data-lenis-prevent>
             <table class="w-full text-left text-xs border-collapse">
               <thead>
                 <tr class="theme-bg-subtle border-b theme-border uppercase theme-text-muted">
@@ -1136,7 +1146,7 @@
             </span>
           </div>
 
-          <div class="overflow-x-auto rounded-xl border theme-border">
+          <div class="overflow-x-auto rounded-xl border theme-border" data-lenis-prevent>
             <table class="w-full text-left text-xs border-collapse">
               <thead>
                 <tr class="theme-bg-subtle border-b theme-border uppercase theme-text-muted">
@@ -1198,7 +1208,7 @@
   <!-- =========================================================================
        MODULE 4: SYSTEM SETTINGS & MASTER CATALOG EDITOR MODAL
        ========================================================================= -->
-  <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 modal-backdrop overflow-y-auto">
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 modal-backdrop overflow-y-auto" data-lenis-prevent>
     <div class="modal-content w-full max-w-4xl rounded-2xl theme-bg-surface theme-border border theme-shadow relative max-h-[90vh] flex flex-col overflow-hidden">
       
       <!-- Modal Header -->
@@ -1306,7 +1316,7 @@
               <input type="text" id="catalogSearchInput" placeholder="Filter inventory..." class="form-input text-xs py-1 px-2.5 max-w-xs">
             </div>
 
-            <div class="overflow-x-auto rounded-xl border theme-border">
+            <div class="overflow-x-auto rounded-xl border theme-border" data-lenis-prevent>
               <table class="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr class="theme-bg-subtle border-b theme-border uppercase theme-text-muted">
@@ -1595,7 +1605,7 @@
   <!-- =========================================================================
        MODAL 2: EDIT STATIONERY SALE MODAL
        ========================================================================= -->
-  <div id="editStationeryModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+  <div id="editStationeryModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" data-lenis-prevent>
     <div class="modal-content w-full max-w-md rounded-2xl theme-bg-surface theme-border border theme-shadow p-6 relative">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-base theme-text-main">Edit Stationery Record</h3>
@@ -1652,7 +1662,7 @@
   <!-- =========================================================================
        MODAL 3: PASSWORD RESET MODAL
        ========================================================================= -->
-  <div id="passwordResetModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+  <div id="passwordResetModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" data-lenis-prevent>
     <div class="modal-content w-full max-w-sm rounded-2xl theme-bg-surface theme-border border theme-shadow p-6 relative">
       <h3 class="font-bold text-base theme-text-main mb-2">Reset Password</h3>
       <p class="text-xs theme-text-muted mb-4">

@@ -1,3 +1,7 @@
+// =============================================================================
+// AL COMMUNICATION — CLOUD FIRESTORE SECURITY RULES (VERSION 4.0)
+// Single-Owner Production Authorization & Strict Data Validations
+// =============================================================================
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {

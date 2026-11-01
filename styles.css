@@ -1,7 +1,7 @@
 /* ==========================================================================
-   AL COMMUNICATION — VERSION 3.1 ADVANCED GLASS UI & MOTION SYSTEM
-   High-Performance GPU-Accelerated CSS, CSS Houdini, Dynamic Themes,
-   3D Tactile Physics, Drag-and-Drop States & iOS Glassmorphism
+   AL COMMUNICATION — VERSION 4.0 ADVANCED GLASS UI, THREE.JS & GSAP MOTION
+   High-Performance GPU-Accelerated CSS, CSS Houdini, Lenis Smooth Scroll,
+   Three.js Anti-Gravity Canvas, Dynamic Themes & 3D Tactile Physics
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -20,7 +20,46 @@
 }
 
 /* --------------------------------------------------------------------------
-   2. Design Tokens & Root Custom Properties
+   2. Lenis Momentum Smooth Scroll Core Styles
+   -------------------------------------------------------------------------- */
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   3. Three.js Anti-Gravity Interactive Canvas Layer
+   -------------------------------------------------------------------------- */
+#webglCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.85;
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+/* --------------------------------------------------------------------------
+   4. Design Tokens & Root Custom Properties (Themes 1 to 4)
    -------------------------------------------------------------------------- */
 :root {
   --fluid-base: clamp(0.875rem, 2.5vw, 1.25rem);
@@ -120,73 +159,45 @@
   --glass-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.55);
 }
 
-/* Theme 4: Warm Amber (Light / Parchment) */
-[data-theme="warm-amber"], body.light-theme[data-theme="warm-amber"] {
-  --bg-app: #fffbeb;
-  --bg-surface: #ffffff;
-  --bg-surface-elevated: #fef3c7;
-  --bg-surface-subtle: #fde68a;
-  --border-color: #fcd34d;
-  --border-focus: #d97706;
-  --text-main: #451a03;
-  --text-muted: #78350f;
+/* Theme 4: Warm Amber (Warm Commercial Dark) */
+[data-theme="warm-amber"] {
+  --bg-app: #18120c;
+  --bg-surface: #261e16;
+  --bg-surface-elevated: #3d3023;
+  --bg-surface-subtle: #1f1710;
+  --border-color: #443527;
+  --border-focus: #f59e0b;
+  --text-main: #fffbeb;
+  --text-muted: #fcd34d;
   --text-dim: #b45309;
-  --accent: #d97706;
-  --accent-hover: #b45309;
-  --accent-light: rgba(217, 119, 6, 0.15);
-  --success: #059669;
-  --success-bg: rgba(5, 150, 105, 0.15);
-  --warning: #b45309;
-  --warning-bg: rgba(180, 83, 9, 0.15);
-  --danger: #dc2626;
-  --danger-bg: rgba(220, 38, 38, 0.15);
-  --card-shadow: 0 10px 25px -5px rgba(69, 26, 3, 0.08), 0 8px 10px -6px rgba(69, 26, 3, 0.05);
-  --header-bg: rgba(255, 251, 235, 0.94);
+  --accent: #f59e0b;
+  --accent-hover: #d97706;
+  --accent-light: rgba(245, 158, 11, 0.15);
+  --success: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.15);
+  --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.15);
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.15);
+  --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  --header-bg: rgba(24, 18, 12, 0.92);
 
-  --glass-surface: rgba(255, 255, 255, 0.86);
-  --glass-elevated: rgba(254, 243, 199, 0.88);
-  --glass-subtle: rgba(253, 230, 138, 0.78);
-  --glass-border: rgba(217, 119, 6, 0.26);
-  --glass-shadow: 0 12px 36px 0 rgba(69, 26, 3, 0.12);
+  --glass-surface: rgba(38, 30, 22, 0.78);
+  --glass-elevated: rgba(61, 48, 35, 0.84);
+  --glass-subtle: rgba(31, 23, 16, 0.72);
+  --glass-border: rgba(245, 158, 11, 0.26);
+  --glass-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.55);
 }
 
 /* --------------------------------------------------------------------------
-   3. Application Resets & Typography
+   5. Dynamic Theme Classes
    -------------------------------------------------------------------------- */
-* {
-  box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent;
-}
-
-html, body {
-  margin: 0;
-  padding: 0;
-  min-height: 100vh;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background-color: var(--bg-app);
-  color: var(--text-main);
-  transition: background-color 0.25s ease, color 0.25s ease;
-  overflow-x: hidden;
-  width: 100%;
-}
-
-input, select, textarea, button {
-  font-size: 16px; /* Prevents auto-zoom on iOS mobile */
-  touch-action: manipulation;
-}
-
-/* Tabular numbers for accurate LKR currency alignment */
-.currency-lkr {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-}
-
-/* Utility Theme Classes */
 .theme-bg-app { background-color: var(--bg-app); }
 .theme-bg-surface { background-color: var(--bg-surface); }
 .theme-bg-elevated { background-color: var(--bg-surface-elevated); }
 .theme-bg-subtle { background-color: var(--bg-surface-subtle); }
 .theme-border { border-color: var(--border-color); }
+.theme-border-focus:focus { border-color: var(--border-focus); outline: none; }
 .theme-text-main { color: var(--text-main); }
 .theme-text-muted { color: var(--text-muted); }
 .theme-text-dim { color: var(--text-dim); }
@@ -194,217 +205,133 @@ input, select, textarea, button {
 .theme-bg-accent { background-color: var(--accent); }
 .theme-bg-accent-light { background-color: var(--accent-light); }
 .theme-shadow { box-shadow: var(--card-shadow); }
-
-.theme-header {
-  background-color: var(--header-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
+.theme-header { background-color: var(--header-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 
 /* --------------------------------------------------------------------------
-   4. Apple iOS Frosted Glassmorphism Engine (body.glass-ui-active)
+   6. Apple iOS Frosted Glassmorphism Engine
    -------------------------------------------------------------------------- */
-body.glass-ui-active {
-  background-color: var(--bg-app) !important;
-  background-image: 
-    radial-gradient(at 10% 12%, rgba(56, 189, 248, 0.18) 0px, transparent 48%),
-    radial-gradient(at 90% 88%, rgba(129, 140, 248, 0.18) 0px, transparent 48%),
-    radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.10) 0px, transparent 60%) !important;
-  background-attachment: fixed !important;
-  background-size: cover !important;
+body.glass-ui-active .theme-bg-surface {
+  background-color: var(--glass-surface) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--glass-shadow) !important;
 }
 
-body.glass-ui-active.light-theme {
-  background-color: var(--bg-app) !important;
-  background-image: 
-    radial-gradient(at 12% 15%, rgba(5, 150, 105, 0.14) 0px, transparent 48%),
-    radial-gradient(at 88% 85%, rgba(217, 119, 6, 0.14) 0px, transparent 48%),
-    radial-gradient(at 50% 50%, rgba(59, 130, 246, 0.10) 0px, transparent 60%) !important;
-  background-attachment: fixed !important;
-  background-size: cover !important;
+body.glass-ui-active .theme-bg-elevated {
+  background-color: var(--glass-elevated) !important;
+  backdrop-filter: blur(24px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+  border-color: var(--glass-border) !important;
 }
 
-/* Comprehensive Glass Rule: Applied across all cards, panels, tables, inputs, modals */
-body.glass-ui-active .card,
-body.glass-ui-active .metric-card,
-body.glass-ui-active .dash-card,
-body.glass-ui-active .theme-bg-surface,
-body.glass-ui-active .theme-bg-subtle,
-body.glass-ui-active .theme-bg-elevated,
-body.glass-ui-active nav,
-body.glass-ui-active .modal-content,
-body.glass-ui-active table,
-body.glass-ui-active input:not(.quantity-stepper input),
-body.glass-ui-active select,
-body.glass-ui-active textarea,
-body.glass-ui-active .autocomplete-dropdown,
-body.glass-ui-active button:not(.primary-solid):not(.glass-exempt) {
-  background: rgba(15, 23, 42, 0.65) !important;
-  backdrop-filter: blur(25px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(25px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37) !important;
-  transform: translateZ(0);
-  will-change: backdrop-filter;
+body.glass-ui-active .theme-bg-subtle {
+  background-color: var(--glass-subtle) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
 }
 
-/* Light Theme Glass Adaptation */
-body.glass-ui-active.light-theme .card,
-body.glass-ui-active.light-theme .metric-card,
-body.glass-ui-active.light-theme .dash-card,
-body.glass-ui-active.light-theme .theme-bg-surface,
-body.glass-ui-active.light-theme .theme-bg-subtle,
-body.glass-ui-active.light-theme .theme-bg-elevated,
-body.glass-ui-active.light-theme nav,
-body.glass-ui-active.light-theme .modal-content,
-body.glass-ui-active.light-theme table,
-body.glass-ui-active.light-theme input:not(.quantity-stepper input),
-body.glass-ui-active.light-theme select,
-body.glass-ui-active.light-theme textarea,
-body.glass-ui-active.light-theme .autocomplete-dropdown,
-body.glass-ui-active.light-theme button:not(.primary-solid):not(.glass-exempt) {
-  background: rgba(255, 255, 255, 0.70) !important;
-  border: 1px solid rgba(255, 255, 255, 0.45) !important;
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15) !important;
-  color: var(--text-main) !important;
-}
-
-/* Header in Glass Mode */
-body.glass-ui-active header,
 body.glass-ui-active .theme-header {
-  background: rgba(15, 23, 42, 0.72) !important;
-  backdrop-filter: blur(28px) saturate(190%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.35) !important;
+  background-color: var(--glass-surface) !important;
+  backdrop-filter: blur(28px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
+  border-bottom-color: var(--glass-border) !important;
 }
 
-body.glass-ui-active.light-theme header,
-body.glass-ui-active.light-theme .theme-header {
-  background: rgba(255, 255, 255, 0.80) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.45) !important;
-  box-shadow: 0 4px 24px 0 rgba(31, 38, 135, 0.12) !important;
+body.glass-ui-active nav.fixed {
+  background-color: var(--glass-surface) !important;
+  backdrop-filter: blur(28px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
+  border-top-color: var(--glass-border) !important;
 }
 
-/* Modal Content in Glass Mode */
 body.glass-ui-active .modal-content {
-  background: rgba(15, 23, 42, 0.88) !important;
-  backdrop-filter: blur(36px) saturate(200%) !important;
-  -webkit-backdrop-filter: blur(36px) saturate(200%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65) !important;
+  background-color: var(--glass-surface) !important;
+  backdrop-filter: blur(32px) saturate(210%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(210%) !important;
+  border-color: var(--glass-border) !important;
+  box-shadow: 0 24px 60px 0 rgba(0, 0, 0, 0.6) !important;
 }
 
-body.glass-ui-active.light-theme .modal-content {
-  background: rgba(255, 255, 255, 0.90) !important;
-  border: 1px solid rgba(255, 255, 255, 0.65) !important;
-  box-shadow: 0 24px 60px rgba(31, 38, 135, 0.22) !important;
+/* Light Theme Glass Adaptations */
+body.light-theme.glass-ui-active .theme-bg-surface {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.07) !important;
 }
 
-/* Solid Primary Button */
-.primary-solid {
-  background: var(--accent) !important;
-  color: #ffffff !important;
-  border: 1px solid transparent !important;
-  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.25) !important;
+body.light-theme.glass-ui-active .modal-content {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
 }
 
-/* Active Filter Tabs in Glass Mode */
-body.glass-ui-active button.active,
-body.glass-ui-active .nav-tab-btn.active,
-body.glass-ui-active .log-cat-btn.active,
-body.glass-ui-active .settings-tab-btn.active,
-body.glass-ui-active .op-select-btn.active,
-body.glass-ui-active .stock-filter-btn.active {
-  background: var(--accent) !important;
-  color: #ffffff !important;
-  border-color: var(--accent) !important;
-  box-shadow: 0 4px 18px rgba(56, 189, 248, 0.40) !important;
+/* Specular Rim Lighting on Glass Cards */
+body.glass-ui-active .dash-card,
+body.glass-ui-active .kpi-card,
+body.glass-ui-active .glass-card {
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
 }
 
-body.glass-ui-active.light-theme button.active,
-body.glass-ui-active.light-theme .nav-tab-btn.active,
-body.glass-ui-active.light-theme .log-cat-btn.active,
-body.glass-ui-active.light-theme .settings-tab-btn.active,
-body.glass-ui-active.light-theme .op-select-btn.active,
-body.glass-ui-active.light-theme .stock-filter-btn.active {
-  background: var(--accent) !important;
-  color: #ffffff !important;
-  border-color: var(--accent) !important;
-  box-shadow: 0 4px 18px rgba(5, 150, 105, 0.35) !important;
+body.glass-ui-active .dash-card::before,
+body.glass-ui-active .kpi-card::before,
+body.glass-ui-active .glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(var(--angle-1), rgba(255, 255, 255, 0.18), transparent 60%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 /* --------------------------------------------------------------------------
-   5. Glass Buttons & Tactile 3D Micro-Interactions (.button-wrap & .glass-btn)
+   7. 3D Tactile Button Press Physics via :has()
    -------------------------------------------------------------------------- */
 .button-wrap {
-  border-radius: 999vw;
-  background: transparent;
-  perspective: 800px;
-  display: inline-flex;
-  transition: transform var(--duration-hover) var(--ease-hover);
+  position: relative;
+  border-radius: 0.75rem;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+  display: inline-block;
 }
 
-/* 3D Press Physics on Button Container driven by :has() */
-.button-wrap:has(.glass-btn:active) {
-  transform: rotate3d(1, 0, 0, 25deg);
+.button-wrap:has(button:active),
+.button-wrap:has(a:active) {
+  transform: scale(0.96) translateY(1.5px);
 }
 
 .glass-btn {
   position: relative;
   overflow: hidden;
-  border-radius: inherit;
-  cursor: pointer;
-  outline: none;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 50%, rgba(255, 255, 255, 0.12) 100%);
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-    0 4px 16px rgba(0, 0, 0, 0.25),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.10);
-  backdrop-filter: blur(clamp(4px, 0.25em, 12px));
-  -webkit-backdrop-filter: blur(clamp(4px, 0.25em, 12px));
-  transition: transform var(--duration-hover) var(--ease-hover), box-shadow 0.2s ease, border-color 0.2s ease, --angle-1 500ms ease;
-  will-change: transform;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, box-shadow;
 }
 
 .glass-btn:hover {
-  transform: scale(0.975);
-  --angle-1: -125deg;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -2px rgba(0, 0, 0, 0.3);
 }
 
 .glass-btn:active {
-  transform: scale(0.95);
+  transform: translateY(1px) scale(0.98);
 }
 
-/* Conical + Linear Gradient Border Pseudo Element */
-.glass-btn::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1.5px;
-  background: conic-gradient(from var(--angle-1), rgba(255, 255, 255, 0.7), transparent 30%, rgba(255, 255, 255, 0.6) 50%, transparent 80%),
-              linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.05));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  pointer-events: none;
-  opacity: 0.85;
-}
-
-/* Water Glass Ripple Effect */
+/* Subtle Interactive Ripple */
 .glass-ripple {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.10) 60%, transparent 80%);
   transform: scale(0);
-  animation: glassRippleEffect 0.5s ease-out forwards;
+  animation: glassRippleAnim 0.55s linear;
+  background-color: rgba(255, 255, 255, 0.25);
   pointer-events: none;
 }
-@keyframes glassRippleEffect {
+
+@keyframes glassRippleAnim {
   to {
     transform: scale(4);
     opacity: 0;
@@ -412,24 +339,21 @@ body.glass-ui-active.light-theme .stock-filter-btn.active {
 }
 
 /* --------------------------------------------------------------------------
-   6. Motion Graphics & Keyframe Animations
+   8. Motion Graphics & Keyframe Animations
    -------------------------------------------------------------------------- */
 @keyframes glassPageIn {
-  0% {
+  from {
     opacity: 0;
-    transform: translateY(16px) scale(0.98);
-    filter: blur(8px);
+    transform: translateY(14px) scale(0.99);
   }
-  100% {
+  to {
     opacity: 1;
     transform: translateY(0) scale(1);
-    filter: blur(0);
   }
 }
 
-.app-view:not(.hidden) {
-  animation: glassPageIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity, filter;
+.animate-page-in {
+  animation: glassPageIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes metricCardPulse {
@@ -438,20 +362,26 @@ body.glass-ui-active.light-theme .stock-filter-btn.active {
   100% { transform: scale(1); }
 }
 
-.metric-card.updated, .dash-card.updated {
-  animation: metricCardPulse 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) ease;
+.animate-metric-pulse {
+  animation: metricCardPulse 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes pulseDot {
+@keyframes pulseGlow {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 0.5; transform: scale(0.85); }
 }
+
 .pulse-dot {
-  animation: pulseDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* GSAP Smooth Hardware-Accelerated Transforms */
+.gsap-reveal {
+  will-change: transform, opacity;
 }
 
 /* --------------------------------------------------------------------------
-   7. Drag-and-Drop Visual States & Dashboard Reflow Engine
+   9. Drag-and-Drop Visual States (Mouse & Mobile Touch)
    -------------------------------------------------------------------------- */
 .dashboard-grid {
   display: grid;
@@ -472,170 +402,148 @@ body.glass-ui-active.light-theme .stock-filter-btn.active {
   }
 }
 
-.dash-card, .metric-card {
-  position: relative;
-  transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+.dash-card {
   user-select: none;
+  -webkit-user-select: none;
   touch-action: pan-y;
+  cursor: default;
 }
 
-/* Dragging Lift State */
-.dash-card.dragging, .metric-card.dragging {
-  opacity: 0.80 !important;
-  transform: scale(1.03) !important;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.60) !important;
-  border: 2px dashed var(--accent) !important;
-  z-index: 50 !important;
-  cursor: grabbing !important;
-}
-
-/* Drop Target Highlight Placeholder */
-.dash-card.drag-over, .metric-card.drag-over {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px var(--accent), 0 8px 24px var(--accent-light) !important;
-  transform: scale(0.985);
-}
-
-.drag-handle {
+.dash-card .drag-handle {
   cursor: grab;
   touch-action: none;
 }
-.drag-handle:active {
+
+.dash-card .drag-handle:active {
   cursor: grabbing;
 }
 
-/* Card Size Customization */
-.metric-card-normal {
-  grid-column: span 1;
+.dash-card.dragging {
+  opacity: 0.45;
+  transform: scale(0.97);
+  box-shadow: 0 16px 32px -4px rgba(0, 0, 0, 0.5);
+  border-color: var(--accent) !important;
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
-.metric-card-wide {
-  grid-column: span 1;
+
+.dash-card.drag-over {
+  border-color: var(--accent) !important;
+  transform: translateY(-3px);
+  box-shadow: 0 0 0 2px var(--accent-light), 0 12px 28px -4px rgba(0, 0, 0, 0.4);
 }
-@media (min-width: 640px) {
-  .metric-card-wide {
-    grid-column: span 2;
-  }
+
+.drag-placeholder {
+  border: 2px dashed var(--accent);
+  background: var(--accent-light);
+  border-radius: 1rem;
+  min-height: 110px;
+  opacity: 0.7;
 }
 
 /* --------------------------------------------------------------------------
-   8. Components, Forms & Table Formatting
+   10. Master Logs Customizable Performance Grid
+   -------------------------------------------------------------------------- */
+.kpi-card {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.kpi-card.dragging {
+  opacity: 0.4;
+  transform: scale(0.96);
+  border-color: var(--accent) !important;
+}
+
+.kpi-card.drag-over {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.kpi-card.col-span-full {
+  grid-column: 1 / -1;
+}
+
+/* --------------------------------------------------------------------------
+   11. Form Inputs, Modals, Autocomplete & Steppers
    -------------------------------------------------------------------------- */
 .form-input {
   width: 100%;
   padding: 0.75rem 1rem;
   border-radius: 0.75rem;
+  border-width: 1px;
+  border-color: var(--border-color);
   background-color: var(--bg-surface-subtle);
-  border: 1px solid var(--border-color);
   color: var(--text-main);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
 }
+
 .form-input:focus {
-  border-color: var(--accent);
+  border-color: var(--border-focus);
   box-shadow: 0 0 0 3px var(--accent-light);
 }
 
-.autocomplete-container {
-  position: relative;
+body.glass-ui-active .form-input {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+  border-color: var(--glass-border) !important;
 }
 
-.autocomplete-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  max-height: 280px;
-  overflow-y: auto;
-  z-index: 50;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: 0.75rem;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
-}
-
-.autocomplete-item {
-  padding: 0.75rem 1rem;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-  border-bottom: 1px solid var(--border-color);
-}
-.autocomplete-item:last-child {
-  border-bottom: none;
-}
-.autocomplete-item:hover, .autocomplete-item.active {
-  background-color: var(--accent-light);
-}
-
-/* Quantity Stepper */
-.quantity-stepper {
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-surface-subtle);
-  border-radius: 0.75rem;
-  overflow: hidden;
-}
-.quantity-stepper button {
-  min-width: 44px;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: transparent;
-  color: var(--text-main);
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-.quantity-stepper button:hover {
-  background-color: var(--accent-light);
-  color: var(--accent);
-}
-.quantity-stepper input {
-  text-align: center;
-  border: none;
-  background: transparent;
-  width: 60px;
-  font-weight: 700;
-  color: var(--text-main);
-  outline: none;
-}
-
-/* Stock Status Badges */
-.badge-stock-in {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-.badge-stock-low {
-  background-color: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-}
-.badge-stock-out {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-.badge-cost-missing {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+body.light-theme.glass-ui-active .form-input {
+  background-color: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Modal Backdrop */
 .modal-backdrop {
-  background-color: rgba(0, 0, 0, 0.72);
+  background-color: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  transition: opacity 0.25s ease;
 }
 
-/* Mobile Safe Bottom Navigation */
-.safe-bottom {
-  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+/* Quantity Stepper & Touch Targets */
+.stepper-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  touch-action: manipulation;
+  user-select: none;
+  font-size: 1.25rem;
+  font-weight: 700;
+  transition: all 0.15s ease;
 }
 
-/* SVG Helpers */
+.stepper-btn:active {
+  transform: scale(0.92);
+}
+
+/* Quick Preset Pill Buttons */
+.preset-pill {
+  min-height: 40px;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preset-pill:active {
+  transform: scale(0.94);
+}
+
+/* Strict Currency Alignment */
+.currency-lkr {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Clean SVG Icon Utilities */
 .icon-svg {
   width: 1.25rem;
   height: 1.25rem;
@@ -648,6 +556,7 @@ body.glass-ui-active.light-theme .stock-filter-btn.active {
   stroke-linejoin: round;
   fill: none;
 }
+
 .icon-svg-sm {
   width: 1rem;
   height: 1rem;
@@ -660,6 +569,7 @@ body.glass-ui-active.light-theme .stock-filter-btn.active {
   stroke-linejoin: round;
   fill: none;
 }
+
 .icon-svg-lg {
   width: 1.75rem;
   height: 1.75rem;
@@ -691,7 +601,7 @@ body.glass-ui-active.light-theme .stock-filter-btn.active {
 
 /* Print Optimization */
 @media print {
-  header, nav, .no-print, button, .modal-backdrop {
+  header, nav, .no-print, button, .modal-backdrop, #webglCanvas {
     display: none !important;
   }
   body, .theme-bg-app, .theme-bg-surface {
