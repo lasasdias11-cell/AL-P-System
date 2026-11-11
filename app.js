@@ -1,26 +1,21 @@
 // =============================================================================
-// AL COMMUNICATION — SYSTEM LOGIC CORE (VERSION 3.1)
-// POS, Real-time Inventory, Mobile Reloads & Automated Profit Tracking System
-// GitHub Pages SPA | Firebase Cloud Firestore v11 | Auth Guard
-// Project ID: al-p1-fb432 | Primary Currency: LKR (Rs. 0.00 exact cent precision)
+// AL COMMUNICATION — PRODUCTION RETAIL MANAGEMENT SYSTEM (VERSION 5.0)
+// High-Contrast Solid Modern Default UI | Branded Sticky Navigation
+// Universal Global Search Engine | Service/Utility Bills (No Qty)
+// Auto Title Case Formatting | Natural Numeric Inventory Sorting
+// Complete Settings Backup & Restore System | Stamped PDF Reporting
+// Single-Owner Persistent Session: lasasdias11@gmail.com
 // =============================================================================
 
 import {
   auth,
   db,
-  isFirebaseInitialized,
-  initError,
-  updateFirebaseApiKey,
-  // Auth Functions
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   updateEmail,
   updatePassword,
   sendPasswordResetEmail,
-  reauthenticateWithCredential,
-  EmailAuthProvider,
-  // Firestore Functions
   collection,
   doc,
   addDoc,
@@ -38,109 +33,64 @@ import {
 } from './firebase-config.js';
 
 // =============================================================================
-// 1. APPLICATION STATE & CONSTANTS
+// 1. GLOBAL APPLICATION STATE (V5.0 ARCHITECTURE)
 // =============================================================================
 
-const DEFAULT_PRESETS = [100, 250, 500, 1000];
-
-const DEFAULT_DASHBOARD_CARDS = [
-  'card-dash-stationery',
-  'card-dash-reloads',
-  'card-dash-commission',
-  'card-dash-profit-today',
-  'card-dash-profit-month',
-  'card-dash-profit-year',
-  'card-dash-catalog',
-  'card-dash-tile-stationery',
-  'card-dash-tile-reloads',
-  'card-dash-tile-stock',
-  'card-dash-tile-logs'
-];
-
-const DEFAULT_LOG_METRIC_CARDS = [
-  'card-today-stationery',
-  'card-today-reloads',
-  'card-combined-revenue',
-  'card-today-profit',
-  'card-monthly-analytics',
-  'card-yearly-analytics',
-  'card-operator-breakdown'
-];
-
-const APP_STATE = {
+export const APP_STATE = {
   currentUser: null,
-  activeTheme: 'modern-slate',
-  activeUiStyle: 'glass', // 'glass' | 'default'
   activeView: 'dashboard',
-  currentDate: '',
+  activeTheme: localStorage.getItem('al_theme_preference') || 'modern-slate',
+  inventoryCatalog: [],
+  todayStationeryTransactions: [],
+  todayReloadTransactions: [],
+  masterStationeryRecords: [],
+  masterReloadRecords: [],
   commissionRates: {
     AIRTEL: 6.80,
     DIALOG: 3.80,
     MOBITEL: 6.80,
     HUTCH: 5.00
   },
-  reloadPresets: [...DEFAULT_PRESETS],
-  inventoryCatalog: [],
+  reloadPresets: [50, 100, 200, 500, 1000],
   selectedCatalogItem: null,
-  activeReloadOperator: 'MOBITEL',
-
-  // Real-time feeds for today
-  todayStationeryTransactions: [],
-  todayReloadTransactions: [],
-
-  // Master Logs Filter State
-  logCategoryFilter: 'ALL', // 'ALL' | 'STATIONERY' | 'RELOAD'
-  logDateMode: 'TODAY',     // 'TODAY' | 'YESTERDAY' | 'THIS_MONTH' | 'SPECIFIC' | 'RANGE'
+  selectedOperator: 'DIALOG',
+  stockSortOrder: 'code-asc',
+  catalogSortOrder: 'code-asc',
+  stockFilter: 'ALL',
+  logTab: 'all',
+  logDateScope: 'today',
   logDateFrom: '',
   logDateTo: '',
-  masterStationeryRecords: [],
-  masterReloadRecords: [],
-
-  // Stock View Filter
-  stockFilter: 'ALL', // 'ALL' | 'LOW' | 'OUT'
-
-  // Analytics Month (YYYY-MM)
-  analyticsMonth: '',
-
-  // Dashboard & Metrics Layouts
-  dashboardCardOrder: [...DEFAULT_DASHBOARD_CARDS],
-  metricsCardOrder: [...DEFAULT_LOG_METRIC_CARDS],
-  metricsCardSizes: {},
-
-  unsubscribers: {
-    commissions: null,
-    presets: null,
-    inventory: null,
-    todayStationery: null,
-    todayReloads: null,
-    masterStationery: null,
-    masterReloads: null,
-    userSettings: null
-  },
+  logSearchQuery: '',
   devLogs: []
 };
 
-// Standard Sri Lankan Stationery Catalog with Getting (Cost) Prices & Selling Prices
+// Standard Sri Lankan Retail Catalog Seed (Including Physical Products & Utility Bills)
 const SAMPLE_SRI_LANKAN_CATALOG = [
-  { code: 'ST-001', name: 'Atlas CR Book 80 Pages (Single Rule)', category: 'Exercise Books', costPrice: 155.00, sellingPrice: 200.00, stockQuantity: 50, lowStockThreshold: 10 },
-  { code: 'ST-002', name: 'Atlas CR Book 120 Pages (Single Rule)', category: 'Exercise Books', costPrice: 215.00, sellingPrice: 280.00, stockQuantity: 40, lowStockThreshold: 10 },
-  { code: 'ST-003', name: 'Atlas CR Book 160 Pages (Single Rule)', category: 'Exercise Books', costPrice: 290.00, sellingPrice: 370.00, stockQuantity: 35, lowStockThreshold: 10 },
-  { code: 'ST-004', name: 'Atlas CR Book 80 Pages (Square Rule)', category: 'Exercise Books', costPrice: 155.00, sellingPrice: 200.00, stockQuantity: 45, lowStockThreshold: 10 },
-  { code: 'ST-005', name: 'Atlas Chooty Pen Blue (0.5mm)', category: 'Pens & Pencils', costPrice: 22.00, sellingPrice: 30.00, stockQuantity: 200, lowStockThreshold: 25 },
-  { code: 'ST-006', name: 'Atlas Chooty Pen Black (0.5mm)', category: 'Pens & Pencils', costPrice: 22.00, sellingPrice: 30.00, stockQuantity: 150, lowStockThreshold: 25 },
-  { code: 'ST-007', name: 'Atlas Chooty Pen Red (0.5mm)', category: 'Pens & Pencils', costPrice: 22.00, sellingPrice: 30.00, stockQuantity: 100, lowStockThreshold: 20 },
-  { code: 'ST-008', name: 'Nataraj 2B Pencil Pack (10s)', category: 'Pens & Pencils', costPrice: 200.00, sellingPrice: 260.00, stockQuantity: 30, lowStockThreshold: 8 },
-  { code: 'ST-009', name: 'A4 Photocopy Paper 80gsm (Pack 500)', category: 'Paper & Files', costPrice: 1380.00, sellingPrice: 1600.00, stockQuantity: 25, lowStockThreshold: 5 },
-  { code: 'ST-010', name: 'A4 Photocopy Single Page (B/W)', category: 'Photocopy & Print', costPrice: 3.50, sellingPrice: 10.00, stockQuantity: 1000, lowStockThreshold: 100 },
-  { code: 'ST-011', name: 'A4 Colour Print Single Page', category: 'Photocopy & Print', costPrice: 15.00, sellingPrice: 40.00, stockQuantity: 500, lowStockThreshold: 50 },
-  { code: 'ST-012', name: 'Bristol Board Sheet (White/Colours)', category: 'Art & Craft', costPrice: 42.00, sellingPrice: 60.00, stockQuantity: 80, lowStockThreshold: 15 },
-  { code: 'ST-013', name: 'Atlas Colour Pastels (12 Shades)', category: 'Art & Craft', costPrice: 175.00, sellingPrice: 230.00, stockQuantity: 25, lowStockThreshold: 5 },
-  { code: 'ST-014', name: 'Clear Display File Folder (A4)', category: 'Paper & Files', costPrice: 125.00, sellingPrice: 170.00, stockQuantity: 40, lowStockThreshold: 10 },
-  { code: 'ST-015', name: 'UHU / Atlas Glue Stick 15g', category: 'Adhesives', costPrice: 110.00, sellingPrice: 150.00, stockQuantity: 30, lowStockThreshold: 8 }
+  { code: '1', name: 'Atlas Cr Book 80 Pages (Single Rule)', category: 'Exercise Books', itemType: 'product', costPrice: 155.00, sellingPrice: 200.00, stockQuantity: 50, lowStockThreshold: 10 },
+  { code: '2', name: 'Atlas Cr Book 120 Pages (Single Rule)', category: 'Exercise Books', itemType: 'product', costPrice: 215.00, sellingPrice: 280.00, stockQuantity: 40, lowStockThreshold: 10 },
+  { code: '3', name: 'Atlas Cr Book 160 Pages (Single Rule)', category: 'Exercise Books', itemType: 'product', costPrice: 290.00, sellingPrice: 370.00, stockQuantity: 35, lowStockThreshold: 10 },
+  { code: '4', name: 'Atlas Cr Book 80 Pages (Square Rule)', category: 'Exercise Books', itemType: 'product', costPrice: 155.00, sellingPrice: 200.00, stockQuantity: 45, lowStockThreshold: 10 },
+  { code: '5', name: 'Atlas Chooty Pen Blue (0.5mm)', category: 'Pens & Pencils', itemType: 'product', costPrice: 22.00, sellingPrice: 30.00, stockQuantity: 200, lowStockThreshold: 25 },
+  { code: '6', name: 'Atlas Chooty Pen Black (0.5mm)', category: 'Pens & Pencils', itemType: 'product', costPrice: 22.00, sellingPrice: 30.00, stockQuantity: 150, lowStockThreshold: 25 },
+  { code: '7', name: 'Atlas Chooty Pen Red (0.5mm)', category: 'Pens & Pencils', itemType: 'product', costPrice: 22.00, sellingPrice: 30.00, stockQuantity: 100, lowStockThreshold: 20 },
+  { code: '8', name: 'Nataraj 2b Pencil Pack (10s)', category: 'Pens & Pencils', itemType: 'product', costPrice: 200.00, sellingPrice: 260.00, stockQuantity: 30, lowStockThreshold: 8 },
+  { code: '9', name: 'A4 Photocopy Paper 80gsm (Pack 500)', category: 'Paper & Files', itemType: 'product', costPrice: 1380.00, sellingPrice: 1600.00, stockQuantity: 25, lowStockThreshold: 5 },
+  { code: '10', name: 'A4 Photocopy Single Page (B/W)', category: 'Photocopy & Print', itemType: 'product', costPrice: 3.50, sellingPrice: 10.00, stockQuantity: 1000, lowStockThreshold: 100 },
+  { code: '11', name: 'A4 Colour Print Single Page', category: 'Photocopy & Print', itemType: 'product', costPrice: 15.00, sellingPrice: 40.00, stockQuantity: 500, lowStockThreshold: 50 },
+  { code: '12', name: 'Bristol Board Sheet (White/Colours)', category: 'Art & Craft', itemType: 'product', costPrice: 42.00, sellingPrice: 60.00, stockQuantity: 80, lowStockThreshold: 15 },
+  { code: '13', name: 'Atlas Colour Pastels (12 Shades)', category: 'Art & Craft', itemType: 'product', costPrice: 175.00, sellingPrice: 230.00, stockQuantity: 25, lowStockThreshold: 5 },
+  { code: '14', name: 'Clear Display File Folder (A4)', category: 'Paper & Files', itemType: 'product', costPrice: 125.00, sellingPrice: 170.00, stockQuantity: 40, lowStockThreshold: 10 },
+  { code: '15', name: 'Uhu / Atlas Glue Stick 15g', category: 'Adhesives', itemType: 'product', costPrice: 110.00, sellingPrice: 150.00, stockQuantity: 30, lowStockThreshold: 8 },
+  // Service & Utility Bills (No Quantity Tracked)
+  { code: 'BILL-01', name: 'Electricity Bill Payment (Ceb / Leco)', category: 'Utility Bills', itemType: 'service', costPrice: 0.00, sellingPrice: 0.00, stockQuantity: 0, lowStockThreshold: 0 },
+  { code: 'BILL-02', name: 'Water Supply Bill Payment (Nwsdb)', category: 'Utility Bills', itemType: 'service', costPrice: 0.00, sellingPrice: 0.00, stockQuantity: 0, lowStockThreshold: 0 },
+  { code: 'BILL-03', name: 'Slt / Mobitel Home Broadband Bill', category: 'Utility Bills', itemType: 'service', costPrice: 0.00, sellingPrice: 0.00, stockQuantity: 0, lowStockThreshold: 0 },
+  { code: 'BILL-04', name: 'Dialog Television / Home Bill', category: 'Utility Bills', itemType: 'service', costPrice: 0.00, sellingPrice: 0.00, stockQuantity: 0, lowStockThreshold: 0 }
 ];
 
 // =============================================================================
-// 2. MATHEMATICAL & FORMATTING UTILITIES (Exact Cent Precision)
+// 2. MATHEMATICAL & FORMATTING UTILITIES (Exact Cent & Title Case)
 // =============================================================================
 
 export function roundCurrency(amount) {
@@ -148,12 +98,23 @@ export function roundCurrency(amount) {
   return Math.round((num + Number.EPSILON) * 100) / 100;
 }
 
-export function formatLKR(amount) {
+export function formatLKR(amount, prefix = 'Rs. ') {
   const rounded = roundCurrency(amount);
-  return 'Rs. ' + rounded.toLocaleString('en-LK', {
+  return prefix + rounded.toLocaleString('en-LK', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+}
+
+/**
+ * Requirement 4.1: Enforce Automatic Title Case Formatting
+ * Capitalizes the first letter of every word (e.g., 'a4 cr books' -> 'A4 Cr Books')
+ */
+export function toTitleCase(str) {
+  if (!str) return '';
+  return String(str)
+    .toLowerCase()
+    .replace(/(?:^|\s|[-/()&])([a-z0-9])/gi, (match) => match.toUpperCase());
 }
 
 export function getTodayDateString() {
@@ -184,27 +145,33 @@ export function getCurrentTimeString() {
   return localTime.toTimeString().split(' ')[0];
 }
 
+function escapeHTML(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // =============================================================================
-// 3. LOGGING, TOASTS & GLASS RIPPLE ENGINE
+// 3. LOGGING & TOAST ENGINE
 // =============================================================================
 
 function logDebug(message, type = 'INFO') {
   const time = getCurrentTimeString();
   const entry = `[${time}] [${type}] ${message}`;
   APP_STATE.devLogs.unshift(entry);
-  if (APP_STATE.devLogs.length > 200) APP_STATE.devLogs.pop();
+  if (APP_STATE.devLogs.length > 100) APP_STATE.devLogs.pop();
 
-  const terminalEl = document.getElementById('dbgTerminalLogs');
-  if (terminalEl) {
-    const logDiv = document.createElement('div');
-    if (type === 'ERROR') logDiv.className = 'text-red-400 font-bold';
-    else if (type === 'SUCCESS') logDiv.className = 'text-emerald-400';
-    else if (type === 'WARN') logDiv.className = 'text-amber-400';
-    else logDiv.className = 'text-gray-300';
-    logDiv.textContent = entry;
-    terminalEl.insertBefore(logDiv, terminalEl.firstChild);
+  const terminal = document.getElementById('dbgTerminalLogs');
+  if (terminal) {
+    const row = document.createElement('div');
+    row.className = type === 'ERROR' ? 'text-red-400' : type === 'WARN' ? 'text-amber-400' : 'text-emerald-400';
+    row.textContent = entry;
+    terminal.insertBefore(row, terminal.firstChild);
   }
-  console.log(entry);
 }
 
 export function showToast(message, type = 'info') {
@@ -212,497 +179,174 @@ export function showToast(message, type = 'info') {
   if (!container) return;
 
   const toast = document.createElement('div');
-  const colors = {
-    success: 'bg-emerald-600 text-white border-emerald-500',
-    error: 'bg-red-600 text-white border-red-500',
-    info: 'theme-bg-surface theme-text-main theme-border'
-  };
-
-  toast.className = `px-4 py-3 rounded-xl shadow-xl text-xs sm:text-sm font-semibold border pointer-events-auto flex items-center gap-2 transform transition-all duration-200 translate-y-2 opacity-0 ${colors[type] || colors.info}`;
-
-  let iconSvg = '';
+  const baseClasses = 'px-4 py-3 rounded-xl border text-xs font-semibold shadow-lg transition-all transform duration-200 pointer-events-auto flex items-center gap-2.5';
+  
   if (type === 'success') {
-    iconSvg = '<svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    toast.className = `${baseClasses} bg-emerald-500/15 border-emerald-500/30 text-emerald-400`;
   } else if (type === 'error') {
-    iconSvg = '<svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+    toast.className = `${baseClasses} bg-red-500/15 border-red-500/30 text-red-400`;
   } else {
-    iconSvg = '<svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
+    toast.className = `${baseClasses} bg-sky-500/15 border-sky-500/30 text-sky-400`;
   }
 
-  toast.innerHTML = `<span>${iconSvg}</span><span>${message}</span>`;
+  toast.innerHTML = `
+    <span class="w-2 h-2 rounded-full ${type === 'success' ? 'bg-emerald-400' : type === 'error' ? 'bg-red-400' : 'bg-sky-400'}"></span>
+    <span>${escapeHTML(message)}</span>
+  `;
+
   container.appendChild(toast);
-
-  requestAnimationFrame(() => {
-    toast.classList.remove('translate-y-2', 'opacity-0');
-  });
-
   setTimeout(() => {
-    toast.classList.add('opacity-0', 'translate-y-2');
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(8px)';
     setTimeout(() => toast.remove(), 250);
   }, 3500);
 }
 
-function initGlassRippleFeedback() {
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.glass-btn');
-    if (!btn) return;
-
-    const rect = btn.getBoundingClientRect();
-    const ripple = document.createElement('span');
-    ripple.className = 'glass-ripple';
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    ripple.style.left = `${x}px`;
-    ripple.style.top = `${y}px`;
-
-    btn.appendChild(ripple);
-    setTimeout(() => {
-      ripple.remove();
-    }, 550);
-  });
-}
-
-function pulseCard(elementId) {
-  const el = document.getElementById(elementId);
-  if (!el) return;
-  const card = el.closest('.dash-card, .metric-card');
-  if (card) {
-    card.classList.remove('updated');
-    void card.offsetWidth; // Trigger reflow
-    card.classList.add('updated');
-  }
-}
-
 // =============================================================================
-// 4. THEME & UI STYLE ENGINE
+// 4. THEME ENGINE & QUICK HEADER TOGGLE
 // =============================================================================
 
-export function setTheme(themeName) {
-  const validThemes = ['modern-slate', 'emerald-store', 'sapphire-blue', 'warm-amber'];
-  if (!validThemes.includes(themeName)) themeName = 'modern-slate';
+export function applyTheme(themeName) {
+  const allowed = ['modern-slate', 'emerald-store', 'sapphire-blue', 'warm-amber'];
+  if (!allowed.includes(themeName)) themeName = 'modern-slate';
 
-  document.documentElement.setAttribute('data-theme', themeName);
   APP_STATE.activeTheme = themeName;
-  localStorage.setItem('al_theme', themeName);
+  document.documentElement.setAttribute('data-theme', themeName);
+  localStorage.setItem('al_theme_preference', themeName);
 
-  const isLight = (themeName === 'emerald-store' || themeName === 'warm-amber');
-  if (isLight) {
-    document.body?.classList.add('light-theme');
-    document.documentElement.classList.add('light-theme');
+  // Sync Light Theme Helper
+  if (themeName === 'emerald-store') {
+    document.body.classList.add('light-theme');
   } else {
-    document.body?.classList.remove('light-theme');
-    document.documentElement.classList.remove('light-theme');
+    document.body.classList.remove('light-theme');
   }
 
-  const metaTheme = document.querySelector('meta[name="theme-color"]');
-  if (metaTheme) {
-    const themeColors = {
-      'modern-slate': '#0b1120',
-      'emerald-store': '#f0fdf4',
-      'sapphire-blue': '#060d1f',
-      'warm-amber': '#fffbeb'
-    };
-    metaTheme.setAttribute('content', themeColors[themeName] || '#0b1120');
-  }
-
-  document.querySelectorAll('.theme-choice-card').forEach(card => {
-    const choice = card.getAttribute('data-theme-choice');
-    if (choice === themeName) {
-      card.classList.add('ring-2', 'ring-sky-400');
+  // Update Sun/Moon icon in header
+  const sunIcon = document.getElementById('themeToggleIconSun');
+  const moonIcon = document.getElementById('themeToggleIconMoon');
+  if (sunIcon && moonIcon) {
+    if (themeName === 'emerald-store') {
+      sunIcon.classList.remove('hidden');
+      moonIcon.classList.add('hidden');
     } else {
-      card.classList.remove('ring-2', 'ring-sky-400');
+      sunIcon.classList.add('hidden');
+      moonIcon.classList.remove('hidden');
+    }
+  }
+
+  // Update theme card highlights in Settings
+  document.querySelectorAll('.theme-choice-card').forEach(card => {
+    if (card.getAttribute('data-theme-choice') === themeName) {
+      card.classList.add('border-sky-500', 'ring-2', 'ring-sky-500/30');
+    } else {
+      card.classList.remove('border-sky-500', 'ring-2', 'ring-sky-500/30');
     }
   });
 
-  logDebug(`Theme applied: ${themeName}`);
+  logDebug(`Theme active: ${themeName}`);
 }
 
-export function setUiStyle(uiStyle) {
-  const validStyles = ['glass', 'default'];
-  if (!validStyles.includes(uiStyle)) uiStyle = 'glass';
+function initThemeSystem() {
+  applyTheme(APP_STATE.activeTheme);
 
-  document.documentElement.setAttribute('data-ui-style', uiStyle);
-  APP_STATE.activeUiStyle = uiStyle;
-  localStorage.setItem('al_ui_style', uiStyle);
-
-  if (uiStyle === 'glass') {
-    document.body?.classList.add('glass-ui-active');
-    document.documentElement.classList.add('glass-ui-active');
-  } else {
-    document.body?.classList.remove('glass-ui-active');
-    document.documentElement.classList.remove('glass-ui-active');
+  // Quick Header Light/Dark Toggle
+  const quickToggle = document.getElementById('themeQuickToggleBtn');
+  if (quickToggle) {
+    quickToggle.addEventListener('click', () => {
+      const nextTheme = APP_STATE.activeTheme === 'emerald-store' ? 'modern-slate' : 'emerald-store';
+      applyTheme(nextTheme);
+      showToast(`Switched to ${nextTheme === 'emerald-store' ? 'Light Mode' : 'Dark Mode'}`, 'info');
+    });
   }
 
-  const toggle = document.getElementById('uiStyleGlassToggle');
-  if (toggle) {
-    toggle.checked = (uiStyle === 'glass');
-  }
-
-  logDebug(`UI style applied: ${uiStyle}`);
-}
-
-function initThemeAndStyle() {
-  const savedTheme = localStorage.getItem('al_theme') || 'modern-slate';
-  setTheme(savedTheme);
-
-  const savedUiStyle = localStorage.getItem('al_ui_style') || 'glass';
-  setUiStyle(savedUiStyle);
-
-  document.querySelectorAll('[data-theme-choice]').forEach(button => {
-    button.addEventListener('click', () => {
-      const choice = button.getAttribute('data-theme-choice');
-      setTheme(choice);
-      showToast(`Theme switched to ${button.querySelector('.font-bold')?.textContent || choice}`, 'info');
+  // Settings Modal Theme Cards
+  document.querySelectorAll('[data-theme-choice]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const chosen = btn.getAttribute('data-theme-choice');
+      applyTheme(chosen);
+      showToast(`Theme applied: ${chosen}`, 'success');
     });
   });
-
-  const uiStyleToggle = document.getElementById('uiStyleGlassToggle');
-  if (uiStyleToggle) {
-    uiStyleToggle.addEventListener('change', (e) => {
-      const newStyle = e.target.checked ? 'glass' : 'default';
-      setUiStyle(newStyle);
-      showToast(`Switched to ${newStyle === 'glass' ? 'iOS Glass UI' : 'Clean Solid UI'}`, 'info');
-    });
-  }
 }
 
 // =============================================================================
-// 5. LIVE LKR CLOCK & NETWORK STATUS
+// 5. CLOCK & NETWORK DETECTION
 // =============================================================================
 
 function startLiveClock() {
   const clockEl = document.getElementById('liveClock');
   const dateEl = document.getElementById('liveDate');
 
-  function update() {
+  function tick() {
     const now = new Date();
     const tzOffset = 5.5 * 60;
-    const lkTime = new Date(now.getTime() + (tzOffset + now.getTimezoneOffset()) * 60000);
+    const local = new Date(now.getTime() + (tzOffset + now.getTimezoneOffset()) * 60000);
 
-    const timeStr = lkTime.toTimeString().split(' ')[0] + ' LK';
-    const dateStr = lkTime.toISOString().split('T')[0];
-
-    if (clockEl) clockEl.textContent = timeStr;
-    if (dateEl) dateEl.textContent = dateStr;
-  }
-
-  update();
-  setInterval(update, 1000);
-}
-
-function initNetworkMonitor() {
-  const syncBadge = document.getElementById('syncBadge');
-  const syncText = document.getElementById('syncStatusText');
-  const mobileSyncBadge = document.getElementById('mobileSyncBadge');
-
-  function updateStatus(isOnline) {
-    if (isOnline) {
-      if (syncBadge) {
-        syncBadge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-        syncText.textContent = 'Cloud Live';
-      }
-      if (mobileSyncBadge) {
-        mobileSyncBadge.className = 'sm:hidden flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-      }
-      logDebug('Network online: Cloud sync active', 'SUCCESS');
-    } else {
-      if (syncBadge) {
-        syncBadge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20';
-        syncText.textContent = 'Offline Cache';
-      }
-      if (mobileSyncBadge) {
-        mobileSyncBadge.className = 'sm:hidden flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20';
-      }
-      logDebug('Network offline: Local offline cache engaged', 'WARN');
+    if (clockEl) {
+      const timeStr = local.toLocaleTimeString('en-US', { hour12: false });
+      clockEl.textContent = `${timeStr} LK`;
+    }
+    if (dateEl) {
+      const year = local.getFullYear();
+      const month = String(local.getMonth() + 1).padStart(2, '0');
+      const day = String(local.getDate()).padStart(2, '0');
+      dateEl.textContent = `${year}/${month}/${day}`;
     }
   }
 
-  window.addEventListener('online', () => updateStatus(true));
-  window.addEventListener('offline', () => updateStatus(false));
-  updateStatus(navigator.onLine);
+  tick();
+  setInterval(tick, 1000);
+}
+
+export function detectOperatorFromPrefix(phone) {
+  const clean = phone.replace(/[^0-9]/g, '');
+  let prefix = '';
+
+  if (clean.startsWith('94') && clean.length >= 4) {
+    prefix = '0' + clean.substring(2, 4);
+  } else if (clean.startsWith('0') && clean.length >= 3) {
+    prefix = clean.substring(0, 3);
+  } else if (clean.length >= 2) {
+    prefix = '0' + clean.substring(0, 2);
+  }
+
+  if (prefix === '077' || prefix === '076' || prefix === '074') return 'DIALOG';
+  if (prefix === '071' || prefix === '070') return 'MOBITEL';
+  if (prefix === '075') return 'AIRTEL';
+  if (prefix === '078' || prefix === '072') return 'HUTCH';
+  return null;
 }
 
 // =============================================================================
-// 6. AUTH GATE & SESSION RESOLUTION (Flash Suppression)
-// =============================================================================
-
-let authGateDismissed = false;
-
-function dismissAuthGate(isAuthenticated) {
-  if (authGateDismissed) return;
-  authGateDismissed = true;
-
-  const authGate = document.getElementById('authGateScreen');
-  const loginScreen = document.getElementById('loginScreen');
-  const appShell = document.getElementById('appShell');
-
-  if (authGate) {
-    authGate.classList.add('opacity-0');
-    setTimeout(() => {
-      authGate.classList.add('hidden');
-      authGate.classList.remove('opacity-0');
-    }, 300);
-  }
-
-  if (isAuthenticated) {
-    loginScreen?.classList.add('hidden');
-    appShell?.classList.remove('hidden');
-  } else {
-    appShell?.classList.add('hidden');
-    loginScreen?.classList.remove('hidden');
-  }
-}
-
-function setupAuth() {
-  const loginForm = document.getElementById('loginForm');
-  const loginAlert = document.getElementById('loginAlert');
-  const loginBtnSpinner = document.getElementById('loginBtnSpinner');
-  const loginBtnText = document.getElementById('loginBtnText');
-  const signOutBtn = document.getElementById('signOutBtn');
-
-  // Toggle Password Visibility
-  const togglePasswordBtn = document.getElementById('togglePasswordBtn');
-  const loginPassword = document.getElementById('loginPassword');
-  if (togglePasswordBtn && loginPassword) {
-    togglePasswordBtn.addEventListener('click', () => {
-      const isPassword = loginPassword.type === 'password';
-      loginPassword.type = isPassword ? 'text' : 'password';
-      togglePasswordBtn.textContent = isPassword ? 'Hide' : 'Show';
-    });
-  }
-
-  // Custom Firebase API Key Handler
-  const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
-  const customApiKeyInput = document.getElementById('customApiKeyInput');
-  const savedKey = localStorage.getItem('al_firebase_api_key');
-  if (savedKey && customApiKeyInput) {
-    customApiKeyInput.value = savedKey;
-  }
-  if (saveApiKeyBtn && customApiKeyInput) {
-    saveApiKeyBtn.addEventListener('click', () => {
-      const newKey = customApiKeyInput.value.trim();
-      if (!newKey) {
-        showToast('Please enter a valid Firebase API Key', 'error');
-        return;
-      }
-      updateFirebaseApiKey(newKey);
-    });
-  }
-
-  // Safety Fallback Timer for Auth Gate (~2.2s transition window)
-  setTimeout(() => {
-    if (!authGateDismissed) {
-      logDebug('Auth check resolution fallback engaged.');
-      dismissAuthGate(Boolean(APP_STATE.currentUser));
-    }
-  }, 2200);
-
-  // Firebase Auth State Observer
-  if (auth) {
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        APP_STATE.currentUser = user;
-        logDebug(`Authenticated as: ${user.email}`, 'SUCCESS');
-        dismissAuthGate(true);
-        initRealtimeListeners();
-        loadSavedDashboardOrder();
-      } else {
-        APP_STATE.currentUser = null;
-        logDebug('No active session. Presenting Login Screen.');
-        dismissAuthGate(false);
-        detachAllListeners();
-      }
-    });
-  } else {
-    logDebug('Firebase Auth not initialized. Verify API key.', 'ERROR');
-    dismissAuthGate(false);
-  }
-
-  // Login Form Submission
-  if (loginForm) {
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      loginAlert.classList.add('hidden');
-      loginAlert.textContent = '';
-
-      const email = document.getElementById('loginEmail').value.trim();
-      const password = document.getElementById('loginPassword').value;
-
-      if (!auth) {
-        loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-red-500/10 text-red-400 border border-red-500/20 block';
-        loginAlert.textContent = 'Firebase is not initialized. Please configure your Web API Key below.';
-        return;
-      }
-
-      loginBtnSpinner.classList.remove('hidden');
-      loginBtnText.textContent = 'Verifying Credentials...';
-
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        showToast(`Signed in as ${email}`, 'success');
-      } catch (error) {
-        logDebug(`Authentication failed: ${error.code}`, 'ERROR');
-        loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-red-500/10 text-red-400 border border-red-500/20 block';
-
-        let errorMsg = 'Failed to sign in. Please verify your email and password.';
-        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
-          errorMsg = 'Invalid email or password.';
-        } else if (error.code === 'auth/user-not-found') {
-          errorMsg = 'No user record found for this email address.';
-        } else if (error.code === 'auth/too-many-requests') {
-          errorMsg = 'Account temporarily blocked due to repeated failures. Try again later or reset password.';
-        }
-        loginAlert.textContent = errorMsg;
-      } finally {
-        loginBtnSpinner.classList.add('hidden');
-        loginBtnText.textContent = 'Sign In to Counter Ledger';
-      }
-    });
-  }
-
-  // Sign Out Flow
-  if (signOutBtn) {
-    signOutBtn.addEventListener('click', async () => {
-      if (confirm('Are you sure you want to sign out of the AL Communication counter?')) {
-        try {
-          await signOut(auth);
-          closeSettingsModal();
-          showToast('Signed out successfully', 'info');
-        } catch (err) {
-          showToast(`Error signing out: ${err.message}`, 'error');
-        }
-      }
-    });
-  }
-
-  // Password Reset Flow
-  const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
-  const passwordResetModal = document.getElementById('passwordResetModal');
-  const cancelResetBtn = document.getElementById('cancelResetBtn');
-  const passwordResetForm = document.getElementById('passwordResetForm');
-
-  if (forgotPasswordBtn && passwordResetModal) {
-    forgotPasswordBtn.addEventListener('click', () => {
-      passwordResetModal.classList.remove('hidden');
-    });
-  }
-  if (cancelResetBtn && passwordResetModal) {
-    cancelResetBtn.addEventListener('click', () => {
-      passwordResetModal.classList.add('hidden');
-    });
-  }
-  if (passwordResetForm) {
-    passwordResetForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const email = document.getElementById('resetEmailInput').value.trim();
-      try {
-        await sendPasswordResetEmail(auth, email);
-        showToast(`Password reset link sent to ${email}`, 'success');
-        passwordResetModal.classList.add('hidden');
-      } catch (err) {
-        showToast(`Reset error: ${err.message}`, 'error');
-      }
-    });
-  }
-
-  setupAccountSecurity();
-}
-
-function setupAccountSecurity() {
-  const updateEmailForm = document.getElementById('updateEmailForm');
-  const updatePasswordForm = document.getElementById('updatePasswordForm');
-
-  if (updateEmailForm) {
-    updateEmailForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const newEmail = document.getElementById('newEmailInput').value.trim();
-      if (!newEmail || !auth.currentUser) return;
-
-      try {
-        await updateEmail(auth.currentUser, newEmail);
-        showToast(`Account email updated to ${newEmail}`, 'success');
-        updateEmailForm.reset();
-      } catch (err) {
-        if (err.code === 'auth/requires-recent-login') {
-          promptReauthAndRetry(() => updateEmail(auth.currentUser, newEmail));
-        } else {
-          showToast(`Failed to update email: ${err.message}`, 'error');
-        }
-      }
-    });
-  }
-
-  if (updatePasswordForm) {
-    updatePasswordForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const newPass = document.getElementById('newPasswordInput').value;
-      const confirmPass = document.getElementById('confirmPasswordInput').value;
-
-      if (newPass !== confirmPass) {
-        showToast('New passwords do not match', 'error');
-        return;
-      }
-      if (newPass.length < 6) {
-        showToast('Password must be at least 6 characters', 'error');
-        return;
-      }
-
-      try {
-        await updatePassword(auth.currentUser, newPass);
-        showToast('Password successfully updated', 'success');
-        updatePasswordForm.reset();
-      } catch (err) {
-        if (err.code === 'auth/requires-recent-login') {
-          promptReauthAndRetry(() => updatePassword(auth.currentUser, newPass));
-        } else {
-          showToast(`Failed to change password: ${err.message}`, 'error');
-        }
-      }
-    });
-  }
-}
-
-async function promptReauthAndRetry(actionCallback) {
-  const currentPassword = prompt('Security Verification: Please re-enter your current password to authorize this update:');
-  if (!currentPassword) return;
-
-  try {
-    const cred = EmailAuthProvider.credential(auth.currentUser.email, currentPassword);
-    await reauthenticateWithCredential(auth.currentUser, cred);
-    await actionCallback();
-    showToast('Credentials verified and update applied', 'success');
-  } catch (err) {
-    showToast(`Verification failed: ${err.message}`, 'error');
-  }
-}
-
-// =============================================================================
-// 7. NAVIGATION & VIEW ROUTING
+// 6. VIEW NAVIGATION & MOBILE-ADAPTIVE ROUTING (Requirement 2.2)
 // =============================================================================
 
 export function switchView(viewName) {
-  const views = ['dashboard', 'stationery', 'reloads', 'stock', 'logs'];
-  if (!views.includes(viewName)) viewName = 'dashboard';
+  const validViews = ['dashboard', 'stationery', 'reloads', 'stock', 'logs'];
+  if (!validViews.includes(viewName)) viewName = 'dashboard';
 
   APP_STATE.activeView = viewName;
 
+  // Toggle view containers
   document.querySelectorAll('.app-view').forEach(viewEl => {
     viewEl.classList.add('hidden');
   });
 
   const targetView = document.getElementById(`view${viewName.charAt(0).toUpperCase() + viewName.slice(1)}`);
-  if (targetView) targetView.classList.remove('hidden');
+  if (targetView) {
+    targetView.classList.remove('hidden');
+  }
 
-  // Desktop Header Nav buttons
+  // Synchronize Desktop Navigation Tabs
   document.querySelectorAll('.nav-tab-btn').forEach(btn => {
     if (btn.getAttribute('data-view') === viewName) {
-      btn.className = 'nav-tab-btn active px-3.5 py-1.5 rounded-lg theme-bg-accent text-white transition';
+      btn.className = 'nav-tab-btn active px-3.5 py-1.5 rounded-lg transition';
     } else {
       btn.className = 'nav-tab-btn px-3.5 py-1.5 rounded-lg theme-text-muted hover:theme-text-main transition';
     }
   });
 
-  // Mobile Bottom Nav buttons
+  // Synchronize Mobile Bottom Navigation Bar
   document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
     if (btn.getAttribute('data-view') === viewName) {
       btn.className = 'mobile-nav-btn active flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-accent';
@@ -711,32 +355,43 @@ export function switchView(viewName) {
     }
   });
 
+  // Contextual view refreshes
   if (viewName === 'stock') {
     renderStockTable();
   } else if (viewName === 'logs') {
     applyMasterLogFilters();
-    calculateFinancialAnalytics();
+  } else if (viewName === 'dashboard') {
+    updateDashboardMetrics();
   }
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  logDebug(`Switched view to: ${viewName}`);
+  logDebug(`Switched active view to: ${viewName}`);
 }
 
 function initNavigation() {
+  // Desktop header links
   document.querySelectorAll('.nav-tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
+    const target = btn.getAttribute('data-view');
+    if (target) {
+      btn.addEventListener('click', () => switchView(target));
+    }
   });
 
+  // Mobile bottom nav links
   document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
+    const target = btn.getAttribute('data-view');
+    if (target) {
+      btn.addEventListener('click', () => switchView(target));
+    }
   });
 
+  // Header Brand Logo link -> Dashboard
   const headerHomeBtn = document.getElementById('headerHomeBtn');
   if (headerHomeBtn) {
     headerHomeBtn.addEventListener('click', () => switchView('dashboard'));
   }
 
-  // Dashboard Shortcut Tiles
+  // Dashboard 4 Operational Quick Actions (Below Metrics)
   const dashTileStationery = document.getElementById('dashTileStationery');
   if (dashTileStationery) {
     dashTileStationery.addEventListener('click', () => switchView('stationery'));
@@ -757,15 +412,7 @@ function initNavigation() {
     dashTileLogs.addEventListener('click', () => switchView('logs'));
   }
 
-  // Settings Modal Controls
-  const openSettingsBtn = document.getElementById('openSettingsBtn');
-  const mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
-  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-
-  if (openSettingsBtn) openSettingsBtn.addEventListener('click', openSettingsModal);
-  if (mobileSettingsBtn) mobileSettingsBtn.addEventListener('click', openSettingsModal);
-  if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettingsModal);
-
+  // Stock inventory -> Open Settings Catalog
   const stockOpenCatalogSettingsBtn = document.getElementById('stockOpenCatalogSettingsBtn');
   if (stockOpenCatalogSettingsBtn) {
     stockOpenCatalogSettingsBtn.addEventListener('click', () => {
@@ -774,6 +421,7 @@ function initNavigation() {
     });
   }
 
+  // Reloads view -> Open Presets
   const openPresetConfigBtn = document.getElementById('openPresetConfigBtn');
   if (openPresetConfigBtn) {
     openPresetConfigBtn.addEventListener('click', () => {
@@ -782,10 +430,23 @@ function initNavigation() {
     });
   }
 
+  // Settings Modal openers
+  const openSettingsBtn = document.getElementById('openSettingsBtn');
+  const mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
+  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+
+  if (openSettingsBtn) openSettingsBtn.addEventListener('click', openSettingsModal);
+  if (mobileSettingsBtn) mobileSettingsBtn.addEventListener('click', openSettingsModal);
+  if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettingsModal);
+
+  // Settings Sub-Tabs
   document.querySelectorAll('[data-settings-tab]').forEach(tabBtn => {
-    tabBtn.addEventListener('click', () => switchSettingsTab(tabBtn.getAttribute('data-settings-tab')));
+    tabBtn.addEventListener('click', () => {
+      switchSettingsTab(tabBtn.getAttribute('data-settings-tab'));
+    });
   });
 
+  // Modal Backdrop Click
   const settingsModal = document.getElementById('settingsModal');
   if (settingsModal) {
     settingsModal.addEventListener('click', (e) => {
@@ -794,408 +455,343 @@ function initNavigation() {
   }
 }
 
-function openSettingsModal() {
+export function openSettingsModal() {
   const modal = document.getElementById('settingsModal');
   if (modal) {
     modal.classList.remove('hidden');
-    updateCacheMetrics();
+    updateBackupStatusDisplay();
   }
 }
 
-function closeSettingsModal() {
+export function closeSettingsModal() {
   const modal = document.getElementById('settingsModal');
   if (modal) modal.classList.add('hidden');
 }
 
-function switchSettingsTab(tabName) {
-  const tabs = ['catalog', 'presets', 'rates', 'themes', 'security', 'developer'];
-  if (!tabs.includes(tabName)) tabName = 'catalog';
+export function switchSettingsTab(tabId) {
+  const validTabs = ['catalog', 'presets', 'rates', 'backup', 'themes', 'security', 'developer'];
+  if (!validTabs.includes(tabId)) tabId = 'catalog';
 
-  document.querySelectorAll('.settings-panel').forEach(panel => {
-    panel.classList.add('hidden');
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('[data-settings-tab]').forEach(b => {
+    b.className = 'settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap';
   });
-  const targetPanel = document.getElementById(`settingsPanel${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`);
+
+  const targetPanel = document.getElementById(`settingsPanel${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
+  const targetBtn = document.querySelector(`[data-settings-tab="${tabId}"]`);
+
   if (targetPanel) targetPanel.classList.remove('hidden');
+  if (targetBtn) {
+    targetBtn.className = 'settings-tab-btn active px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap theme-bg-accent text-white font-bold';
+  }
 
-  document.querySelectorAll('.settings-tab-btn').forEach(btn => {
-    if (btn.getAttribute('data-settings-tab') === tabName) {
-      btn.className = 'settings-tab-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-accent text-white transition whitespace-nowrap';
-    } else {
-      btn.className = 'settings-tab-btn px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text-main transition whitespace-nowrap';
-    }
-  });
-}
-
-// =============================================================================
-// 8. FIRESTORE REAL-TIME LISTENERS
-// =============================================================================
-
-function detachAllListeners() {
-  Object.keys(APP_STATE.unsubscribers).forEach(key => {
-    if (typeof APP_STATE.unsubscribers[key] === 'function') {
-      APP_STATE.unsubscribers[key]();
-      APP_STATE.unsubscribers[key] = null;
-    }
-  });
-}
-
-function initRealtimeListeners() {
-  detachAllListeners();
-
-  const today = getTodayDateString();
-  APP_STATE.currentDate = today;
-
-  const currentMonth = today.substring(0, 7);
-  APP_STATE.analyticsMonth = currentMonth;
-  const monthPicker = document.getElementById('logAnalyticsMonthPicker');
-  if (monthPicker) monthPicker.value = currentMonth;
-
-  APP_STATE.logDateFrom = today;
-  APP_STATE.logDateTo = today;
-  const logFrom = document.getElementById('logDateFrom');
-  const logTo = document.getElementById('logDateTo');
-  if (logFrom) logFrom.value = today;
-  if (logTo) logTo.value = today;
-
-  listenToCommissions();
-  listenToPresets();
-  listenToInventory();
-  listenToTodayStationery(today);
-  listenToTodayReloads(today);
-  listenToMasterLogs();
-}
-
-function listenToCommissions() {
-  if (!db) return;
-  const commissionsDocRef = doc(db, 'settings', 'commissions');
-
-  APP_STATE.unsubscribers.commissions = onSnapshot(commissionsDocRef, (snap) => {
-    if (snap.exists()) {
-      const data = snap.data();
-      APP_STATE.commissionRates = {
-        AIRTEL: Number(data.airtel ?? 6.80),
-        DIALOG: Number(data.dialog ?? 3.80),
-        MOBITEL: Number(data.mobitel ?? 6.80),
-        HUTCH: Number(data.hutch ?? 5.00)
-      };
-      logDebug('Commission rates synced from Firestore', 'SUCCESS');
-    } else {
-      setDoc(commissionsDocRef, {
-        airtel: 6.80,
-        dialog: 3.80,
-        mobitel: 6.80,
-        hutch: 5.00,
-        updatedAt: serverTimestamp()
-      }).catch(err => logDebug(`Init commissions failed: ${err.message}`, 'WARN'));
-    }
-    updateCommissionUI();
-  }, (err) => {
-    logDebug(`Commissions listener error: ${err.message}`, 'ERROR');
-  });
-}
-
-function listenToPresets() {
-  if (!db) return;
-  const presetsDocRef = doc(db, 'settings', 'presets');
-
-  APP_STATE.unsubscribers.presets = onSnapshot(presetsDocRef, (snap) => {
-    if (snap.exists() && Array.isArray(snap.data().amounts) && snap.data().amounts.length > 0) {
-      APP_STATE.reloadPresets = snap.data().amounts.map(Number).sort((a, b) => a - b);
-      logDebug(`Reload presets synced: ${APP_STATE.reloadPresets.join(', ')}`, 'SUCCESS');
-    } else {
-      APP_STATE.reloadPresets = [...DEFAULT_PRESETS];
-      setDoc(presetsDocRef, {
-        amounts: DEFAULT_PRESETS,
-        updatedAt: serverTimestamp()
-      }).catch(err => logDebug(`Init presets doc failed: ${err.message}`, 'WARN'));
-    }
-    renderReloadPresets();
-    renderSettingsPresets();
-  }, (err) => {
-    logDebug(`Presets listener error: ${err.message}`, 'ERROR');
-    renderReloadPresets();
-    renderSettingsPresets();
-  });
-}
-
-function listenToInventory() {
-  if (!db) return;
-  const invColRef = collection(db, 'inventory');
-
-  APP_STATE.unsubscribers.inventory = onSnapshot(invColRef, (snap) => {
-    const items = [];
-    snap.forEach(docSnap => {
-      const data = docSnap.data();
-      items.push({
-        id: docSnap.id,
-        code: data.code || '',
-        name: data.name || '',
-        category: data.category || 'General',
-        costPrice: Number(data.costPrice ?? 0),
-        sellingPrice: Number(data.sellingPrice || 0),
-        stockQuantity: Number(data.stockQuantity || 0),
-        lowStockThreshold: Number(data.lowStockThreshold ?? 5)
-      });
-    });
-
-    items.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
-    APP_STATE.inventoryCatalog = items;
-
-    updateStockPreviews();
-    renderStockTable();
+  if (tabId === 'catalog') {
     renderCatalogTable();
-    updateDashboardCatalogKPIs();
-    logDebug(`Inventory catalog synced: ${items.length} items`);
-  }, (err) => {
-    logDebug(`Inventory listener error: ${err.message}`, 'ERROR');
-  });
-}
-
-function listenToTodayStationery(todayDate) {
-  if (!db) return;
-  const statColRef = collection(db, 'stationery_transactions');
-  const q = query(statColRef, where('date', '==', todayDate));
-
-  APP_STATE.unsubscribers.todayStationery = onSnapshot(q, (snap) => {
-    const list = [];
-    snap.forEach(docSnap => {
-      list.push({ id: docSnap.id, ...docSnap.data() });
-    });
-
-    list.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
-    APP_STATE.todayStationeryTransactions = list;
-
-    renderStationeryRecentFeed();
-    updateDashboardOverviewKPIs();
-    updateMasterLogsTodayCards();
-  }, (err) => {
-    logDebug(`Today stationery listener error: ${err.message}`, 'ERROR');
-  });
-}
-
-function listenToTodayReloads(todayDate) {
-  if (!db) return;
-  const reloadColRef = collection(db, 'reload_transactions');
-  const q = query(reloadColRef, where('date', '==', todayDate));
-
-  APP_STATE.unsubscribers.todayReloads = onSnapshot(q, (snap) => {
-    const list = [];
-    snap.forEach(docSnap => {
-      list.push({ id: docSnap.id, ...docSnap.data() });
-    });
-
-    list.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
-    APP_STATE.todayReloadTransactions = list;
-
-    updateDashboardOverviewKPIs();
-    updateMasterLogsTodayCards();
-  }, (err) => {
-    logDebug(`Today reloads listener error: ${err.message}`, 'ERROR');
-  });
-}
-
-function listenToMasterLogs() {
-  if (!db) return;
-
-  const statColRef = collection(db, 'stationery_transactions');
-  APP_STATE.unsubscribers.masterStationery = onSnapshot(statColRef, (snap) => {
-    const list = [];
-    snap.forEach(docSnap => {
-      list.push({ id: docSnap.id, ...docSnap.data() });
-    });
-    APP_STATE.masterStationeryRecords = list;
-    applyMasterLogFilters();
-    calculateFinancialAnalytics();
-  });
-
-  const reloadColRef = collection(db, 'reload_transactions');
-  APP_STATE.unsubscribers.masterReloads = onSnapshot(reloadColRef, (snap) => {
-    const list = [];
-    snap.forEach(docSnap => {
-      list.push({ id: docSnap.id, ...docSnap.data() });
-    });
-    APP_STATE.masterReloadRecords = list;
-    applyMasterLogFilters();
-    calculateFinancialAnalytics();
-  });
+  } else if (tabId === 'backup') {
+    updateBackupStatusDisplay();
+  }
 }
 
 // =============================================================================
-// 9. DASHBOARD DRAG-AND-DROP REORDERABLE GRID (MOUSE & TOUCH SUPPORT)
+// 7. UNIVERSAL GLOBAL SEARCH ENGINE (Requirement 2.3)
 // =============================================================================
 
-function setupDashboardDragAndDrop() {
-  const grid = document.getElementById('dashboardGrid');
-  const resetBtn = document.getElementById('resetDashboardLayoutSettingsBtn');
-  if (!grid) return;
+function initGlobalSearch() {
+  const desktopInput = document.getElementById('globalSearchInput');
+  const desktopResults = document.getElementById('globalSearchResults');
+  const mobileInput = document.getElementById('mobileSearchInput');
+  const mobileResults = document.getElementById('mobileSearchResults');
+  const mobileToggleBtn = document.getElementById('mobileSearchToggleBtn');
+  const mobileContainer = document.getElementById('mobileSearchContainer');
 
-  let draggedItem = null;
-  let touchStartY = 0;
-  let touchStartX = 0;
-  let isTouchDragging = false;
-
-  // --- Desktop Mouse Drag ---
-  grid.querySelectorAll('.dash-card').forEach(card => {
-    card.addEventListener('dragstart', (e) => {
-      draggedItem = card;
-      card.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', card.getAttribute('data-card-id'));
+  // Mobile drawer toggle
+  if (mobileToggleBtn && mobileContainer) {
+    mobileToggleBtn.addEventListener('click', () => {
+      mobileContainer.classList.toggle('hidden');
+      if (!mobileContainer.classList.contains('hidden') && mobileInput) {
+        mobileInput.focus();
+      }
     });
+  }
 
-    card.addEventListener('dragend', () => {
-      card.classList.remove('dragging');
-      grid.querySelectorAll('.dash-card').forEach(c => c.classList.remove('drag-over'));
-      saveDashboardLayout();
-    });
-
-    card.addEventListener('dragover', (e) => {
+  // Keyboard shortcut Ctrl+K or / to focus search
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey && e.key === 'k') || (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA')) {
       e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      const targetCard = card;
-      if (draggedItem && targetCard !== draggedItem) {
-        const bounding = targetCard.getBoundingClientRect();
-        const offset = e.clientY - bounding.top - (bounding.height / 2);
-        if (offset > 0) {
-          targetCard.after(draggedItem);
-        } else {
-          targetCard.before(draggedItem);
-        }
+      if (window.innerWidth >= 768 && desktopInput) {
+        desktopInput.focus();
+        desktopInput.select();
+      } else if (mobileInput) {
+        if (mobileContainer) mobileContainer.classList.remove('hidden');
+        mobileInput.focus();
+        mobileInput.select();
       }
+    } else if (e.key === 'Escape') {
+      if (desktopResults) desktopResults.classList.add('hidden');
+      if (mobileResults) mobileResults.classList.add('hidden');
+    }
+  });
+
+  function setupSearchField(input, resultsEl) {
+    if (!input || !resultsEl) return;
+
+    input.addEventListener('input', () => {
+      const queryStr = input.value.trim().toLowerCase();
+      if (!queryStr) {
+        resultsEl.classList.add('hidden');
+        resultsEl.innerHTML = '';
+        return;
+      }
+      performSearch(queryStr, resultsEl);
     });
 
-    // --- Mobile Touch Drag via .drag-handle ---
-    const handle = card.querySelector('.drag-handle');
-    if (handle) {
-      handle.addEventListener('touchstart', (e) => {
-        const touch = e.touches[0];
-        touchStartY = touch.clientY;
-        touchStartX = touch.clientX;
-        draggedItem = card;
-        isTouchDragging = true;
-        card.classList.add('dragging');
-        // Prevent window scrolling while dragging card
-        e.stopPropagation();
-      }, { passive: false });
+    input.addEventListener('focus', () => {
+      const queryStr = input.value.trim().toLowerCase();
+      if (queryStr) performSearch(queryStr, resultsEl);
+    });
+  }
 
-      handle.addEventListener('touchmove', (e) => {
-        if (!isTouchDragging || !draggedItem) return;
-        e.preventDefault(); // Prevent page scroll while dragging
+  setupSearchField(desktopInput, desktopResults);
+  setupSearchField(mobileInput, mobileResults);
 
-        const touch = e.touches[0];
-        const elemUnder = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (!elemUnder) return;
+  // Close results when clicking outside
+  document.addEventListener('click', (e) => {
+    if (desktopResults && !desktopResults.contains(e.target) && e.target !== desktopInput) {
+      desktopResults.classList.add('hidden');
+    }
+    if (mobileResults && !mobileResults.contains(e.target) && e.target !== mobileInput) {
+      mobileResults.classList.add('hidden');
+    }
+  });
 
-        const targetCard = elemUnder.closest('.dash-card');
-        if (targetCard && targetCard !== draggedItem && targetCard.parentNode === grid) {
-          const bounding = targetCard.getBoundingClientRect();
-          const offset = touch.clientY - bounding.top - (bounding.height / 2);
-          if (offset > 0) {
-            targetCard.after(draggedItem);
+  function performSearch(q, container) {
+    container.innerHTML = '';
+    container.classList.remove('hidden');
+
+    // 1. Search Catalog Items & Stock
+    const matchedCatalog = APP_STATE.inventoryCatalog.filter(item => {
+      return (item.code || '').toLowerCase().includes(q) ||
+             (item.name || '').toLowerCase().includes(q) ||
+             (item.category || '').toLowerCase().includes(q);
+    }).slice(0, 5);
+
+    // 2. Search Mobile Reload Transactions
+    const combinedReloads = [...APP_STATE.todayReloadTransactions, ...APP_STATE.masterReloadRecords];
+    const uniqueReloads = [];
+    const seenRIds = new Set();
+    for (const r of combinedReloads) {
+      if (!seenRIds.has(r.id)) {
+        seenRIds.add(r.id);
+        if ((r.phone || '').includes(q) || (r.operator || '').toLowerCase().includes(q) || String(r.amount).includes(q)) {
+          uniqueReloads.push(r);
+          if (uniqueReloads.length >= 4) break;
+        }
+      }
+    }
+
+    // 3. Search Stationery & Utility Bill Transactions
+    const combinedStats = [...APP_STATE.todayStationeryTransactions, ...APP_STATE.masterStationeryRecords];
+    const uniqueStats = [];
+    const seenSIds = new Set();
+    for (const s of combinedStats) {
+      if (!seenSIds.has(s.id)) {
+        seenSIds.add(s.id);
+        if ((s.itemName || '').toLowerCase().includes(q) || (s.itemCode || '').toLowerCase().includes(q) || String(s.totalAmount).includes(q)) {
+          uniqueStats.push(s);
+          if (uniqueStats.length >= 4) break;
+        }
+      }
+    }
+
+    const totalMatches = matchedCatalog.length + uniqueReloads.length + uniqueStats.length;
+
+    if (totalMatches === 0) {
+      container.innerHTML = `
+        <div class="p-4 text-center text-xs theme-text-dim">
+          No records or transactions matching "<span class="font-semibold theme-text-main">${escapeHTML(q)}</span>"
+        </div>
+      `;
+      return;
+    }
+
+    // CATEGORY 1: CATALOG & STOCK INVENTORY
+    if (matchedCatalog.length > 0) {
+      const header = document.createElement('div');
+      header.className = 'search-section-header flex items-center justify-between';
+      header.innerHTML = `<span>Catalog & Stock Inventory</span><span>${matchedCatalog.length}</span>`;
+      container.appendChild(header);
+
+      matchedCatalog.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'search-result-item';
+        const isService = item.itemType === 'service';
+        const stockBadge = isService
+          ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service/Bill</span>`
+          : item.stockQuantity <= 5
+          ? `<span class="badge-stock-low px-2 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} Left</span>`
+          : `<span class="badge-stock-in px-2 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} in stock</span>`;
+
+        row.innerHTML = `
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="px-2 py-0.5 rounded text-[11px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">${escapeHTML(item.code)}</span>
+            <div class="truncate">
+              <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(item.name)}</div>
+              <div class="text-[11px] theme-text-dim">${escapeHTML(item.category || 'General')}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0 text-right">
+            <div>
+              <div class="font-bold text-xs theme-text-main font-mono">${formatLKR(item.sellingPrice)}</div>
+              ${stockBadge}
+            </div>
+            <button type="button" class="px-2 py-1 rounded bg-sky-500/15 text-sky-400 hover:bg-sky-500 text-[10px] font-bold hover:text-white transition">POS</button>
+          </div>
+        `;
+
+        row.addEventListener('click', (e) => {
+          container.classList.add('hidden');
+          if (e.target.tagName === 'BUTTON' || isService) {
+            // Jump to POS and preselect
+            switchView('stationery');
+            selectCatalogItemForPOS(item);
           } else {
-            targetCard.before(draggedItem);
+            // Jump to Stock Inventory and search
+            switchView('stock');
+            const stockInput = document.getElementById('stockSearchInput');
+            if (stockInput) {
+              stockInput.value = item.code;
+              renderStockTable();
+            }
           }
-        }
-      }, { passive: false });
+        });
 
-      const endTouch = () => {
-        if (isTouchDragging && draggedItem) {
-          draggedItem.classList.remove('dragging');
-          grid.querySelectorAll('.dash-card').forEach(c => c.classList.remove('drag-over'));
-          saveDashboardLayout();
-          draggedItem = null;
-          isTouchDragging = false;
-        }
-      };
-
-      handle.addEventListener('touchend', endTouch);
-      handle.addEventListener('touchcancel', endTouch);
-    }
-  });
-
-  // Settings Reset Button
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-      localStorage.removeItem('al_dashboard_order');
-      if (db && auth.currentUser) {
-        setDoc(doc(db, 'settings', 'dashboard'), {
-          order: DEFAULT_DASHBOARD_CARDS,
-          updatedAt: serverTimestamp()
-        }).catch(e => console.warn(e));
-      }
-
-      DEFAULT_DASHBOARD_CARDS.forEach(id => {
-        const c = grid.querySelector(`[data-card-id="${id}"]`);
-        if (c) grid.appendChild(c);
+        container.appendChild(row);
       });
-      showToast('Dashboard card order restored to default', 'success');
-    });
-  }
-}
+    }
 
-function saveDashboardLayout() {
-  const grid = document.getElementById('dashboardGrid');
-  if (!grid) return;
+    // CATEGORY 2: MOBILE RELOADS
+    if (uniqueReloads.length > 0) {
+      const header = document.createElement('div');
+      header.className = 'search-section-header flex items-center justify-between';
+      header.innerHTML = `<span>Mobile Reload Ledger</span><span>${uniqueReloads.length}</span>`;
+      container.appendChild(header);
 
-  const order = [];
-  grid.querySelectorAll('.dash-card').forEach(card => {
-    const id = card.getAttribute('data-card-id');
-    if (id) order.push(id);
-  });
+      uniqueReloads.forEach(r => {
+        const row = document.createElement('div');
+        row.className = 'search-result-item';
+        row.innerHTML = `
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${r.operator === 'DIALOG' ? 'text-orange-400 border-orange-500/30' : r.operator === 'MOBITEL' ? 'text-blue-400 border-blue-500/30' : r.operator === 'AIRTEL' ? 'text-red-400 border-red-500/30' : 'text-amber-300 border-amber-500/30'}">${escapeHTML(r.operator)}</span>
+            <div class="truncate">
+              <div class="font-bold text-xs font-mono theme-text-main">${escapeHTML(r.phone || 'Walk-in')}</div>
+              <div class="text-[10px] theme-text-dim">${escapeHTML(r.date || '')} ${escapeHTML(r.time || '')}</div>
+            </div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <div class="font-bold text-xs text-emerald-400 font-mono">${formatLKR(r.amount)}</div>
+            <div class="text-[10px] theme-text-dim font-mono">+${formatLKR(r.commissionAmount)}</div>
+          </div>
+        `;
 
-  APP_STATE.dashboardCardOrder = order;
-  localStorage.setItem('al_dashboard_order', JSON.stringify(order));
-
-  // Sync to Firestore settings document
-  if (db && auth?.currentUser) {
-    setDoc(doc(db, 'settings', 'dashboard'), {
-      order: order,
-      updatedAt: serverTimestamp()
-    }).catch(err => console.warn('Sync dashboard order failed:', err.message));
-  }
-}
-
-function loadSavedDashboardOrder() {
-  const grid = document.getElementById('dashboardGrid');
-  if (!grid) return;
-
-  // 1. Try local storage first for instant layout without network hop
-  const localOrder = localStorage.getItem('al_dashboard_order');
-  if (localOrder) {
-    try {
-      const order = JSON.parse(localOrder);
-      if (Array.isArray(order) && order.length > 0) {
-        order.forEach(id => {
-          const card = grid.querySelector(`[data-card-id="${id}"]`);
-          if (card) grid.appendChild(card);
+        row.addEventListener('click', () => {
+          container.classList.add('hidden');
+          switchView('logs');
+          setMasterLogCategoryTab('reloads');
+          const filterInput = document.getElementById('logSearchFilter');
+          if (filterInput) {
+            filterInput.value = r.phone || r.operator;
+            applyMasterLogFilters();
+          }
         });
-      }
-    } catch (e) {
-      console.warn('Error parsing local dashboard order', e);
+
+        container.appendChild(row);
+      });
+    }
+
+    // CATEGORY 3: STATIONERY & BILL TRANSACTIONS
+    if (uniqueStats.length > 0) {
+      const header = document.createElement('div');
+      header.className = 'search-section-header flex items-center justify-between';
+      header.innerHTML = `<span>Stationery & Bill Ledger</span><span>${uniqueStats.length}</span>`;
+      container.appendChild(header);
+
+      uniqueStats.forEach(s => {
+        const row = document.createElement('div');
+        row.className = 'search-result-item';
+        row.innerHTML = `
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(s.itemCode || 'ST')}</span>
+            <div class="truncate">
+              <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(s.itemName)}</div>
+              <div class="text-[10px] theme-text-dim">${escapeHTML(s.date || '')} • Qty: ${s.quantity || 1}</div>
+            </div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <div class="font-bold text-xs theme-text-main font-mono">${formatLKR(s.totalAmount)}</div>
+            <div class="text-[10px] text-sky-400 font-mono">Profit: +${formatLKR(s.profit || 0)}</div>
+          </div>
+        `;
+
+        row.addEventListener('click', () => {
+          container.classList.add('hidden');
+          switchView('logs');
+          setMasterLogCategoryTab('stationery');
+          const filterInput = document.getElementById('logSearchFilter');
+          if (filterInput) {
+            filterInput.value = s.itemName;
+            applyMasterLogFilters();
+          }
+        });
+
+        container.appendChild(row);
+      });
     }
   }
+}
 
-  // 2. Fetch from Firestore for cross-device sync
-  if (db) {
-    getDoc(doc(db, 'settings', 'dashboard')).then(snap => {
-      if (snap.exists() && Array.isArray(snap.data().order)) {
-        const firestoreOrder = snap.data().order;
-        APP_STATE.dashboardCardOrder = firestoreOrder;
-        localStorage.setItem('al_dashboard_order', JSON.stringify(firestoreOrder));
-        firestoreOrder.forEach(id => {
-          const card = grid.querySelector(`[data-card-id="${id}"]`);
-          if (card) grid.appendChild(card);
-        });
-      }
-    }).catch(e => console.warn('Fetch cloud dashboard order failed:', e));
+// =============================================================================
+// 8. NATURAL NUMERICAL SORTING (Requirement 4.3)
+// =============================================================================
+
+/**
+ * Natural numerical sort for catalog and stock items:
+ * '1, 2, 3... 10, 11' naturally rather than '1, 10, 11, 2'
+ */
+export function sortCatalogList(items, sortKey) {
+  const list = [...items];
+  switch (sortKey) {
+    case 'code-asc':
+      return list.sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
+    case 'code-desc':
+      return list.sort((a, b) => String(b.code || '').localeCompare(String(a.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
+    case 'price-asc':
+      return list.sort((a, b) => (Number(a.sellingPrice) || 0) - (Number(b.sellingPrice) || 0));
+    case 'price-desc':
+      return list.sort((a, b) => (Number(b.sellingPrice) || 0) - (Number(a.sellingPrice) || 0));
+    case 'stock-asc':
+      return list.sort((a, b) => {
+        if (a.itemType === 'service') return 1;
+        if (b.itemType === 'service') return -1;
+        return (Number(a.stockQuantity) || 0) - (Number(b.stockQuantity) || 0);
+      });
+    case 'stock-desc':
+      return list.sort((a, b) => {
+        if (a.itemType === 'service') return 1;
+        if (b.itemType === 'service') return -1;
+        return (Number(b.stockQuantity) || 0) - (Number(a.stockQuantity) || 0);
+      });
+    case 'name-asc':
+      return list.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }));
+    default:
+      return list;
   }
 }
 
 // =============================================================================
-// 10. REAL-TIME PROFIT TRACKING & DASHBOARD KPIS
+// 9. DASHBOARD METRICS CALCULATION (Requirement 3.1)
 // =============================================================================
 
-function updateDashboardOverviewKPIs() {
+export function updateDashboardMetrics() {
   // 1. Today's Stationery Sales & Profit
   let statSales = 0;
   let statUnits = 0;
@@ -1207,7 +803,6 @@ function updateDashboardOverviewKPIs() {
     statSales += total;
     statUnits += qty;
 
-    // Use stored profit, or compute dynamically if missing
     if (t.profit !== undefined) {
       statProfitToday += Number(t.profit);
     } else {
@@ -1217,7 +812,7 @@ function updateDashboardOverviewKPIs() {
     }
   });
 
-  // 2. Today's Reloads & Commission (Reload commission = reload profit)
+  // 2. Today's Reloads & Commission
   let reloadVolume = 0;
   let reloadCommission = 0;
 
@@ -1226,1515 +821,350 @@ function updateDashboardOverviewKPIs() {
     reloadCommission += Number(r.commissionAmount || 0);
   });
 
-  const totalRevenue = roundCurrency(statSales + reloadCommission);
-  const totalProfitToday = roundCurrency(statProfitToday + reloadCommission);
+  // Combined Totals
+  const combinedRevenue = roundCurrency(statSales + reloadVolume);
+  const combinedTotalProfit = roundCurrency(statProfitToday + reloadCommission);
 
-  // Update DOM Elements
-  const dashCombined = document.getElementById('dashTodayCombinedRevenue');
-  const dashStat = document.getElementById('dashStationerySales');
-  const dashStatUnits = document.getElementById('dashStationeryUnits');
-  const dashReloadVol = document.getElementById('dashReloadVolume');
-  const dashReloadComm = document.getElementById('dashReloadCommission');
-  const dashProfitToday = document.getElementById('dashProfitToday');
+  // Exact 6 Dashboard Metric Cards
+  const elCombinedRevenue = document.getElementById('dashTodayCombinedRevenue');
+  const elStatSales = document.getElementById('dashStationerySales');
+  const elStatUnits = document.getElementById('dashStationeryUnits');
+  const elReloadVol = document.getElementById('dashReloadVolume');
+  const elReloadComm = document.getElementById('dashReloadCommission');
+  const elStatProfit = document.getElementById('dashStationeryProfit');
+  const elCatalogCount = document.getElementById('dashCatalogCount');
+  const elCombinedProfit = document.getElementById('dashCombinedTotalProfit');
 
-  if (dashCombined) dashCombined.textContent = formatLKR(totalRevenue);
-  if (dashStat) dashStat.textContent = formatLKR(roundCurrency(statSales));
-  if (dashStatUnits) dashStatUnits.textContent = statUnits.toLocaleString();
-  if (dashReloadVol) dashReloadVol.textContent = formatLKR(roundCurrency(reloadVolume));
-  // Clean currency format: Strictly NO "Comm." text
-  if (dashReloadComm) dashReloadComm.textContent = `+${formatLKR(roundCurrency(reloadCommission))}`;
-  if (dashProfitToday) dashProfitToday.textContent = formatLKR(totalProfitToday);
+  if (elCombinedRevenue) elCombinedRevenue.textContent = formatLKR(combinedRevenue);
+  if (elStatSales) elStatSales.textContent = formatLKR(statSales);
+  if (elStatUnits) elStatUnits.textContent = String(statUnits);
+  if (elReloadVol) elReloadVol.textContent = formatLKR(reloadVolume);
+  // Clean LKR amount only — Strictly NO "Comm." text
+  if (elReloadComm) elReloadComm.textContent = formatLKR(reloadCommission);
+  if (elStatProfit) elStatProfit.textContent = formatLKR(statProfitToday);
+  if (elCatalogCount) elCatalogCount.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
+  if (elCombinedProfit) elCombinedProfit.textContent = formatLKR(combinedTotalProfit);
 
-  // Trigger subtle pulse animations on updated KPI cards
-  pulseCard('dashTodayCombinedRevenue');
-  pulseCard('dashProfitToday');
-
-  // Compute Month and Year Profits
-  calculateProfitOverview();
-}
-
-function calculateProfitOverview() {
-  const currentMonth = getTodayDateString().substring(0, 7);
-  const currentYear = currentMonth.substring(0, 4);
-
-  let monthProfit = 0;
-  let yearProfit = 0;
-
-  // Monthly & Yearly Stationery Profit
-  APP_STATE.masterStationeryRecords.forEach(s => {
-    if (!s.date) return;
-    const qty = Number(s.quantity || 1);
-    let p = 0;
-    if (s.profit !== undefined) {
-      p = Number(s.profit);
-    } else {
-      const cost = Number(s.costPrice || 0);
-      const sell = Number(s.sellingPrice || 0);
-      p = (sell - cost) * qty;
-    }
-
-    if (s.date.startsWith(currentMonth)) monthProfit += p;
-    if (s.date.startsWith(currentYear)) yearProfit += p;
-  });
-
-  // Monthly & Yearly Reload Commissions (Treated as Profit)
-  APP_STATE.masterReloadRecords.forEach(r => {
-    if (!r.date) return;
-    const comm = Number(r.commissionAmount || 0);
-    if (r.date.startsWith(currentMonth)) monthProfit += comm;
-    if (r.date.startsWith(currentYear)) yearProfit += comm;
-  });
-
-  const elMonth = document.getElementById('dashProfitMonth');
-  const elYear = document.getElementById('dashProfitYear');
-
-  if (elMonth) elMonth.textContent = formatLKR(roundCurrency(monthProfit));
-  if (elYear) elYear.textContent = formatLKR(roundCurrency(yearProfit));
-}
-
-function updateDashboardCatalogKPIs() {
-  const dashCatalogCount = document.getElementById('dashCatalogCount');
-  if (dashCatalogCount) {
-    dashCatalogCount.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
-  }
+  // Also update paired cards in Master Logs
+  updateMasterLogsPairedCards();
 }
 
 // =============================================================================
-// 11. STATIONERY POS ENTRY (WITH ENTER-KEY AUTO-FLOW)
+// 10. MASTER LOGS REFINEMENT & SUMMARY BLOCKS (Requirement 5.1)
 // =============================================================================
 
-function setupStationeryModule() {
-  const posItemInput = document.getElementById('posItemInput');
-  const posAutocompleteList = document.getElementById('posAutocompleteList');
-  const posSellingPrice = document.getElementById('posSellingPrice');
-  const posQuantity = document.getElementById('posQuantity');
-  const posTotalAmountPreview = document.getElementById('posTotalAmountPreview');
-  const posStockStatusBadge = document.getElementById('posStockStatusBadge');
-  const posItemBadge = document.getElementById('posItemBadge');
-  const stationeryEntryForm = document.getElementById('stationeryEntryForm');
-  const posQtyDecBtn = document.getElementById('posQtyDecBtn');
-  const posQtyIncBtn = document.getElementById('posQtyIncBtn');
-
-  // Quantity Stepper Handlers
-  if (posQtyDecBtn && posQuantity) {
-    posQtyDecBtn.addEventListener('click', () => {
-      const current = Math.max(1, (parseInt(posQuantity.value, 10) || 1) - 1);
-      posQuantity.value = current;
-      calculatePosTotal();
-    });
-  }
-
-  if (posQtyIncBtn && posQuantity) {
-    posQtyIncBtn.addEventListener('click', () => {
-      const current = (parseInt(posQuantity.value, 10) || 1) + 1;
-      posQuantity.value = current;
-      calculatePosTotal();
-    });
-  }
-
-  // Quick Quantity Presets
-  document.querySelectorAll('[data-qty-pill]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const qty = parseInt(btn.getAttribute('data-qty-pill'), 10) || 1;
-      if (posQuantity) {
-        posQuantity.value = qty;
-        calculatePosTotal();
-      }
-    });
-  });
-
-  function calculatePosTotal() {
-    const price = Number(posSellingPrice?.value) || 0;
-    const qty = Math.max(1, parseInt(posQuantity?.value, 10) || 1);
-    const total = roundCurrency(price * qty);
-    if (posTotalAmountPreview) posTotalAmountPreview.textContent = formatLKR(total);
-  }
-
-  if (posSellingPrice) posSellingPrice.addEventListener('input', calculatePosTotal);
-  if (posQuantity) posQuantity.addEventListener('input', calculatePosTotal);
-
-  // Autocomplete Filtering & Enter-Key Flow
-  let highlightedIndex = -1;
-  let currentMatches = [];
-
-  function updateAutocompleteHighlight() {
-    const items = posAutocompleteList.querySelectorAll('.autocomplete-item');
-    items.forEach((itemEl, idx) => {
-      if (idx === highlightedIndex) {
-        itemEl.classList.add('bg-sky-500/20');
-        itemEl.scrollIntoView({ block: 'nearest' });
-      } else {
-        itemEl.classList.remove('bg-sky-500/20');
-      }
-    });
-  }
-
-  function selectCatalogItem(item) {
-    posItemInput.value = item.name;
-    posSellingPrice.value = Number(item.sellingPrice).toFixed(2);
-    APP_STATE.selectedCatalogItem = item;
-
-    if (posItemBadge) {
-      posItemBadge.textContent = item.code;
-      posItemBadge.classList.remove('hidden');
-    }
-
-    renderPosStockBadge(item.stockQuantity);
-    posAutocompleteList.classList.add('hidden');
-    calculatePosTotal();
-  }
-
-  function renderPosStockBadge(stockQty) {
-    if (!posStockStatusBadge) return;
-    posStockStatusBadge.classList.remove('hidden');
-
-    if (stockQty > 5) {
-      posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-in';
-      posStockStatusBadge.textContent = `In Stock: ${stockQty} units`;
-    } else if (stockQty > 0) {
-      posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-low';
-      posStockStatusBadge.textContent = `Low Stock: ${stockQty} units left`;
-    } else {
-      posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-out';
-      posStockStatusBadge.textContent = `Out of Stock (0 units)`;
-    }
-  }
-
-  if (posItemInput && posAutocompleteList) {
-    posItemInput.addEventListener('input', () => {
-      const queryStr = posItemInput.value.trim().toLowerCase();
-      highlightedIndex = -1;
-
-      if (!queryStr) {
-        posAutocompleteList.classList.add('hidden');
-        posAutocompleteList.innerHTML = '';
-        currentMatches = [];
-        if (posItemBadge) posItemBadge.classList.add('hidden');
-        if (posStockStatusBadge) posStockStatusBadge.classList.add('hidden');
-        APP_STATE.selectedCatalogItem = null;
-        return;
-      }
-
-      currentMatches = APP_STATE.inventoryCatalog.filter(item => {
-        const cMatch = (item.code || '').toLowerCase().includes(queryStr);
-        const nMatch = (item.name || '').toLowerCase().includes(queryStr);
-        return cMatch || nMatch;
-      }).slice(0, 8);
-
-      if (currentMatches.length === 0) {
-        posAutocompleteList.innerHTML = `
-          <div class="p-3 text-xs theme-text-dim text-center">
-            No matching item in catalog. Custom item entry.
-          </div>
-        `;
-        posAutocompleteList.classList.remove('hidden');
-        if (posStockStatusBadge) {
-          posStockStatusBadge.className = 'text-xs font-semibold px-2 py-0.5 rounded-full theme-bg-subtle theme-text-dim';
-          posStockStatusBadge.textContent = 'Custom Item';
-          posStockStatusBadge.classList.remove('hidden');
-        }
-        return;
-      }
-
-      posAutocompleteList.innerHTML = '';
-      currentMatches.forEach((item) => {
-        const itemRow = document.createElement('div');
-        itemRow.className = 'autocomplete-item flex items-center justify-between gap-2';
-
-        let stockPill = item.stockQuantity > 5
-          ? `<span class="badge-stock-in px-1.5 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} in stock</span>`
-          : (item.stockQuantity > 0
-              ? `<span class="badge-stock-low px-1.5 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} left</span>`
-              : `<span class="badge-stock-out px-1.5 py-0.5 rounded text-[10px] font-bold">Out of stock</span>`);
-
-        itemRow.innerHTML = `
-          <div>
-            <div class="font-bold text-xs theme-text-main">${item.name}</div>
-            <div class="text-[11px] font-mono theme-text-muted">Code: <span class="text-sky-400 font-bold">${item.code}</span></div>
-          </div>
-          <div class="text-right flex flex-col items-end gap-1">
-            <div class="text-xs font-mono font-bold text-emerald-400">${formatLKR(item.sellingPrice)}</div>
-            ${stockPill}
-          </div>
-        `;
-
-        itemRow.addEventListener('click', () => {
-          selectCatalogItem(item);
-          posQuantity.focus();
-          posQuantity.select();
-        });
-        posAutocompleteList.appendChild(itemRow);
-      });
-
-      posAutocompleteList.classList.remove('hidden');
-    });
-
-    // Enter-Key Rapid Checkout Flow:
-    // 1. Select matching item
-    // 2. Update price and total
-    // 3. Move focus to quantity
-    // 4. Pressing Enter in quantity posts transaction
-    posItemInput.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown') {
-        if (!posAutocompleteList.classList.contains('hidden') && currentMatches.length > 0) {
-          e.preventDefault();
-          highlightedIndex = (highlightedIndex + 1) % currentMatches.length;
-          updateAutocompleteHighlight();
-        }
-      } else if (e.key === 'ArrowUp') {
-        if (!posAutocompleteList.classList.contains('hidden') && currentMatches.length > 0) {
-          e.preventDefault();
-          highlightedIndex = (highlightedIndex - 1 + currentMatches.length) % currentMatches.length;
-          updateAutocompleteHighlight();
-        }
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-
-        // If an item in dropdown is highlighted, select it
-        if (!posAutocompleteList.classList.contains('hidden') && highlightedIndex >= 0 && currentMatches[highlightedIndex]) {
-          selectCatalogItem(currentMatches[highlightedIndex]);
-          posAutocompleteList.classList.add('hidden');
-          posQuantity.focus();
-          posQuantity.select();
-          return;
-        }
-
-        // Exact match check
-        const inputVal = posItemInput.value.trim().toLowerCase();
-        const exactMatch = APP_STATE.inventoryCatalog.find(i =>
-          (i.code || '').toLowerCase() === inputVal ||
-          (i.name || '').toLowerCase() === inputVal
-        );
-
-        if (exactMatch) {
-          selectCatalogItem(exactMatch);
-          posAutocompleteList.classList.add('hidden');
-          posQuantity.focus();
-          posQuantity.select();
-          return;
-        }
-
-        // Auto-select top match if available
-        if (currentMatches.length > 0) {
-          selectCatalogItem(currentMatches[0]);
-          posAutocompleteList.classList.add('hidden');
-          posQuantity.focus();
-          posQuantity.select();
-          return;
-        }
-
-        // If item name & price are already valid, advance focus to quantity
-        if (posItemInput.value.trim() && Number(posSellingPrice.value) > 0) {
-          posQuantity.focus();
-          posQuantity.select();
-        }
-      } else if (e.key === 'Escape') {
-        posAutocompleteList.classList.add('hidden');
-      }
-    });
-
-    document.addEventListener('click', (e) => {
-      if (!posItemInput.contains(e.target) && !posAutocompleteList.contains(e.target)) {
-        posAutocompleteList.classList.add('hidden');
-      }
-    });
-  }
-
-  // Pressing Enter inside quantity input directly submits sale
-  if (posQuantity) {
-    posQuantity.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        stationeryEntryForm.dispatchEvent(new Event('submit', { cancelable: true }));
-      }
-    });
-  }
-
-  // Stationery Sale Submission & Real-Time Stock & Profit Logging
-  if (stationeryEntryForm) {
-    stationeryEntryForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const itemName = posItemInput.value.trim();
-      const sellingPrice = roundCurrency(posSellingPrice.value);
-      const quantity = Math.max(1, parseInt(posQuantity.value, 10) || 1);
-      const totalAmount = roundCurrency(sellingPrice * quantity);
-
-      const matchedItem = APP_STATE.selectedCatalogItem;
-      const itemCode = matchedItem ? matchedItem.code : 'CUSTOM';
-      const category = matchedItem ? (matchedItem.category || 'General') : 'Custom';
-      // Getting (Cost) Price snapshot
-      const costPrice = matchedItem ? roundCurrency(matchedItem.costPrice || 0) : 0;
-      const unitProfit = roundCurrency(sellingPrice - costPrice);
-      const lineProfit = roundCurrency(unitProfit * quantity);
-
-      if (!itemName) {
-        showToast('Please specify an item name or code', 'error');
-        return;
-      }
-      if (sellingPrice <= 0) {
-        showToast('Please enter a valid selling price', 'error');
-        return;
-      }
-
-      // Stock check warning
-      if (matchedItem && matchedItem.stockQuantity < quantity) {
-        if (!confirm(`Warning: Only ${matchedItem.stockQuantity} units in stock for "${matchedItem.name}". Proceed with logging sale of ${quantity} units?`)) {
-          return;
-        }
-      }
-
-      const transactionPayload = {
-        date: getTodayDateString(),
-        time: getCurrentTimeString(),
-        itemCode: itemCode,
-        itemName: itemName,
-        category: category,
-        costPrice: costPrice,
-        sellingPrice: sellingPrice,
-        unitProfit: unitProfit,
-        profit: lineProfit,
-        quantity: quantity,
-        totalAmount: totalAmount,
-        timestamp: serverTimestamp()
-      };
-
-      try {
-        // 1. Add Stationery Transaction Record to Firestore
-        await addDoc(collection(db, 'stationery_transactions'), transactionPayload);
-
-        // 2. Automatically Deduct Sold Quantity in Firestore
-        if (matchedItem && matchedItem.id) {
-          const itemDocRef = doc(db, 'inventory', matchedItem.id);
-          await updateDoc(itemDocRef, {
-            stockQuantity: increment(-quantity),
-            updatedAt: serverTimestamp()
-          });
-          const remainingStock = Math.max(0, matchedItem.stockQuantity - quantity);
-          showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) • Stock left: ${remainingStock}`, 'success');
-        } else {
-          showToast(`Logged custom sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)})`, 'success');
-        }
-
-        // Reset Entry Form
-        stationeryEntryForm.reset();
-        APP_STATE.selectedCatalogItem = null;
-        if (posItemBadge) posItemBadge.classList.add('hidden');
-        if (posStockStatusBadge) posStockStatusBadge.classList.add('hidden');
-        if (posQuantity) posQuantity.value = '1';
-        if (posTotalAmountPreview) posTotalAmountPreview.textContent = 'Rs. 0.00';
-        posItemInput.focus();
-      } catch (err) {
-        logDebug(`Error recording stationery sale: ${err.message}`, 'ERROR');
-        showToast(`Failed to log sale: ${err.message}`, 'error');
-      }
-    });
-  }
-
-  setupEditStationeryModal();
-}
-
-function updateStockPreviews() {
-  if (APP_STATE.selectedCatalogItem) {
-    const updated = APP_STATE.inventoryCatalog.find(i => i.id === APP_STATE.selectedCatalogItem.id);
-    if (updated) {
-      APP_STATE.selectedCatalogItem = updated;
-      const posStockStatusBadge = document.getElementById('posStockStatusBadge');
-      if (posStockStatusBadge) {
-        if (updated.stockQuantity > 5) {
-          posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-in';
-          posStockStatusBadge.textContent = `In Stock: ${updated.stockQuantity} units`;
-        } else if (updated.stockQuantity > 0) {
-          posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-low';
-          posStockStatusBadge.textContent = `Low Stock: ${updated.stockQuantity} units`;
-        } else {
-          posStockStatusBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-out';
-          posStockStatusBadge.textContent = `Out of Stock (0 units)`;
-        }
-      }
-    }
-  }
-}
-
-function renderStationeryRecentFeed() {
-  const feed = document.getElementById('statRecentFeed');
-  if (!feed) return;
-
-  const count = APP_STATE.todayStationeryTransactions.length;
-  if (count === 0) {
-    feed.innerHTML = `
-      <div class="p-3 text-xs text-center theme-text-dim rounded-xl border theme-border">
-        No stationery sales recorded yet today.
-      </div>
-    `;
-    return;
-  }
-
-  feed.innerHTML = '';
-  APP_STATE.todayStationeryTransactions.slice(0, 5).forEach(item => {
-    const row = document.createElement('div');
-    row.className = 'p-2.5 rounded-xl theme-bg-subtle border theme-border flex items-center justify-between text-xs';
-    const profitDisplay = item.profit !== undefined ? ` • Profit: +${formatLKR(item.profit)}` : '';
-
-    row.innerHTML = `
-      <div>
-        <div class="font-bold theme-text-main">${item.itemName}</div>
-        <div class="text-[11px] theme-text-dim font-mono">${item.time || '--:--'} • Code: ${item.itemCode || 'ST'} • Qty: ${item.quantity || 1}${profitDisplay}</div>
-      </div>
-      <div class="font-mono font-bold text-emerald-400">
-        ${formatLKR(item.totalAmount || item.sellingPrice)}
-      </div>
-    `;
-    feed.appendChild(row);
-  });
-}
-
-// =============================================================================
-// 12. MOBILE RELOADS MODULE & CLEAN COMMISSION
-// =============================================================================
-
-function setupReloadModule() {
-  const reloadEntryForm = document.getElementById('reloadEntryForm');
-  const reloadMobileInput = document.getElementById('reloadMobileInput');
-  const reloadAmountInput = document.getElementById('reloadAmountInput');
-
-  // Operator Select Buttons
-  document.querySelectorAll('[data-select-op]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const op = btn.getAttribute('data-select-op');
-      APP_STATE.activeReloadOperator = op;
-
-      document.querySelectorAll('[data-select-op]').forEach(b => {
-        b.classList.remove('ring-2', 'ring-sky-400', 'theme-bg-elevated');
-      });
-      btn.classList.add('ring-2', 'ring-sky-400', 'theme-bg-elevated');
-
-      updateReloadRatePreview();
-    });
-  });
-
-  if (reloadAmountInput) {
-    reloadAmountInput.addEventListener('input', updateReloadRatePreview);
-  }
-
-  // Submit Reload
-  if (reloadEntryForm) {
-    reloadEntryForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const amount = roundCurrency(reloadAmountInput.value);
-      if (amount <= 0) {
-        showToast('Please enter a valid reload amount', 'error');
-        return;
-      }
-
-      const mobileNumber = (reloadMobileInput?.value || '').trim() || '-';
-      const op = APP_STATE.activeReloadOperator;
-      const rate = Number(APP_STATE.commissionRates[op]) || 0;
-      const commissionAmount = roundCurrency((amount * rate) / 100);
-
-      const reloadPayload = {
-        date: getTodayDateString(),
-        time: getCurrentTimeString(),
-        operator: op,
-        mobileNumber: mobileNumber,
-        amount: amount,
-        commissionRate: rate,
-        commissionAmount: commissionAmount,
-        profit: commissionAmount, // Reload commission is treated as profit
-        timestamp: serverTimestamp()
-      };
-
-      try {
-        await addDoc(collection(db, 'reload_transactions'), reloadPayload);
-        const mobileTag = mobileNumber !== '-' ? ` to ${mobileNumber}` : '';
-        // Zero occurrences of "Comm." text: clean currency output
-        showToast(`Recorded ${op} Reload ${formatLKR(amount)}${mobileTag} (+${formatLKR(commissionAmount)})`, 'success');
-
-        reloadAmountInput.value = '';
-        if (reloadMobileInput) reloadMobileInput.value = '';
-        updateReloadRatePreview();
-        reloadMobileInput ? reloadMobileInput.focus() : reloadAmountInput.focus();
-      } catch (err) {
-        logDebug(`Error recording reload: ${err.message}`, 'ERROR');
-        showToast(`Failed to record reload: ${err.message}`, 'error');
-      }
-    });
-  }
-
-  updateReloadRatePreview();
-}
-
-function updateReloadRatePreview() {
-  const reloadAmountInput = document.getElementById('reloadAmountInput');
-  const reloadCommissionPreview = document.getElementById('reloadCommissionPreview');
-  const reloadActiveRatePreview = document.getElementById('reloadActiveRatePreview');
-
-  const op = APP_STATE.activeReloadOperator;
-  const rate = Number(APP_STATE.commissionRates[op]) || 0;
-  const amount = Number(reloadAmountInput?.value) || 0;
-  const earned = roundCurrency((amount * rate) / 100);
-
-  if (reloadActiveRatePreview) reloadActiveRatePreview.textContent = `${rate.toFixed(2)}%`;
-  // Clean currency only: NO "Comm." text
-  if (reloadCommissionPreview) reloadCommissionPreview.textContent = formatLKR(earned);
-}
-
-function updateCommissionUI() {
-  const formAirtel = document.getElementById('formRateAirtel');
-  const formDialog = document.getElementById('formRateDialog');
-  const formMobitel = document.getElementById('formRateMobitel');
-  const formHutch = document.getElementById('formRateHutch');
-
-  if (formAirtel) formAirtel.textContent = `${APP_STATE.commissionRates.AIRTEL.toFixed(2)}%`;
-  if (formDialog) formDialog.textContent = `${APP_STATE.commissionRates.DIALOG.toFixed(2)}%`;
-  if (formMobitel) formMobitel.textContent = `${APP_STATE.commissionRates.MOBITEL.toFixed(2)}%`;
-  if (formHutch) formHutch.textContent = `${APP_STATE.commissionRates.HUTCH.toFixed(2)}%`;
-
-  const inputAirtel = document.getElementById('rateAirtelInput');
-  const inputDialog = document.getElementById('rateDialogInput');
-  const inputMobitel = document.getElementById('rateMobitelInput');
-  const inputHutch = document.getElementById('rateHutchInput');
-
-  if (inputAirtel) inputAirtel.value = APP_STATE.commissionRates.AIRTEL.toFixed(2);
-  if (inputDialog) inputDialog.value = APP_STATE.commissionRates.DIALOG.toFixed(2);
-  if (inputMobitel) inputMobitel.value = APP_STATE.commissionRates.MOBITEL.toFixed(2);
-  if (inputHutch) inputHutch.value = APP_STATE.commissionRates.HUTCH.toFixed(2);
-
-  updateReloadRatePreview();
-}
-
-function renderReloadPresets() {
-  const container = document.getElementById('reloadPresetsContainer');
-  if (!container) return;
-
-  container.innerHTML = '';
-  const reloadAmountInput = document.getElementById('reloadAmountInput');
-
-  APP_STATE.reloadPresets.forEach(amount => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'preset-btn px-3.5 py-2 rounded-xl theme-bg-subtle border theme-border font-mono font-bold text-xs hover:theme-bg-elevated transition glass-btn';
-    btn.textContent = `Rs. ${amount}`;
-    btn.addEventListener('click', () => {
-      if (reloadAmountInput) {
-        reloadAmountInput.value = amount;
-        updateReloadRatePreview();
-        reloadAmountInput.focus();
-      }
-    });
-    container.appendChild(btn);
-  });
-}
-
-function renderSettingsPresets() {
-  const listContainer = document.getElementById('settingsPresetsList');
-  if (!listContainer) return;
-
-  listContainer.innerHTML = '';
-
-  if (APP_STATE.reloadPresets.length === 0) {
-    listContainer.innerHTML = `<span class="text-xs theme-text-dim">No active presets configured.</span>`;
-    return;
-  }
-
-  APP_STATE.reloadPresets.forEach(amount => {
-    const tag = document.createElement('div');
-    tag.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl theme-bg-surface border theme-border text-xs font-mono font-bold theme-text-main shadow-sm';
-    tag.innerHTML = `
-      <span>Rs. ${amount}</span>
-      <button type="button" class="text-red-400 hover:text-red-300 font-bold ml-1 transition" title="Delete preset">✕</button>
-    `;
-
-    const delBtn = tag.querySelector('button');
-    delBtn.addEventListener('click', () => removePresetAmount(amount));
-
-    listContainer.appendChild(tag);
-  });
-}
-
-async function removePresetAmount(amountToRemove) {
-  if (APP_STATE.reloadPresets.length <= 1) {
-    showToast('At least one preset amount must remain configured', 'error');
-    return;
-  }
-
-  const updated = APP_STATE.reloadPresets.filter(a => a !== amountToRemove);
-  try {
-    await setDoc(doc(db, 'settings', 'presets'), {
-      amounts: updated,
-      updatedAt: serverTimestamp()
-    });
-    showToast(`Removed preset Rs. ${amountToRemove}`, 'info');
-  } catch (err) {
-    showToast(`Failed to remove preset: ${err.message}`, 'error');
-  }
-}
-
-function setupPresetControls() {
-  const addPresetForm = document.getElementById('addPresetForm');
-  const newPresetInput = document.getElementById('newPresetAmountInput');
-  const resetPresetsBtn = document.getElementById('resetPresetsDefaultBtn');
-
-  if (addPresetForm) {
-    addPresetForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const val = parseInt(newPresetInput.value, 10);
-      if (!val || val <= 0) {
-        showToast('Please enter a valid amount', 'error');
-        return;
-      }
-      if (APP_STATE.reloadPresets.includes(val)) {
-        showToast(`Preset Rs. ${val} already exists`, 'error');
-        return;
-      }
-
-      const updated = [...APP_STATE.reloadPresets, val].sort((a, b) => a - b);
-      try {
-        await setDoc(doc(db, 'settings', 'presets'), {
-          amounts: updated,
-          updatedAt: serverTimestamp()
-        });
-        showToast(`Added preset Rs. ${val}`, 'success');
-        newPresetInput.value = '';
-      } catch (err) {
-        showToast(`Failed to add preset: ${err.message}`, 'error');
-      }
-    });
-  }
-
-  if (resetPresetsBtn) {
-    resetPresetsBtn.addEventListener('click', async () => {
-      if (!confirm('Reset quick presets back to defaults (Rs. 100, 250, 500, 1000)?')) return;
-      try {
-        await setDoc(doc(db, 'settings', 'presets'), {
-          amounts: DEFAULT_PRESETS,
-          updatedAt: serverTimestamp()
-        });
-        showToast('Presets reset to defaults', 'success');
-      } catch (err) {
-        showToast(`Reset failed: ${err.message}`, 'error');
-      }
-    });
-  }
-}
-
-// =============================================================================
-// 13. STOCK INVENTORY VIEW
-// =============================================================================
-
-function setupStockModule() {
-  const stockSearchInput = document.getElementById('stockSearchInput');
-  if (stockSearchInput) {
-    stockSearchInput.addEventListener('input', renderStockTable);
-  }
-
-  document.querySelectorAll('.stock-filter-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const filter = btn.getAttribute('data-stock-filter');
-      APP_STATE.stockFilter = filter;
-
-      document.querySelectorAll('.stock-filter-btn').forEach(b => {
-        b.classList.remove('active', 'theme-bg-subtle');
-      });
-      btn.classList.add('active', 'theme-bg-subtle');
-
-      renderStockTable();
-    });
-  });
-}
-
-function renderStockTable() {
-  const tbody = document.getElementById('stockTableBody');
-  const searchInput = document.getElementById('stockSearchInput');
-  const queryStr = searchInput ? searchInput.value.trim().toLowerCase() : '';
-
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  let filtered = APP_STATE.inventoryCatalog.filter(item => {
-    if (!queryStr) return true;
-    return (item.code || '').toLowerCase().includes(queryStr) ||
-           (item.name || '').toLowerCase().includes(queryStr) ||
-           (item.category || '').toLowerCase().includes(queryStr);
-  });
-
-  if (APP_STATE.stockFilter === 'LOW') {
-    filtered = filtered.filter(item => item.stockQuantity > 0 && item.stockQuantity <= item.lowStockThreshold);
-  } else if (APP_STATE.stockFilter === 'OUT') {
-    filtered = filtered.filter(item => item.stockQuantity <= 0);
-  }
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="5" class="py-10 text-center theme-text-dim text-xs">
-          No inventory items match the current query/filter.
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
-  filtered.forEach(item => {
-    const tr = document.createElement('tr');
-    tr.className = 'hover:theme-bg-subtle transition';
-
-    let badgeHtml = '';
-    if (item.stockQuantity > item.lowStockThreshold) {
-      badgeHtml = `<span class="badge-stock-in px-2.5 py-0.5 rounded text-[11px] font-bold">${item.stockQuantity} units</span>`;
-    } else if (item.stockQuantity > 0) {
-      badgeHtml = `<span class="badge-stock-low px-2.5 py-0.5 rounded text-[11px] font-bold">Low (${item.stockQuantity})</span>`;
-    } else {
-      badgeHtml = `<span class="badge-stock-out px-2.5 py-0.5 rounded text-[11px] font-bold">Out of Stock</span>`;
-    }
-
-    tr.innerHTML = `
-      <td class="py-3 px-3 sm:px-4 font-mono font-bold text-sky-400 whitespace-nowrap text-xs">${item.code}</td>
-      <td class="py-3 px-3 sm:px-4 font-medium theme-text-main text-xs">
-        <div>${item.name}</div>
-        <div class="text-[10px] theme-text-dim">${item.category || 'General'}</div>
-      </td>
-      <td class="py-3 px-3 sm:px-4 text-right font-mono font-bold text-xs theme-text-main">${formatLKR(item.sellingPrice)}</td>
-      <td class="py-3 px-3 sm:px-4 text-center whitespace-nowrap">${badgeHtml}</td>
-      <td class="py-3 px-3 sm:px-4 text-center whitespace-nowrap">
-        <button type="button" data-pos-quick="${item.id}" class="px-3 py-1 rounded-lg text-xs font-semibold theme-bg-accent text-white hover:opacity-90 transition glass-btn">
-          Sell
-        </button>
-      </td>
-    `;
-
-    const sellBtn = tr.querySelector(`[data-pos-quick="${item.id}"]`);
-    if (sellBtn) {
-      sellBtn.addEventListener('click', () => {
-        switchView('stationery');
-        const posItemInput = document.getElementById('posItemInput');
-        if (posItemInput) {
-          posItemInput.value = item.name;
-          posItemInput.dispatchEvent(new Event('input'));
-        }
-      });
-    }
-
-    tbody.appendChild(tr);
-  });
-}
-
-// =============================================================================
-// 14. MASTER LOGS, CONSOLIDATED METRICS & PROFIT FILTERING
-// =============================================================================
-
-function setupMasterLogsModule() {
-  // Category Filtering Pills
-  document.querySelectorAll('[data-log-cat]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const cat = btn.getAttribute('data-log-cat');
-      APP_STATE.logCategoryFilter = cat;
-
-      document.querySelectorAll('[data-log-cat]').forEach(b => {
-        b.className = 'log-cat-btn px-3 py-1.5 rounded-lg border theme-border theme-text-muted hover:theme-text-main transition glass-btn';
-      });
-      btn.className = 'log-cat-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-accent text-white transition glass-btn';
-
-      applyMasterLogFilters();
-    });
-  });
-
-  // Date Filter Quick Buttons
-  const btnToday = document.getElementById('logFilterTodayBtn');
-  const btnYesterday = document.getElementById('logFilterYesterdayBtn');
-  const btnMonth = document.getElementById('logFilterThisMonthBtn');
-  const inputSpecificDate = document.getElementById('logFilterSpecificDate');
-  const logFrom = document.getElementById('logDateFrom');
-  const logTo = document.getElementById('logDateTo');
-  const btnApplyRange = document.getElementById('applyLogDateRangeBtn');
-
-  if (btnToday) {
-    btnToday.addEventListener('click', () => {
-      const today = getTodayDateString();
-      if (logFrom) logFrom.value = today;
-      if (logTo) logTo.value = today;
-      if (inputSpecificDate) inputSpecificDate.value = '';
-      APP_STATE.logDateFrom = today;
-      APP_STATE.logDateTo = today;
-      applyMasterLogFilters();
-    });
-  }
-
-  if (btnYesterday) {
-    btnYesterday.addEventListener('click', () => {
-      const yest = getYesterdayDateString();
-      if (logFrom) logFrom.value = yest;
-      if (logTo) logTo.value = yest;
-      if (inputSpecificDate) inputSpecificDate.value = '';
-      APP_STATE.logDateFrom = yest;
-      APP_STATE.logDateTo = yest;
-      applyMasterLogFilters();
-    });
-  }
-
-  if (btnMonth) {
-    btnMonth.addEventListener('click', () => {
-      const today = getTodayDateString();
-      const firstOfMonth = `${today.substring(0, 7)}-01`;
-      if (logFrom) logFrom.value = firstOfMonth;
-      if (logTo) logTo.value = today;
-      if (inputSpecificDate) inputSpecificDate.value = '';
-      APP_STATE.logDateFrom = firstOfMonth;
-      APP_STATE.logDateTo = today;
-      applyMasterLogFilters();
-    });
-  }
-
-  if (inputSpecificDate) {
-    inputSpecificDate.addEventListener('change', () => {
-      const pickedDate = inputSpecificDate.value;
-      if (!pickedDate) return;
-      if (logFrom) logFrom.value = pickedDate;
-      if (logTo) logTo.value = pickedDate;
-      APP_STATE.logDateFrom = pickedDate;
-      APP_STATE.logDateTo = pickedDate;
-      applyMasterLogFilters();
-    });
-  }
-
-  if (btnApplyRange && logFrom && logTo) {
-    btnApplyRange.addEventListener('click', () => {
-      APP_STATE.logDateFrom = logFrom.value || getTodayDateString();
-      APP_STATE.logDateTo = logTo.value || logFrom.value || getTodayDateString();
-      if (inputSpecificDate) inputSpecificDate.value = '';
-      applyMasterLogFilters();
-    });
-  }
-
-  // Monthly Analytics Month Picker
-  const monthPicker = document.getElementById('logAnalyticsMonthPicker');
-  if (monthPicker) {
-    monthPicker.addEventListener('change', () => {
-      APP_STATE.analyticsMonth = monthPicker.value;
-      calculateFinancialAnalytics();
-    });
-  }
-
-  // PDF Download Button
-  const downloadPdfBtn = document.getElementById('downloadPdfReportBtn');
-  if (downloadPdfBtn) {
-    downloadPdfBtn.addEventListener('click', generateProfessionalPdfReport);
-  }
-
-  initMetricCardsLayoutEngine();
-}
-
-function initMetricCardsLayoutEngine() {
-  const grid = document.getElementById('masterLogsMetricsGrid');
-  const resetBtn = document.getElementById('resetMetricCardsLayoutBtn');
-  if (!grid) return;
-
-  applySavedCardLayout();
-
-  let draggedCard = null;
-
-  grid.querySelectorAll('.metric-card').forEach(card => {
-    card.addEventListener('dragstart', (e) => {
-      draggedCard = card;
-      card.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', card.getAttribute('data-card-id'));
-    });
-
-    card.addEventListener('dragend', () => {
-      card.classList.remove('dragging');
-      grid.querySelectorAll('.metric-card').forEach(c => c.classList.remove('drag-over'));
-      saveCardLayout();
-    });
-
-    card.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      const targetCard = card;
-      if (draggedCard && targetCard !== draggedCard) {
-        const bounding = targetCard.getBoundingClientRect();
-        const offset = e.clientY - bounding.top - (bounding.height / 2);
-        if (offset > 0) {
-          targetCard.after(draggedCard);
-        } else {
-          targetCard.before(draggedCard);
-        }
-      }
-    });
-  });
-
-  // Card Resize Toggle Buttons
-  grid.querySelectorAll('.card-resize-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const card = btn.closest('.metric-card');
-      if (!card) return;
-
-      const isWide = card.classList.contains('metric-card-wide');
-      if (isWide) {
-        card.classList.remove('metric-card-wide');
-        card.classList.add('metric-card-normal');
-      } else {
-        card.classList.remove('metric-card-normal');
-        card.classList.add('metric-card-wide');
-      }
-      saveCardLayout();
-      showToast('Card size updated', 'info');
-    });
-  });
-
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-      localStorage.removeItem('al_metrics_order');
-      localStorage.removeItem('al_metrics_sizes');
-
-      DEFAULT_LOG_METRIC_CARDS.forEach(cardId => {
-        const card = grid.querySelector(`[data-card-id="${cardId}"]`);
-        if (card) {
-          card.classList.remove('metric-card-wide');
-          card.classList.add('metric-card-normal');
-          grid.appendChild(card);
-        }
-      });
-      showToast('Master Logs card layout restored to default', 'success');
-    });
-  }
-}
-
-function saveCardLayout() {
-  const grid = document.getElementById('masterLogsMetricsGrid');
-  if (!grid) return;
-
-  const order = [];
-  const sizes = {};
-
-  grid.querySelectorAll('.metric-card').forEach(card => {
-    const cardId = card.getAttribute('data-card-id');
-    if (cardId) {
-      order.push(cardId);
-      sizes[cardId] = card.classList.contains('metric-card-wide') ? 'wide' : 'normal';
-    }
-  });
-
-  localStorage.setItem('al_metrics_order', JSON.stringify(order));
-  localStorage.setItem('al_metrics_sizes', JSON.stringify(sizes));
-}
-
-function applySavedCardLayout() {
-  const grid = document.getElementById('masterLogsMetricsGrid');
-  if (!grid) return;
-
-  try {
-    const savedOrder = JSON.parse(localStorage.getItem('al_metrics_order'));
-    const savedSizes = JSON.parse(localStorage.getItem('al_metrics_sizes'));
-
-    if (savedSizes) {
-      Object.keys(savedSizes).forEach(cardId => {
-        const card = grid.querySelector(`[data-card-id="${cardId}"]`);
-        if (card) {
-          if (savedSizes[cardId] === 'wide') {
-            card.classList.remove('metric-card-normal');
-            card.classList.add('metric-card-wide');
-          } else {
-            card.classList.remove('metric-card-wide');
-            card.classList.add('metric-card-normal');
-          }
-        }
-      });
-    }
-
-    if (Array.isArray(savedOrder)) {
-      savedOrder.forEach(cardId => {
-        const card = grid.querySelector(`[data-card-id="${cardId}"]`);
-        if (card) grid.appendChild(card);
-      });
-    }
-  } catch (e) {
-    console.warn('Failed restoring metrics card layout', e);
-  }
-}
-
-function updateMasterLogsTodayCards() {
-  // Card 1: Today's Stationery
-  let statSales = 0;
-  let statUnits = 0;
-  let statProfit = 0;
-  const statTx = APP_STATE.todayStationeryTransactions.length;
-
-  APP_STATE.todayStationeryTransactions.forEach(t => {
-    const total = Number(t.totalAmount || t.sellingPrice || 0);
-    const qty = Number(t.quantity || 1);
-    statSales += total;
-    statUnits += qty;
-
-    if (t.profit !== undefined) {
-      statProfit += Number(t.profit);
-    } else {
-      const cost = Number(t.costPrice || 0);
-      const sell = Number(t.sellingPrice || 0);
-      statProfit += (sell - cost) * qty;
-    }
-  });
-
-  const cardStatSales = document.getElementById('logCardStatSales');
-  const cardStatUnits = document.getElementById('logCardStatUnits');
-  const cardStatTx = document.getElementById('logCardStatTx');
-
-  if (cardStatSales) cardStatSales.textContent = formatLKR(roundCurrency(statSales));
-  if (cardStatUnits) cardStatUnits.textContent = statUnits.toLocaleString();
-  if (cardStatTx) cardStatTx.textContent = statTx.toLocaleString();
-
-  // Card 2: Today's Reloads
-  let reloadVol = 0;
-  let reloadComm = 0;
-  const opTotals = { AIRTEL: 0, DIALOG: 0, MOBITEL: 0, HUTCH: 0 };
+export function updateMasterLogsPairedCards() {
+  // Compute Today's Reloads
+  let todayReloadVol = 0;
+  let todayReloadComm = 0;
+  let todayReloadCount = APP_STATE.todayReloadTransactions.length;
 
   APP_STATE.todayReloadTransactions.forEach(r => {
-    const amt = Number(r.amount || 0);
-    const comm = Number(r.commissionAmount || 0);
-    reloadVol += amt;
-    reloadComm += comm;
-    if (opTotals[r.operator] !== undefined) {
-      opTotals[r.operator] += amt;
-    }
+    todayReloadVol += Number(r.amount || 0);
+    todayReloadComm += Number(r.commissionAmount || 0);
   });
 
-  const cardReloadVol = document.getElementById('logCardReloadVol');
-  const cardReloadComm = document.getElementById('logCardReloadComm');
+  // Compute Today's Stationery & Bills
+  let todayStatSales = 0;
+  let todayStatProfit = 0;
+  let todayStatUnits = 0;
+  let todayStatCount = APP_STATE.todayStationeryTransactions.length;
 
-  if (cardReloadVol) cardReloadVol.textContent = formatLKR(roundCurrency(reloadVol));
-  // Clean currency only: NO "Comm." text
-  if (cardReloadComm) cardReloadComm.textContent = `+${formatLKR(roundCurrency(reloadComm))}`;
-
-  // Card 3: Combined Store Revenue
-  const combinedRev = roundCurrency(statSales + reloadComm);
-  const cardCombinedRev = document.getElementById('logCardCombinedRevenue');
-  if (cardCombinedRev) cardCombinedRev.textContent = formatLKR(combinedRev);
-
-  // Card 4: Today Net Profit (NEW)
-  const totalTodayProfit = roundCurrency(statProfit + reloadComm);
-  const cardTodayProfit = document.getElementById('logCardTodayProfit');
-  const cardTodayMargin = document.getElementById('logCardTodayMargin');
-  if (cardTodayProfit) cardTodayProfit.textContent = formatLKR(totalTodayProfit);
-  if (cardTodayMargin) {
-    const margin = combinedRev > 0 ? (totalTodayProfit / combinedRev) * 100 : 0;
-    cardTodayMargin.textContent = `${margin.toFixed(1)}%`;
-  }
-
-  // Card 7: Operator Reload Breakdown
-  const opAirtel = document.getElementById('logCardAirtelVol');
-  const opDialog = document.getElementById('logCardDialogVol');
-  const opMobitel = document.getElementById('logCardMobitelVol');
-  const opHutch = document.getElementById('logCardHutchVol');
-
-  if (opAirtel) opAirtel.textContent = formatLKR(roundCurrency(opTotals.AIRTEL));
-  if (opDialog) opDialog.textContent = formatLKR(roundCurrency(opTotals.DIALOG));
-  if (opMobitel) opMobitel.textContent = formatLKR(roundCurrency(opTotals.MOBITEL));
-  if (opHutch) opHutch.textContent = formatLKR(roundCurrency(opTotals.HUTCH));
-}
-
-function calculateFinancialAnalytics() {
-  updateMasterLogsTodayCards();
-
-  // Card 5: Monthly Performance Statement
-  const activeMonth = APP_STATE.analyticsMonth || getTodayDateString().substring(0, 7);
-  let monthStatSales = 0;
-  let monthReloadVol = 0;
-  let monthReloadComm = 0;
-  let monthProfit = 0;
-
-  APP_STATE.masterStationeryRecords.forEach(s => {
-    if (s.date && s.date.startsWith(activeMonth)) {
-      monthStatSales += Number(s.totalAmount || s.sellingPrice || 0);
-      const qty = Number(s.quantity || 1);
-      if (s.profit !== undefined) {
-        monthProfit += Number(s.profit);
-      } else {
-        const cost = Number(s.costPrice || 0);
-        const sell = Number(s.sellingPrice || 0);
-        monthProfit += (sell - cost) * qty;
-      }
-    }
-  });
-
-  APP_STATE.masterReloadRecords.forEach(r => {
-    if (r.date && r.date.startsWith(activeMonth)) {
-      monthReloadVol += Number(r.amount || 0);
-      const comm = Number(r.commissionAmount || 0);
-      monthReloadComm += comm;
-      monthProfit += comm; // Reload profit
-    }
-  });
-
-  const cardMSales = document.getElementById('logCardMonthSales');
-  const cardMReload = document.getElementById('logCardMonthReload');
-  const cardMComm = document.getElementById('logCardMonthComm');
-  const cardMNet = document.getElementById('logCardMonthNet');
-
-  if (cardMSales) cardMSales.textContent = formatLKR(roundCurrency(monthStatSales));
-  if (cardMReload) cardMReload.textContent = formatLKR(roundCurrency(monthReloadVol));
-  if (cardMComm) cardMComm.textContent = formatLKR(roundCurrency(monthReloadComm));
-  if (cardMNet) cardMNet.textContent = formatLKR(roundCurrency(monthProfit));
-
-  // Card 6: Annual YTD Statement
-  const activeYear = activeMonth.substring(0, 4);
-  const cardYearLabel = document.getElementById('logCardYearLabel');
-  if (cardYearLabel) cardYearLabel.textContent = activeYear;
-
-  let yearStatSales = 0;
-  let yearReloadVol = 0;
-  let yearReloadComm = 0;
-  let yearProfit = 0;
-
-  APP_STATE.masterStationeryRecords.forEach(s => {
-    if (s.date && s.date.startsWith(activeYear)) {
-      yearStatSales += Number(s.totalAmount || s.sellingPrice || 0);
-      const qty = Number(s.quantity || 1);
-      if (s.profit !== undefined) {
-        yearProfit += Number(s.profit);
-      } else {
-        const cost = Number(s.costPrice || 0);
-        const sell = Number(s.sellingPrice || 0);
-        yearProfit += (sell - cost) * qty;
-      }
-    }
-  });
-
-  APP_STATE.masterReloadRecords.forEach(r => {
-    if (r.date && r.date.startsWith(activeYear)) {
-      yearReloadVol += Number(r.amount || 0);
-      const comm = Number(r.commissionAmount || 0);
-      yearReloadComm += comm;
-      yearProfit += comm;
-    }
-  });
-
-  const cardYSales = document.getElementById('logCardYearSales');
-  const cardYReload = document.getElementById('logCardYearReload');
-  const cardYComm = document.getElementById('logCardYearComm');
-  const cardYNet = document.getElementById('logCardYearNet');
-
-  if (cardYSales) cardYSales.textContent = formatLKR(roundCurrency(yearStatSales));
-  if (cardYReload) cardYReload.textContent = formatLKR(roundCurrency(yearReloadVol));
-  if (cardYComm) cardYComm.textContent = formatLKR(roundCurrency(yearReloadComm));
-  if (cardYNet) cardYNet.textContent = formatLKR(roundCurrency(yearProfit));
-}
-
-// -----------------------------------------------------------------------------
-// MASTER LOGS FILTERING & TABLE RENDERING
-// -----------------------------------------------------------------------------
-
-function applyMasterLogFilters() {
-  const fromDate = APP_STATE.logDateFrom || getTodayDateString();
-  const toDate = APP_STATE.logDateTo || fromDate;
-
-  const filteredStationery = APP_STATE.masterStationeryRecords.filter(s => {
-    if (!s.date) return false;
-    return s.date >= fromDate && s.date <= toDate;
-  });
-
-  const filteredReloads = APP_STATE.masterReloadRecords.filter(r => {
-    if (!r.date) return false;
-    return r.date >= fromDate && r.date <= toDate;
-  });
-
-  // Calculate filtered summary KPIs & Profit
-  let statSales = 0;
-  let unitsSold = 0;
-  let statProfit = 0;
-
-  filteredStationery.forEach(s => {
+  APP_STATE.todayStationeryTransactions.forEach(s => {
     const total = Number(s.totalAmount || s.sellingPrice || 0);
     const qty = Number(s.quantity || 1);
-    statSales += total;
-    unitsSold += qty;
+    todayStatSales += total;
+    todayStatUnits += qty;
 
     if (s.profit !== undefined) {
-      statProfit += Number(s.profit);
+      todayStatProfit += Number(s.profit);
     } else {
       const cost = Number(s.costPrice || 0);
       const sell = Number(s.sellingPrice || 0);
-      statProfit += (sell - cost) * qty;
+      todayStatProfit += (sell - cost) * qty;
     }
   });
 
-  let reloadVol = 0;
-  let reloadComm = 0;
-  filteredReloads.forEach(r => {
-    reloadVol += Number(r.amount || 0);
-    reloadComm += Number(r.commissionAmount || 0);
-  });
+  // Paired Block 1: Today's Reloads Card
+  const elLogReloadVol = document.getElementById('logPairedReloadVol');
+  const elLogReloadComm = document.getElementById('logPairedReloadComm');
+  const elLogReloadStats = document.getElementById('logPairedReloadStats');
 
-  const totalPeriodRevenue = roundCurrency(statSales + reloadComm);
-  const totalPeriodProfit = roundCurrency(statProfit + reloadComm);
+  if (elLogReloadVol) elLogReloadVol.textContent = formatLKR(todayReloadVol);
+  if (elLogReloadComm) elLogReloadComm.textContent = `+${formatLKR(todayReloadComm)}`;
+  if (elLogReloadStats) elLogReloadStats.textContent = `${todayReloadCount} reload transactions today`;
 
-  // Update Summary Bar Elements
-  const sStatSales = document.getElementById('logSummaryStatSales');
-  const sUnitsSold = document.getElementById('logSummaryUnitsSold');
-  const sReloadVol = document.getElementById('logSummaryReloadVol');
-  const sReloadComm = document.getElementById('logSummaryReloadComm');
-  const sTotalRevenue = document.getElementById('logSummaryTotalRevenue');
-  const sTotalProfit = document.getElementById('logSummaryTotalProfit');
-  const filterLabel = document.getElementById('masterLogFilterLabel');
+  // Paired Block 2: Today's Stationery & Bills Card
+  const elLogStatSales = document.getElementById('logPairedStatSales');
+  const elLogStatProfit = document.getElementById('logPairedStatProfit');
+  const elLogStatStats = document.getElementById('logPairedStatStats');
 
-  if (sStatSales) sStatSales.textContent = formatLKR(roundCurrency(statSales));
-  if (sUnitsSold) sUnitsSold.textContent = unitsSold.toLocaleString();
-  if (sReloadVol) sReloadVol.textContent = formatLKR(roundCurrency(reloadVol));
-  if (sReloadComm) sReloadComm.textContent = formatLKR(roundCurrency(reloadComm));
-  if (sTotalRevenue) sTotalRevenue.textContent = formatLKR(totalPeriodRevenue);
-  if (sTotalProfit) sTotalProfit.textContent = formatLKR(totalPeriodProfit);
-
-  if (filterLabel) {
-    filterLabel.textContent = fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`;
-  }
-
-  // Combine rows for table display
-  let combinedRows = [];
-
-  if (APP_STATE.logCategoryFilter === 'ALL' || APP_STATE.logCategoryFilter === 'STATIONERY') {
-    filteredStationery.forEach(s => {
-      const qty = Number(s.quantity || 1);
-      const sell = Number(s.totalAmount || s.sellingPrice || 0);
-      let p = 0;
-      if (s.profit !== undefined) {
-        p = Number(s.profit);
-      } else {
-        const cost = Number(s.costPrice || 0);
-        p = (Number(s.sellingPrice || 0) - cost) * qty;
-      }
-
-      combinedRows.push({
-        id: s.id,
-        category: 'STATIONERY',
-        date: s.date || '',
-        time: s.time || '',
-        itemOrOp: `${s.itemName || ''} (${s.itemCode || 'ST'})`,
-        mobileNumber: '-',
-        qtyOrRate: `${qty} units`,
-        amount: sell,
-        profit: p,
-        rawRecord: s
-      });
-    });
-  }
-
-  if (APP_STATE.logCategoryFilter === 'ALL' || APP_STATE.logCategoryFilter === 'RELOAD') {
-    filteredReloads.forEach(r => {
-      const comm = Number(r.commissionAmount || 0);
-      combinedRows.push({
-        id: r.id,
-        category: 'RELOAD',
-        date: r.date || '',
-        time: r.time || '',
-        itemOrOp: `${r.operator} Top-Up`,
-        mobileNumber: r.mobileNumber || '-',
-        qtyOrRate: `${Number(r.commissionRate || 0).toFixed(2)}%`,
-        amount: Number(r.amount || 0),
-        profit: comm,
-        rawRecord: r
-      });
-    });
-  }
-
-  // Sort by Date descending, then Time descending
-  combinedRows.sort((a, b) => {
-    if (a.date !== b.date) return (b.date || '').localeCompare(a.date || '');
-    return (b.time || '').localeCompare(a.time || '');
-  });
-
-  const countBadge = document.getElementById('masterLogCountBadge');
-  if (countBadge) countBadge.textContent = `${combinedRows.length} Records`;
-
-  renderMasterLogTable(combinedRows);
+  if (elLogStatSales) elLogStatSales.textContent = formatLKR(todayStatSales);
+  if (elLogStatProfit) elLogStatProfit.textContent = `+${formatLKR(todayStatProfit)}`;
+  if (elLogStatStats) elLogStatStats.textContent = `${todayStatUnits} units sold • ${todayStatCount} txs today`;
 }
 
-function renderMasterLogTable(records) {
-  const tbody = document.getElementById('masterLogTableBody');
+function initMasterLogs() {
+  // Date preset pills
+  document.querySelectorAll('[data-log-date]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-log-date]').forEach(b => {
+        b.className = 'log-date-btn px-3.5 py-1.5 rounded-lg border theme-border transition';
+      });
+      btn.className = 'log-date-btn active px-3.5 py-1.5 rounded-lg border theme-border theme-bg-subtle transition font-bold theme-text-main';
+
+      const scope = btn.getAttribute('data-log-date');
+      APP_STATE.logDateScope = scope;
+      const customRangeBox = document.getElementById('logCustomDateRange');
+
+      if (scope === 'today') {
+        if (customRangeBox) customRangeBox.classList.add('hidden');
+        APP_STATE.logDateFrom = getTodayDateString();
+        APP_STATE.logDateTo = getTodayDateString();
+      } else if (scope === 'yesterday') {
+        if (customRangeBox) customRangeBox.classList.add('hidden');
+        APP_STATE.logDateFrom = getYesterdayDateString();
+        APP_STATE.logDateTo = getYesterdayDateString();
+      } else if (scope === 'this-month') {
+        if (customRangeBox) customRangeBox.classList.add('hidden');
+        const today = getTodayDateString();
+        APP_STATE.logDateFrom = today.substring(0, 8) + '01';
+        APP_STATE.logDateTo = today;
+      } else if (scope === 'custom') {
+        if (customRangeBox) {
+          customRangeBox.classList.remove('hidden');
+          const fromInput = document.getElementById('logDateFrom');
+          const toInput = document.getElementById('logDateTo');
+          if (fromInput) fromInput.value = APP_STATE.logDateFrom || getTodayDateString();
+          if (toInput) toInput.value = APP_STATE.logDateTo || getTodayDateString();
+        }
+      }
+      applyMasterLogFilters();
+    });
+  });
+
+  const applyCustomDateBtn = document.getElementById('applyCustomDateBtn');
+  if (applyCustomDateBtn) {
+    applyCustomDateBtn.addEventListener('click', () => {
+      const fromInput = document.getElementById('logDateFrom');
+      const toInput = document.getElementById('logDateTo');
+      if (fromInput && toInput) {
+        APP_STATE.logDateFrom = fromInput.value || getTodayDateString();
+        APP_STATE.logDateTo = toInput.value || APP_STATE.logDateFrom;
+        applyMasterLogFilters();
+      }
+    });
+  }
+
+  // Category Tabs
+  document.querySelectorAll('[data-log-tab]').forEach(tabBtn => {
+    tabBtn.addEventListener('click', () => {
+      setMasterLogCategoryTab(tabBtn.getAttribute('data-log-tab'));
+    });
+  });
+
+  // Search filter input
+  const searchInput = document.getElementById('logSearchFilter');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      APP_STATE.logSearchQuery = searchInput.value.trim().toLowerCase();
+      applyMasterLogFilters();
+    });
+  }
+
+  // PDF Export Stamped with Brand Logo
+  const pdfBtn = document.getElementById('downloadPdfReportBtn');
+  if (pdfBtn) {
+    pdfBtn.addEventListener('click', generateProfessionalPdfReport);
+  }
+}
+
+function setMasterLogCategoryTab(tabId) {
+  APP_STATE.logTab = tabId;
+  document.querySelectorAll('[data-log-tab]').forEach(btn => {
+    if (btn.getAttribute('data-log-tab') === tabId) {
+      btn.className = 'log-tab-btn active pb-2 border-b-2 border-sky-400 theme-text-main font-bold transition';
+    } else {
+      btn.className = 'log-tab-btn pb-2 border-b-2 border-transparent theme-text-muted hover:theme-text-main transition';
+    }
+  });
+  applyMasterLogFilters();
+}
+
+export function applyMasterLogFilters() {
+  const fromDate = APP_STATE.logDateFrom || getTodayDateString();
+  const toDate = APP_STATE.logDateTo || fromDate;
+  const q = APP_STATE.logSearchQuery || '';
+
+  // Filter Stationery & Bills
+  const filteredStationery = APP_STATE.masterStationeryRecords.filter(s => {
+    const d = s.date || '';
+    if (d < fromDate || d > toDate) return false;
+    if (!q) return true;
+    return (s.itemName || '').toLowerCase().includes(q) ||
+           (s.itemCode || '').toLowerCase().includes(q) ||
+           String(s.totalAmount).includes(q);
+  });
+
+  // Filter Reloads
+  const filteredReloads = APP_STATE.masterReloadRecords.filter(r => {
+    const d = r.date || '';
+    if (d < fromDate || d > toDate) return false;
+    if (!q) return true;
+    return (r.phone || '').includes(q) ||
+           (r.operator || '').toLowerCase().includes(q) ||
+           String(r.amount).includes(q);
+  });
+
+  // Update Category Badge Counts
+  const countAll = document.getElementById('countLogAll');
+  const countStat = document.getElementById('countLogStat');
+  const countReloads = document.getElementById('countLogReloads');
+
+  if (countAll) countAll.textContent = String(filteredStationery.length + filteredReloads.length);
+  if (countStat) countStat.textContent = String(filteredStationery.length);
+  if (countReloads) countReloads.textContent = String(filteredReloads.length);
+
+  // Combine & Sort by Date + Time descending
+  let displayRows = [];
+
+  if (APP_STATE.logTab === 'all' || APP_STATE.logTab === 'stationery') {
+    filteredStationery.forEach(s => {
+      displayRows.push({
+        type: s.itemType === 'service' ? 'SERVICE' : 'STATIONERY',
+        date: s.date || '',
+        time: s.time || '',
+        title: s.itemName,
+        code: s.itemCode,
+        ref: `Qty: ${s.quantity || 1}`,
+        amount: Number(s.totalAmount || s.sellingPrice || 0),
+        profit: Number(s.profit || 0),
+        raw: s
+      });
+    });
+  }
+
+  if (APP_STATE.logTab === 'all' || APP_STATE.logTab === 'reloads') {
+    filteredReloads.forEach(r => {
+      displayRows.push({
+        type: 'RELOAD',
+        date: r.date || '',
+        time: r.time || '',
+        title: `${r.operator} Reload`,
+        code: r.operator,
+        ref: r.phone || 'Walk-in Customer',
+        amount: Number(r.amount || 0),
+        profit: Number(r.commissionAmount || 0),
+        raw: r
+      });
+    });
+  }
+
+  displayRows.sort((a, b) => (b.date + ' ' + b.time).localeCompare(a.date + ' ' + a.time));
+
+  renderMasterLogsTable(displayRows);
+}
+
+function renderMasterLogsTable(rows) {
+  const tbody = document.getElementById('masterLogsTableBody');
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  if (records.length === 0) {
+  if (rows.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" class="py-12 text-center theme-text-dim text-xs">
-          No records found for the selected date filter and category.
+        <td colspan="6" class="py-10 text-center theme-text-dim text-xs">
+          No transaction records found for the selected period.
         </td>
       </tr>
     `;
     return;
   }
 
-  records.forEach(row => {
+  rows.forEach(item => {
     const tr = document.createElement('tr');
     tr.className = 'hover:theme-bg-subtle transition';
 
-    let typePill = row.category === 'STATIONERY'
-      ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">Stationery</span>'
-      : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Reload</span>';
-
-    let mobileDisplay = row.mobileNumber !== '-'
-      ? `<span class="font-mono font-bold text-sky-400">${row.mobileNumber}</span>`
-      : `<span class="theme-text-dim text-center block">-</span>`;
+    let typeBadge = '';
+    if (item.type === 'RELOAD') {
+      typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold border ${item.code === 'DIALOG' ? 'text-orange-400 border-orange-500/30' : item.code === 'MOBITEL' ? 'text-blue-400 border-blue-500/30' : item.code === 'AIRTEL' ? 'text-red-400 border-red-500/30' : 'text-amber-300 border-amber-500/30'}">${escapeHTML(item.code)}</span>`;
+    } else if (item.type === 'SERVICE') {
+      typeBadge = `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service / Bill</span>`;
+    } else {
+      typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(item.code || 'ST')}</span>`;
+    }
 
     tr.innerHTML = `
-      <td class="py-3 px-3 sm:px-4 font-mono text-xs whitespace-nowrap">
-        <span class="theme-text-main font-semibold">${row.date}</span>
-        <span class="theme-text-dim ml-1 font-normal">${row.time}</span>
+      <td class="py-2.5 px-3 font-mono text-xs whitespace-nowrap">
+        <div class="font-bold theme-text-main">${escapeHTML(item.time || '--:--')}</div>
+        <div class="text-[10px] theme-text-dim">${escapeHTML(item.date || '')}</div>
       </td>
-      <td class="py-3 px-3 sm:px-4 whitespace-nowrap">${typePill}</td>
-      <td class="py-3 px-3 sm:px-4 font-medium theme-text-main text-xs">${row.itemOrOp}</td>
-      <td class="py-3 px-3 sm:px-4 whitespace-nowrap text-xs">${mobileDisplay}</td>
-      <td class="py-3 px-3 sm:px-4 text-center font-mono text-xs theme-text-muted whitespace-nowrap">${row.qtyOrRate}</td>
-      <td class="py-3 px-3 sm:px-4 text-right font-mono text-xs font-bold theme-text-main whitespace-nowrap">${formatLKR(row.amount)}</td>
-      <td class="py-3 px-3 sm:px-4 text-right font-mono text-xs font-bold text-emerald-400 whitespace-nowrap">+${formatLKR(row.profit)}</td>
-      <td class="py-3 px-3 sm:px-4 text-center whitespace-nowrap space-x-1">
-        ${row.category === 'STATIONERY'
-          ? `<button type="button" data-edit-log="${row.id}" class="p-1 text-sky-400 hover:text-sky-300 transition" title="Edit Record">
-              <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-             </button>`
-          : ''}
-        <button type="button" data-delete-log="${row.id}" data-cat="${row.category}" class="p-1 text-red-400 hover:text-red-300 transition" title="Delete Record">
+      <td class="py-2.5 px-3">
+        <div class="flex items-center gap-2">
+          ${typeBadge}
+          <span class="font-semibold text-xs theme-text-main">${escapeHTML(item.title)}</span>
+        </div>
+      </td>
+      <td class="py-2.5 px-3 font-mono text-xs theme-text-dim">
+        ${escapeHTML(item.ref)}
+      </td>
+      <td class="py-2.5 px-3 text-right font-mono font-bold text-xs theme-text-main currency-lkr">
+        ${formatLKR(item.amount)}
+      </td>
+      <td class="py-2.5 px-3 text-right font-mono font-bold text-xs ${item.type === 'RELOAD' ? 'text-emerald-400' : 'text-sky-400'} currency-lkr">
+        +${formatLKR(item.profit)}
+      </td>
+      <td class="py-2.5 px-3 text-center">
+        <button type="button" class="delete-tx-btn p-1 text-red-400 hover:text-red-300 transition" title="Delete record">
           <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </td>
     `;
 
-    const editBtn = tr.querySelector(`[data-edit-log="${row.id}"]`);
-    if (editBtn) {
-      editBtn.addEventListener('click', () => openEditStationeryModal(row.rawRecord));
-    }
-
-    const delBtn = tr.querySelector(`[data-delete-log="${row.id}"]`);
-    if (delBtn) {
-      delBtn.addEventListener('click', () => deleteTransactionRecord(row.id, row.category, row.itemOrOp, row.rawRecord));
+    const deleteBtn = tr.querySelector('.delete-tx-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async () => {
+        if (!confirm(`Delete transaction for "${item.title}" (${formatLKR(item.amount)})?`)) return;
+        try {
+          const colName = item.type === 'RELOAD' ? 'reload_transactions' : 'stationery_transactions';
+          await deleteDoc(doc(db, colName, item.raw.id));
+          showToast('Transaction record deleted', 'success');
+        } catch (err) {
+          showToast(`Delete failed: ${err.message}`, 'error');
+        }
+      });
     }
 
     tbody.appendChild(tr);
   });
 }
 
-async function deleteTransactionRecord(id, category, title, rawRecord) {
-  if (!confirm(`Permanently delete ${category.toLowerCase()} record "${title}"?`)) return;
+// =============================================================================
+// 11. STAMPED PROFESSIONAL PDF REPORT ENGINE (Requirement 5.1)
+// =============================================================================
 
-  const collectionName = category === 'STATIONERY' ? 'stationery_transactions' : 'reload_transactions';
-  try {
-    await deleteDoc(doc(db, collectionName, id));
-
-    // Restore stock if stationery transaction
-    if (category === 'STATIONERY' && rawRecord && rawRecord.itemCode && rawRecord.itemCode !== 'CUSTOM') {
-      const catalogItem = APP_STATE.inventoryCatalog.find(i => i.code === rawRecord.itemCode);
-      if (catalogItem && catalogItem.id) {
-        await updateDoc(doc(db, 'inventory', catalogItem.id), {
-          stockQuantity: increment(rawRecord.quantity || 1),
-          updatedAt: serverTimestamp()
-        });
-      }
-    }
-
-    showToast(`Deleted ${title}`, 'info');
-  } catch (err) {
-    showToast(`Delete failed: ${err.message}`, 'error');
-  }
-}
-
-// -----------------------------------------------------------------------------
-// EDIT STATIONERY TRANSACTION MODAL
-// -----------------------------------------------------------------------------
-
-function setupEditStationeryModal() {
-  const modal = document.getElementById('editStationeryModal');
-  const closeBtn = document.getElementById('closeEditStatModalBtn');
-  const cancelBtn = document.getElementById('cancelEditStatBtn');
-  const form = document.getElementById('editStationeryForm');
-  const priceInput = document.getElementById('editStatSelling');
-  const costInput = document.getElementById('editStatCost');
-  const qtyInput = document.getElementById('editStatQty');
-  const preview = document.getElementById('editStatTotalPreview');
-
-  function calculateEditTotal() {
-    const p = Number(priceInput.value) || 0;
-    const q = Math.max(1, parseInt(qtyInput.value, 10) || 1);
-    if (preview) preview.textContent = formatLKR(roundCurrency(p * q));
-  }
-
-  if (priceInput) priceInput.addEventListener('input', calculateEditTotal);
-  if (qtyInput) qtyInput.addEventListener('input', calculateEditTotal);
-
-  if (closeBtn && modal) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
-  if (cancelBtn && modal) cancelBtn.addEventListener('click', () => modal.classList.add('hidden'));
-
-  if (form) {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const docId = document.getElementById('editStatDocId').value;
-      const originalRecord = APP_STATE.masterStationeryRecords.find(r => r.id === docId);
-      if (!originalRecord) return;
-
-      const newName = document.getElementById('editStatName').value.trim();
-      const newCode = document.getElementById('editStatCode').value.trim();
-      const newCost = roundCurrency(costInput.value);
-      const newSelling = roundCurrency(priceInput.value);
-      const newQty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
-      const newTotal = roundCurrency(newSelling * newQty);
-      const newProfit = roundCurrency((newSelling - newCost) * newQty);
-
-      const oldQty = originalRecord.quantity || 1;
-      const qtyDiff = newQty - oldQty;
-
+function getLogoDataUrl() {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
       try {
-        await updateDoc(doc(db, 'stationery_transactions', docId), {
-          itemName: newName,
-          itemCode: newCode,
-          costPrice: newCost,
-          sellingPrice: newSelling,
-          quantity: newQty,
-          totalAmount: newTotal,
-          profit: newProfit,
-          unitProfit: roundCurrency(newSelling - newCost),
-          updatedAt: serverTimestamp()
-        });
-
-        if (newCode && newCode !== 'CUSTOM') {
-          const catalogItem = APP_STATE.inventoryCatalog.find(i => i.code === newCode);
-          if (catalogItem && catalogItem.id && qtyDiff !== 0) {
-            await updateDoc(doc(db, 'inventory', catalogItem.id), {
-              stockQuantity: increment(-qtyDiff),
-              updatedAt: serverTimestamp()
-            });
-          }
-        }
-
-        modal.classList.add('hidden');
-        showToast('Stationery transaction updated', 'success');
-      } catch (err) {
-        showToast(`Update failed: ${err.message}`, 'error');
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || 140;
+        canvas.height = img.naturalHeight || 140;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (e) {
+        resolve(null);
       }
-    });
-  }
+    };
+    img.onerror = () => resolve(null);
+    img.src = './images/logo.png';
+  });
 }
 
-function openEditStationeryModal(record) {
-  const modal = document.getElementById('editStationeryModal');
-  if (!modal || !record) return;
-
-  document.getElementById('editStatDocId').value = record.id;
-  document.getElementById('editStatName').value = record.itemName || '';
-  document.getElementById('editStatCode').value = record.itemCode || '';
-  document.getElementById('editStatCost').value = (record.costPrice || 0).toFixed(2);
-  document.getElementById('editStatSelling').value = (record.sellingPrice || 0).toFixed(2);
-  document.getElementById('editStatQty').value = record.quantity || 1;
-
-  const total = roundCurrency((record.sellingPrice || 0) * (record.quantity || 1));
-  const preview = document.getElementById('editStatTotalPreview');
-  if (preview) preview.textContent = formatLKR(total);
-
-  modal.classList.remove('hidden');
-}
-
-// =============================================================================
-// 15. CLIENT-SIDE PDF REPORT ENGINE WITH PROFIT TOTALS
-// =============================================================================
-
-function generateProfessionalPdfReport() {
+export async function generateProfessionalPdfReport() {
   if (typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF === 'undefined') {
     showToast('PDF generator library is initializing. Please try again.', 'error');
     return;
@@ -2759,7 +1189,6 @@ function generateProfessionalPdfReport() {
     .filter(r => r.date >= fromDate && r.date <= toDate)
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
 
-  // Compute Totals & Profit
   let totalStatSales = 0;
   let totalUnitsSold = 0;
   let totalStatProfit = 0;
@@ -2769,7 +1198,6 @@ function generateProfessionalPdfReport() {
     const qty = Number(s.quantity || 1);
     totalStatSales += total;
     totalUnitsSold += qty;
-
     if (s.profit !== undefined) {
       totalStatProfit += Number(s.profit);
     } else {
@@ -2779,216 +1207,790 @@ function generateProfessionalPdfReport() {
     }
   });
 
-  let totalReloadVolume = 0;
-  let totalReloadCommission = 0;
-  const opBreakdown = {
-    AIRTEL: { vol: 0, comm: 0 },
-    DIALOG: { vol: 0, comm: 0 },
-    MOBITEL: { vol: 0, comm: 0 },
-    HUTCH: { vol: 0, comm: 0 }
-  };
-
+  let totalReloadVol = 0;
+  let totalReloadComm = 0;
   reloadList.forEach(r => {
-    const amt = Number(r.amount || 0);
-    const comm = Number(r.commissionAmount || 0);
-    totalReloadVolume += amt;
-    totalReloadCommission += comm;
-
-    if (opBreakdown[r.operator]) {
-      opBreakdown[r.operator].vol += amt;
-      opBreakdown[r.operator].comm += comm;
-    }
+    totalReloadVol += Number(r.amount || 0);
+    totalReloadComm += Number(r.commissionAmount || 0);
   });
 
-  const totalStoreRevenue = roundCurrency(totalStatSales + totalReloadCommission);
-  const totalNetProfit = roundCurrency(totalStatProfit + totalReloadCommission);
+  const totalStoreRevenue = roundCurrency(totalStatSales + totalReloadVol);
+  const totalNetProfit = roundCurrency(totalStatProfit + totalReloadComm);
 
   // 1. Header Banner
-  pdfDoc.setFillColor(15, 23, 42); // Slate 900
+  pdfDoc.setFillColor(11, 17, 32); // Modern Slate #0b1120
   pdfDoc.rect(0, 0, 210, 36, 'F');
+
+  // Load and stamp official logo
+  const logoDataUri = await getLogoDataUrl();
+  if (logoDataUri) {
+    try {
+      pdfDoc.addImage(logoDataUri, 'PNG', 168, 5, 26, 26);
+    } catch (e) {
+      console.warn('PDF logo stamp error:', e);
+    }
+  }
 
   pdfDoc.setTextColor(255, 255, 255);
   pdfDoc.setFont('helvetica', 'bold');
-  pdfDoc.setFontSize(20);
+  pdfDoc.setFontSize(18);
   pdfDoc.text('AL Communication', 14, 15);
 
   pdfDoc.setFont('helvetica', 'normal');
-  pdfDoc.setFontSize(9);
+  pdfDoc.setFontSize(8.5);
   pdfDoc.setTextColor(203, 213, 225);
-  pdfDoc.text('Sri Lankan Retail Stationery POS, Mobile Reload Ledger & Profit Tracker', 14, 22);
-  pdfDoc.text(`Statement Period: ${dateRangeStr} | Generated: ${new Date().toLocaleString()}`, 14, 28);
+  pdfDoc.text('Retail Stationery, Utility Bill Payments & Mobile Reload Ledger', 14, 22);
+  pdfDoc.text(`Period: ${dateRangeStr} | Generated: ${new Date().toLocaleString()}`, 14, 28);
 
-  // 2. Financial Summary Box (Including Net Profit)
+  // 2. Summary Box
   pdfDoc.setFillColor(248, 250, 252);
   pdfDoc.setDrawColor(226, 232, 240);
-  pdfDoc.roundedRect(14, 42, 182, 30, 3, 3, 'FD');
+  pdfDoc.roundedRect(14, 42, 182, 30, 2, 2, 'FD');
 
   pdfDoc.setTextColor(15, 23, 42);
   pdfDoc.setFont('helvetica', 'bold');
-  pdfDoc.setFontSize(10);
+  pdfDoc.setFontSize(9.5);
   pdfDoc.text('EXECUTIVE FINANCIAL & PROFIT SUMMARY', 18, 48);
 
   pdfDoc.setFont('helvetica', 'normal');
-  pdfDoc.setFontSize(8.5);
+  pdfDoc.setFontSize(8);
   pdfDoc.setTextColor(71, 85, 105);
   pdfDoc.text(`Stationery Sales: ${formatLKR(totalStatSales)} (${totalUnitsSold} items)`, 18, 55);
-  pdfDoc.text(`Reload Volume: ${formatLKR(totalReloadVolume)}`, 18, 61);
+  pdfDoc.text(`Reload Sales Volume: ${formatLKR(totalReloadVol)} (${reloadList.length} top-ups)`, 18, 61);
   pdfDoc.text(`Stationery Net Profit: ${formatLKR(totalStatProfit)}`, 18, 67);
 
-  pdfDoc.text(`Earned Reload Commission: ${formatLKR(totalReloadCommission)}`, 105, 55);
-  pdfDoc.text(`Total Period Revenue: ${formatLKR(totalStoreRevenue)}`, 105, 61);
+  pdfDoc.text(`Earned Reload Commission: ${formatLKR(totalReloadComm)}`, 105, 55);
+  pdfDoc.text(`Combined Total Revenue: ${formatLKR(totalStoreRevenue)}`, 105, 61);
 
   pdfDoc.setFont('helvetica', 'bold');
-  pdfDoc.setTextColor(5, 150, 105); // Emerald Green
-  pdfDoc.text(`Total Period Net Profit: ${formatLKR(totalNetProfit)}`, 105, 67);
+  pdfDoc.setTextColor(5, 150, 105);
+  pdfDoc.text(`COMBINED NET PROFIT: ${formatLKR(totalNetProfit)}`, 105, 67);
 
-  let currentY = 78;
+  // 3. Transactions Table (AutoTable)
+  const tableData = [];
+  stationeryList.forEach(s => {
+    tableData.push([
+      `${s.date} ${s.time || ''}`,
+      s.itemType === 'service' ? 'Service/Bill' : 'Stationery',
+      s.itemName,
+      String(s.quantity || 1),
+      formatLKR(s.totalAmount),
+      formatLKR(s.profit || 0)
+    ]);
+  });
 
-  // 3. Stationery Sales Table with Cost & Profit
-  if (stationeryList.length > 0) {
-    pdfDoc.setTextColor(15, 23, 42);
-    pdfDoc.setFont('helvetica', 'bold');
-    pdfDoc.setFontSize(11);
-    pdfDoc.text(`1. Stationery Sales & Margin Breakdown (${stationeryList.length} Transactions)`, 14, currentY);
-
-    const statRows = stationeryList.map(s => {
-      const qty = Number(s.quantity || 1);
-      const sell = Number(s.totalAmount || s.sellingPrice || 0);
-      let p = 0;
-      if (s.profit !== undefined) {
-        p = Number(s.profit);
-      } else {
-        const cost = Number(s.costPrice || 0);
-        p = (Number(s.sellingPrice || 0) - cost) * qty;
-      }
-
-      return [
-        s.date,
-        s.time,
-        s.itemCode || 'ST',
-        s.itemName,
-        String(qty),
-        formatLKR(s.costPrice || 0),
-        formatLKR(s.sellingPrice || 0),
-        formatLKR(sell),
-        `+${formatLKR(p)}`
-      ];
-    });
-
-    pdfDoc.autoTable({
-      startY: currentY + 3,
-      head: [['Date', 'Time', 'Code', 'Item Name', 'Qty', 'Cost Price', 'Sell Price', 'Total Sales', 'Profit']],
-      body: statRows,
-      theme: 'grid',
-      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
-      bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
-      columnStyles: {
-        4: { halign: 'center' },
-        5: { halign: 'right' },
-        6: { halign: 'right' },
-        7: { halign: 'right', fontStyle: 'bold' },
-        8: { halign: 'right', fontStyle: 'bold', textColor: [5, 150, 105] }
-      },
-      margin: { left: 14, right: 14 }
-    });
-
-    currentY = pdfDoc.lastAutoTable.finalY + 12;
-  }
-
-  // 4. Mobile Reload Table
-  if (reloadList.length > 0) {
-    if (currentY > 235) {
-      pdfDoc.addPage();
-      currentY = 20;
-    }
-
-    pdfDoc.setTextColor(15, 23, 42);
-    pdfDoc.setFont('helvetica', 'bold');
-    pdfDoc.setFontSize(11);
-    pdfDoc.text(`2. Mobile Reload Log & Commissions (${reloadList.length} Top-Ups)`, 14, currentY);
-
-    const reloadRows = reloadList.map(r => [
-      r.date,
-      r.time,
-      r.operator,
-      r.mobileNumber || '-',
+  reloadList.forEach(r => {
+    tableData.push([
+      `${r.date} ${r.time || ''}`,
+      'Mobile Reload',
+      `${r.operator} (${r.phone || 'Walk-in'})`,
+      '1',
       formatLKR(r.amount),
-      `${Number(r.commissionRate || 0).toFixed(2)}%`,
       formatLKR(r.commissionAmount)
     ]);
+  });
 
+  tableData.sort((a, b) => b[0].localeCompare(a[0]));
+
+  if (typeof pdfDoc.autoTable === 'function') {
     pdfDoc.autoTable({
-      startY: currentY + 3,
-      head: [['Date', 'Time', 'Network Operator', 'Mobile Number', 'Reload Amount', 'Commission Rate', 'Earned Commission']],
-      body: reloadRows,
+      startY: 78,
+      head: [['Time / Date', 'Category', 'Description / Customer', 'Qty', 'Amount [Rs.]', 'Profit / Comm']],
+      body: tableData,
       theme: 'grid',
-      headStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-      bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
-      columnStyles: {
-        3: { halign: 'center' },
-        4: { halign: 'right' },
-        5: { halign: 'center' },
-        6: { halign: 'right', fontStyle: 'bold' }
+      headStyles: {
+        fillColor: [15, 23, 42],
+        textColor: [255, 255, 255],
+        fontSize: 7.5,
+        fontStyle: 'bold'
       },
-      margin: { left: 14, right: 14 }
-    });
-
-    currentY = pdfDoc.lastAutoTable.finalY + 10;
-
-    // Operator Breakdown Table
-    if (currentY > 240) {
-      pdfDoc.addPage();
-      currentY = 20;
-    }
-
-    const opRows = [
-      ['Airtel', `${APP_STATE.commissionRates.AIRTEL.toFixed(2)}%`, formatLKR(opBreakdown.AIRTEL.vol), formatLKR(opBreakdown.AIRTEL.comm)],
-      ['Dialog', `${APP_STATE.commissionRates.DIALOG.toFixed(2)}%`, formatLKR(opBreakdown.DIALOG.vol), formatLKR(opBreakdown.DIALOG.comm)],
-      ['Mobitel', `${APP_STATE.commissionRates.MOBITEL.toFixed(2)}%`, formatLKR(opBreakdown.MOBITEL.vol), formatLKR(opBreakdown.MOBITEL.comm)],
-      ['Hutch', `${APP_STATE.commissionRates.HUTCH.toFixed(2)}%`, formatLKR(opBreakdown.HUTCH.vol), formatLKR(opBreakdown.HUTCH.comm)]
-    ];
-
-    pdfDoc.autoTable({
-      startY: currentY,
-      head: [['Network Operator', 'Applied Rate', 'Total Reload Volume', 'Earned Commission']],
-      body: opRows,
-      theme: 'striped',
-      headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-      bodyStyles: { fontSize: 8 },
-      columnStyles: {
-        1: { halign: 'center' },
-        2: { halign: 'right' },
-        3: { halign: 'right', fontStyle: 'bold' }
+      styles: {
+        fontSize: 7,
+        cellPadding: 2
       },
-      margin: { left: 14, right: 14 }
+      columnStyles: {
+        0: { cellWidth: 32 },
+        1: { cellWidth: 26 },
+        2: { cellWidth: 64 },
+        3: { cellWidth: 12, halign: 'center' },
+        4: { cellWidth: 24, halign: 'right' },
+        5: { cellWidth: 24, halign: 'right' }
+      }
     });
   }
 
-  // Page Numbers
-  const pageCount = pdfDoc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    pdfDoc.setPage(i);
-    pdfDoc.setFont('helvetica', 'normal');
-    pdfDoc.setFontSize(8);
-    pdfDoc.setTextColor(148, 163, 184);
-    pdfDoc.text(
-      `AL Communication • Page ${i} of ${pageCount}`,
-      105,
-      290,
-      { align: 'center' }
-    );
-  }
-
-  pdfDoc.save(`AL-Communication-Report-${dateRangeStr}.pdf`);
-  showToast('PDF Report generated and downloaded', 'success');
+  pdfDoc.save(`AL_Communication_Ledger_${dateRangeStr.replace(/\s+/g, '_')}.pdf`);
+  showToast('Stamped PDF report downloaded successfully', 'success');
 }
 
 // =============================================================================
-// 16. MASTER INVENTORY CATALOG & GETTING PRICE MANAGER
+// 12. STOCK INVENTORY & NATURAL NUMERICAL SORTING (Requirements 4.2 & 4.3)
 // =============================================================================
 
-function setupCatalogManager() {
+function initStockInventory() {
+  const searchInput = document.getElementById('stockSearchInput');
+  const sortSelect = document.getElementById('stockSortSelect');
+
+  if (searchInput) {
+    searchInput.addEventListener('input', renderStockTable);
+  }
+
+  if (sortSelect) {
+    sortSelect.value = APP_STATE.stockSortOrder;
+    sortSelect.addEventListener('change', () => {
+      APP_STATE.stockSortOrder = sortSelect.value;
+      renderStockTable();
+    });
+  }
+
+  // Stock Filter Pills
+  document.querySelectorAll('.stock-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.stock-filter-btn').forEach(b => {
+        b.className = 'stock-filter-btn px-3 py-1.5 rounded-lg border theme-border transition';
+      });
+      btn.className = 'stock-filter-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-subtle transition font-bold theme-text-main';
+      APP_STATE.stockFilter = btn.getAttribute('data-stock-filter');
+      renderStockTable();
+    });
+  });
+}
+
+export function renderStockTable() {
+  const tbody = document.getElementById('stockTableBody');
+  const searchInput = document.getElementById('stockSearchInput');
+  const queryStr = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  // 1. Filter
+  let items = APP_STATE.inventoryCatalog.filter(item => {
+    // Text search
+    if (queryStr) {
+      const match = (item.code || '').toLowerCase().includes(queryStr) ||
+                    (item.name || '').toLowerCase().includes(queryStr) ||
+                    (item.category || '').toLowerCase().includes(queryStr);
+      if (!match) return false;
+    }
+
+    // Filter pill
+    if (APP_STATE.stockFilter === 'LOW') {
+      return item.itemType !== 'service' && item.stockQuantity > 0 && item.stockQuantity <= (item.lowStockThreshold || 5);
+    }
+    if (APP_STATE.stockFilter === 'OUT') {
+      return item.itemType !== 'service' && item.stockQuantity <= 0;
+    }
+    if (APP_STATE.stockFilter === 'SERVICE') {
+      return item.itemType === 'service';
+    }
+    return true;
+  });
+
+  // 2. Sort Naturally (Requirement 4.3)
+  items = sortCatalogList(items, APP_STATE.stockSortOrder);
+
+  if (items.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="py-10 text-center theme-text-dim text-xs">
+          No inventory products found matching the active criteria.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  items.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:theme-bg-subtle transition';
+
+    const isService = item.itemType === 'service';
+
+    let typeCol = isService
+      ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service / Bill</span>`
+      : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">Physical</span>`;
+
+    let stockCol = '';
+    if (isService) {
+      stockCol = `<span class="badge-service-bill px-2.5 py-1 rounded-full text-xs font-bold">Service / Bill</span>`;
+    } else if (item.stockQuantity <= 0) {
+      stockCol = `<span class="badge-stock-out px-2.5 py-1 rounded-full text-xs font-bold">Out of Stock (0)</span>`;
+    } else if (item.stockQuantity <= (item.lowStockThreshold || 5)) {
+      stockCol = `<span class="badge-stock-low px-2.5 py-1 rounded-full text-xs font-bold">${item.stockQuantity} Left (Low)</span>`;
+    } else {
+      stockCol = `<span class="badge-stock-in px-2.5 py-1 rounded-full text-xs font-bold">${item.stockQuantity} in stock</span>`;
+    }
+
+    tr.innerHTML = `
+      <td class="py-3 px-3 sm:px-4 font-mono font-bold text-xs theme-text-main">${escapeHTML(item.code)}</td>
+      <td class="py-3 px-3 sm:px-4">
+        <div class="font-bold text-xs theme-text-main">${escapeHTML(item.name)}</div>
+        <div class="text-[11px] theme-text-dim">${escapeHTML(item.category || 'General')}</div>
+      </td>
+      <td class="py-3 px-3 sm:px-4">${typeCol}</td>
+      <td class="py-3 px-3 sm:px-4 text-right font-mono font-bold text-xs theme-text-main currency-lkr">
+        ${formatLKR(item.sellingPrice)}
+      </td>
+      <td class="py-3 px-3 sm:px-4 text-center">${stockCol}</td>
+      <td class="py-3 px-3 sm:px-4 text-center">
+        <button type="button" class="quick-pos-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-500/15 text-sky-400 hover:bg-sky-500 hover:text-white transition">
+          ${isService ? 'Pay Bill' : 'Sell at POS'}
+        </button>
+      </td>
+    `;
+
+    const posBtn = tr.querySelector('.quick-pos-btn');
+    if (posBtn) {
+      posBtn.addEventListener('click', () => {
+        switchView('stationery');
+        selectCatalogItemForPOS(item);
+      });
+    }
+
+    tbody.appendChild(tr);
+  });
+}
+
+// =============================================================================
+// 13. POS STATIONERY ENTRY & SERVICE / BILLS (Requirements 4.1 & 4.2)
+// =============================================================================
+
+function selectCatalogItemForPOS(item) {
+  APP_STATE.selectedCatalogItem = item;
+  const input = document.getElementById('posItemInput');
+  const codeBadge = document.getElementById('posItemBadge');
+  const stockBadge = document.getElementById('posStockStatusBadge');
+  const priceInput = document.getElementById('posSellingPrice');
+  const priceLabel = document.getElementById('posSellingPriceLabel');
+  const qtyInput = document.getElementById('posQuantity');
+  const submitBtnText = document.getElementById('posSubmitBtnText');
+
+  if (input) input.value = item.name;
+  if (codeBadge) {
+    codeBadge.textContent = item.code;
+    codeBadge.classList.remove('hidden');
+  }
+
+  const isService = item.itemType === 'service';
+
+  if (stockBadge) {
+    stockBadge.classList.remove('hidden');
+    if (isService) {
+      stockBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-service-bill';
+      stockBadge.textContent = 'Service / Utility Bill (No Stock Count)';
+    } else if (item.stockQuantity <= 0) {
+      stockBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-out';
+      stockBadge.textContent = 'Out of Stock (0)';
+    } else if (item.stockQuantity <= (item.lowStockThreshold || 5)) {
+      stockBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-low';
+      stockBadge.textContent = `Low Stock: ${item.stockQuantity} Left`;
+    } else {
+      stockBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-in';
+      stockBadge.textContent = `In Stock: ${item.stockQuantity}`;
+    }
+  }
+
+  if (priceLabel) {
+    priceLabel.textContent = isService ? 'Bill Amount [Rs.] *' : 'Selling Price [Rs.]';
+  }
+
+  if (priceInput) {
+    if (isService) {
+      // Clear price and focus for user to type custom bill amount
+      priceInput.value = item.sellingPrice > 0 ? item.sellingPrice.toFixed(2) : '';
+      priceInput.placeholder = 'Enter Bill Amount...';
+      priceInput.focus();
+    } else {
+      priceInput.value = item.sellingPrice.toFixed(2);
+    }
+  }
+
+  if (qtyInput) {
+    qtyInput.value = '1';
+  }
+
+  if (submitBtnText) {
+    submitBtnText.textContent = isService ? 'Log Bill Payment' : 'Log Stationery Sale';
+  }
+
+  updatePOSTotalPreview();
+}
+
+function updatePOSTotalPreview() {
+  const priceInput = document.getElementById('posSellingPrice');
+  const qtyInput = document.getElementById('posQuantity');
+  const totalPreview = document.getElementById('posTotalAmountPreview');
+
+  const price = Number(priceInput?.value) || 0;
+  const qty = Math.max(1, parseInt(qtyInput?.value, 10) || 1);
+  const total = roundCurrency(price * qty);
+
+  if (totalPreview) {
+    totalPreview.textContent = formatLKR(total);
+  }
+}
+
+function initStationeryPOS() {
+  const itemInput = document.getElementById('posItemInput');
+  const autocompleteList = document.getElementById('posAutocompleteList');
+  const priceInput = document.getElementById('posSellingPrice');
+  const qtyInput = document.getElementById('posQuantity');
+  const form = document.getElementById('stationeryEntryForm');
+
+  // Title Case Formatting on Blur (Requirement 4.1)
+  if (itemInput) {
+    itemInput.addEventListener('blur', () => {
+      if (!APP_STATE.selectedCatalogItem) {
+        itemInput.value = toTitleCase(itemInput.value);
+      }
+    });
+
+    itemInput.addEventListener('input', () => {
+      const q = itemInput.value.trim().toLowerCase();
+      if (!q) {
+        if (autocompleteList) autocompleteList.classList.add('hidden');
+        APP_STATE.selectedCatalogItem = null;
+        const codeBadge = document.getElementById('posItemBadge');
+        const stockBadge = document.getElementById('posStockStatusBadge');
+        if (codeBadge) codeBadge.classList.add('hidden');
+        if (stockBadge) stockBadge.classList.add('hidden');
+        return;
+      }
+
+      const matches = APP_STATE.inventoryCatalog.filter(i => {
+        return (i.code || '').toLowerCase().includes(q) || (i.name || '').toLowerCase().includes(q);
+      }).slice(0, 6);
+
+      if (matches.length > 0 && autocompleteList) {
+        autocompleteList.innerHTML = '';
+        autocompleteList.classList.remove('hidden');
+
+        matches.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'autocomplete-item';
+          const isService = item.itemType === 'service';
+          div.innerHTML = `
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(item.code)}</span>
+              <span class="font-bold text-xs theme-text-main">${escapeHTML(item.name)}</span>
+            </div>
+            <div class="text-right">
+              <div class="font-bold text-xs theme-text-main font-mono">${formatLKR(item.sellingPrice)}</div>
+              <div class="text-[10px] theme-text-dim">${isService ? 'Service/Bill' : item.stockQuantity + ' left'}</div>
+            </div>
+          `;
+          div.addEventListener('click', () => {
+            selectCatalogItemForPOS(item);
+            autocompleteList.classList.add('hidden');
+          });
+          autocompleteList.appendChild(div);
+        });
+      } else if (autocompleteList) {
+        autocompleteList.classList.add('hidden');
+      }
+    });
+  }
+
+  // Steppers & Quantity Pills
+  const decBtn = document.getElementById('posQtyDecBtn');
+  const incBtn = document.getElementById('posQtyIncBtn');
+
+  if (decBtn && qtyInput) {
+    decBtn.addEventListener('click', () => {
+      const cur = parseInt(qtyInput.value, 10) || 1;
+      if (cur > 1) {
+        qtyInput.value = cur - 1;
+        updatePOSTotalPreview();
+      }
+    });
+  }
+
+  if (incBtn && qtyInput) {
+    incBtn.addEventListener('click', () => {
+      const cur = parseInt(qtyInput.value, 10) || 1;
+      qtyInput.value = cur + 1;
+      updatePOSTotalPreview();
+    });
+  }
+
+  document.querySelectorAll('[data-qty-pill]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      if (qtyInput) {
+        qtyInput.value = pill.getAttribute('data-qty-pill');
+        updatePOSTotalPreview();
+      }
+    });
+  });
+
+  if (priceInput) priceInput.addEventListener('input', updatePOSTotalPreview);
+  if (qtyInput) qtyInput.addEventListener('input', updatePOSTotalPreview);
+
+  // Form Submit: Log Stationery Sale or Utility Bill (Requirement 4.2)
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const rawName = itemInput.value.trim();
+      const itemName = toTitleCase(rawName); // Requirement 4.1 Auto Title Case
+      const sellingPrice = roundCurrency(priceInput.value);
+      const quantity = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+      const totalAmount = roundCurrency(sellingPrice * quantity);
+
+      const matchedItem = APP_STATE.selectedCatalogItem;
+      const isService = matchedItem && matchedItem.itemType === 'service';
+      const itemCode = matchedItem ? matchedItem.code : 'CUSTOM';
+      const category = matchedItem ? (matchedItem.category || (isService ? 'Utility Bills' : 'General')) : 'Custom';
+      
+      // Cost price & profit handling
+      let costPrice = 0;
+      let unitProfit = 0;
+      let lineProfit = 0;
+
+      if (isService) {
+        // Utility bills: No stock count. Profit is service fee or margin if defined, else 0
+        costPrice = matchedItem ? roundCurrency(matchedItem.costPrice || 0) : 0;
+        unitProfit = roundCurrency(costPrice > 0 ? sellingPrice - costPrice : 0);
+        lineProfit = roundCurrency(unitProfit * quantity);
+      } else {
+        costPrice = matchedItem ? roundCurrency(matchedItem.costPrice || 0) : 0;
+        unitProfit = roundCurrency(sellingPrice - costPrice);
+        lineProfit = roundCurrency(unitProfit * quantity);
+      }
+
+      if (!itemName) {
+        showToast('Please specify an item name or code', 'error');
+        return;
+      }
+      if (sellingPrice <= 0) {
+        showToast('Please enter a valid amount / selling price', 'error');
+        return;
+      }
+
+      // Stock Warning for physical products
+      if (!isService && matchedItem && matchedItem.stockQuantity < quantity) {
+        if (!confirm(`Warning: Only ${matchedItem.stockQuantity} units in stock for "${matchedItem.name}". Proceed with logging sale of ${quantity} units?`)) {
+          return;
+        }
+      }
+
+      const transactionPayload = {
+        date: getTodayDateString(),
+        time: getCurrentTimeString(),
+        itemCode,
+        itemName,
+        category,
+        itemType: isService ? 'service' : 'product',
+        costPrice,
+        sellingPrice,
+        unitProfit,
+        profit: lineProfit,
+        quantity,
+        totalAmount,
+        timestamp: serverTimestamp()
+      };
+
+      try {
+        // 1. Add Transaction to Firestore
+        await addDoc(collection(db, 'stationery_transactions'), transactionPayload);
+
+        // 2. Deduct Stock strictly for Physical Products (Requirement 4.2)
+        if (!isService && matchedItem && matchedItem.id) {
+          const itemDocRef = doc(db, 'inventory', matchedItem.id);
+          await updateDoc(itemDocRef, {
+            stockQuantity: increment(-quantity),
+            updatedAt: serverTimestamp()
+          });
+          const remainingStock = Math.max(0, matchedItem.stockQuantity - quantity);
+          showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) • Stock left: ${remainingStock}`, 'success');
+        } else if (isService) {
+          showToast(`Recorded utility bill: ${itemName} (${formatLKR(totalAmount)}) [No stock deduction]`, 'success');
+        } else {
+          showToast(`Logged custom sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)})`, 'success');
+        }
+
+        // Reset Form
+        form.reset();
+        APP_STATE.selectedCatalogItem = null;
+        const codeBadge = document.getElementById('posItemBadge');
+        const stockBadge = document.getElementById('posStockStatusBadge');
+        const submitBtnText = document.getElementById('posSubmitBtnText');
+        const priceLabel = document.getElementById('posSellingPriceLabel');
+
+        if (codeBadge) codeBadge.classList.add('hidden');
+        if (stockBadge) stockBadge.classList.add('hidden');
+        if (priceLabel) priceLabel.textContent = 'Selling Price / Amount [Rs.]';
+        if (submitBtnText) submitBtnText.textContent = 'Log Stationery Sale';
+        if (qtyInput) qtyInput.value = '1';
+        updatePOSTotalPreview();
+        itemInput.focus();
+      } catch (err) {
+        logDebug(`Error recording sale: ${err.message}`, 'ERROR');
+        showToast(`Failed to log sale: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  setupEditStationeryModal();
+}
+
+function renderRecentStationeryFeed() {
+  const feed = document.getElementById('statRecentFeed');
+  if (!feed) return;
+  feed.innerHTML = '';
+
+  const recent = [...APP_STATE.todayStationeryTransactions].slice(0, 5);
+
+  if (recent.length === 0) {
+    feed.innerHTML = `
+      <div class="p-3 text-xs text-center theme-text-dim rounded-xl border theme-border">
+        No sales or utility bills recorded yet today.
+      </div>
+    `;
+    return;
+  }
+
+  recent.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'p-3 rounded-xl border theme-border theme-bg-subtle flex items-center justify-between text-xs';
+    const isService = item.itemType === 'service';
+    const badge = isService
+      ? `<span class="badge-service-bill px-1.5 py-0.5 rounded text-[10px] font-bold">Bill</span>`
+      : `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(item.itemCode || 'ST')}</span>`;
+
+    div.innerHTML = `
+      <div class="flex items-center gap-2">
+        ${badge}
+        <div>
+          <span class="font-bold theme-text-main">${escapeHTML(item.itemName)}</span>
+          <span class="text-[11px] theme-text-dim"> × ${item.quantity || 1} • ${escapeHTML(item.time || '')}</span>
+        </div>
+      </div>
+      <div class="text-right">
+        <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.totalAmount)}</span>
+        <span class="text-[10px] theme-text-dim block">+${formatLKR(item.profit || 0)} margin</span>
+      </div>
+    `;
+    feed.appendChild(div);
+  });
+}
+
+function setupEditStationeryModal() {
+  const modal = document.getElementById('editStationeryModal');
+  const closeBtn = document.getElementById('closeEditStatModalBtn');
+  const cancelBtn = document.getElementById('cancelEditStatBtn');
+  const form = document.getElementById('editStationeryForm');
+
+  if (closeBtn && modal) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  if (cancelBtn && modal) cancelBtn.addEventListener('click', () => modal.classList.add('hidden'));
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const docId = document.getElementById('editStatDocId')?.value;
+      const rawName = document.getElementById('editStatName')?.value.trim();
+      const name = toTitleCase(rawName); // Auto Title Case
+      const cost = roundCurrency(document.getElementById('editStatCost')?.value);
+      const sell = roundCurrency(document.getElementById('editStatSell')?.value);
+      const qty = parseInt(document.getElementById('editStatQty')?.value, 10) || 1;
+      const profit = roundCurrency((sell - cost) * qty);
+      const total = roundCurrency(sell * qty);
+
+      if (!docId) return;
+
+      try {
+        await updateDoc(doc(db, 'stationery_transactions', docId), {
+          itemName: name,
+          costPrice: cost,
+          sellingPrice: sell,
+          quantity: qty,
+          profit,
+          totalAmount: total,
+          unitProfit: roundCurrency(sell - cost),
+          updatedAt: serverTimestamp()
+        });
+        showToast('Stationery record updated', 'success');
+        if (modal) modal.classList.add('hidden');
+      } catch (err) {
+        showToast(`Update failed: ${err.message}`, 'error');
+      }
+    });
+  }
+}
+
+// =============================================================================
+// 14. MOBILE RELOADS & COMMISSION ENGINE
+// =============================================================================
+
+function selectOperator(operator) {
+  APP_STATE.selectedOperator = operator;
+  document.querySelectorAll('.op-select-btn').forEach(btn => {
+    if (btn.getAttribute('data-operator') === operator) {
+      btn.className = 'op-select-btn p-3 rounded-xl border border-sky-400 theme-bg-elevated ring-2 ring-sky-500/30 flex flex-col items-center justify-center gap-1 transition text-center';
+    } else {
+      btn.className = 'op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated';
+    }
+  });
+  updateReloadCommissionPreview();
+}
+
+function updateReloadCommissionPreview() {
+  const amountInput = document.getElementById('reloadAmount');
+  const commPreview = document.getElementById('reloadCommissionPreview');
+  const totalPreview = document.getElementById('reloadTotalPreview');
+
+  const amount = Number(amountInput?.value) || 0;
+  const rate = APP_STATE.commissionRates[APP_STATE.selectedOperator] || 0;
+  const commission = roundCurrency((amount * rate) / 100);
+
+  if (commPreview) {
+    commPreview.textContent = formatLKR(commission);
+  }
+  if (totalPreview) {
+    totalPreview.textContent = formatLKR(amount);
+  }
+}
+
+function renderPresetPills() {
+  const container = document.getElementById('quickPresetsContainer');
+  if (!container) return;
+  container.innerHTML = '';
+
+  APP_STATE.reloadPresets.sort((a, b) => a - b).forEach(val => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'preset-pill';
+    btn.textContent = `Rs. ${val}`;
+    btn.addEventListener('click', () => {
+      const amountInput = document.getElementById('reloadAmount');
+      if (amountInput) {
+        amountInput.value = val;
+        updateReloadCommissionPreview();
+      }
+    });
+    container.appendChild(btn);
+  });
+}
+
+function initMobileReloads() {
+  // Operator buttons
+  document.querySelectorAll('.op-select-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectOperator(btn.getAttribute('data-operator'));
+    });
+  });
+
+  selectOperator('DIALOG');
+
+  // Phone number input with auto network detection
+  const phoneInput = document.getElementById('reloadPhone');
+  const detectedBadge = document.getElementById('detectedOperatorBadge');
+
+  if (phoneInput) {
+    phoneInput.addEventListener('input', () => {
+      const detected = detectOperatorFromPrefix(phoneInput.value);
+      if (detected) {
+        selectOperator(detected);
+        if (detectedBadge) {
+          detectedBadge.textContent = detected;
+          detectedBadge.className = `absolute right-3 top-2.5 px-2 py-0.5 rounded text-xs font-bold border ${detected === 'DIALOG' ? 'text-orange-400 border-orange-500/30' : detected === 'MOBITEL' ? 'text-blue-400 border-blue-500/30' : detected === 'AIRTEL' ? 'text-red-400 border-red-500/30' : 'text-amber-300 border-amber-500/30'}`;
+          detectedBadge.classList.remove('hidden');
+        }
+      } else if (detectedBadge) {
+        detectedBadge.classList.add('hidden');
+      }
+    });
+  }
+
+  const amountInput = document.getElementById('reloadAmount');
+  if (amountInput) amountInput.addEventListener('input', updateReloadCommissionPreview);
+
+  renderPresetPills();
+
+  // Reload Form Submit
+  const form = document.getElementById('reloadEntryForm');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const phone = phoneInput ? phoneInput.value.trim() : '';
+      const amount = roundCurrency(amountInput ? amountInput.value : 0);
+      const operator = APP_STATE.selectedOperator;
+      const rate = APP_STATE.commissionRates[operator] || 0;
+      const commissionAmount = roundCurrency((amount * rate) / 100);
+
+      if (amount < 10) {
+        showToast('Minimum reload amount is Rs. 10.00', 'error');
+        return;
+      }
+
+      const payload = {
+        date: getTodayDateString(),
+        time: getCurrentTimeString(),
+        operator,
+        phone: phone || 'Walk-in Customer',
+        amount,
+        commissionRate: rate,
+        commissionAmount,
+        timestamp: serverTimestamp()
+      };
+
+      try {
+        await addDoc(collection(db, 'reload_transactions'), payload);
+        showToast(`Recorded ${operator} reload of ${formatLKR(amount)} (+${formatLKR(commissionAmount)} comm.)`, 'success');
+        form.reset();
+        if (detectedBadge) detectedBadge.classList.add('hidden');
+        selectOperator(operator);
+        updateReloadCommissionPreview();
+      } catch (err) {
+        logDebug(`Error recording reload: ${err.message}`, 'ERROR');
+        showToast(`Failed to log reload: ${err.message}`, 'error');
+      }
+    });
+  }
+}
+
+function renderRecentReloadsFeed() {
+  const feed = document.getElementById('reloadRecentFeed');
+  if (!feed) return;
+  feed.innerHTML = '';
+
+  const recent = [...APP_STATE.todayReloadTransactions].slice(0, 5);
+
+  if (recent.length === 0) {
+    feed.innerHTML = `
+      <div class="p-3 text-xs text-center theme-text-dim rounded-xl border theme-border">
+        No mobile reloads recorded yet today.
+      </div>
+    `;
+    return;
+  }
+
+  recent.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'p-3 rounded-xl border theme-border theme-bg-subtle flex items-center justify-between text-xs';
+    div.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${item.operator === 'DIALOG' ? 'text-orange-400 border-orange-500/30' : item.operator === 'MOBITEL' ? 'text-blue-400 border-blue-500/30' : item.operator === 'AIRTEL' ? 'text-red-400 border-red-500/30' : 'text-amber-300 border-amber-500/30'}">${escapeHTML(item.operator)}</span>
+        <div>
+          <span class="font-bold font-mono theme-text-main">${escapeHTML(item.phone || 'Walk-in')}</span>
+          <span class="text-[11px] theme-text-dim block">${escapeHTML(item.time || '')}</span>
+        </div>
+      </div>
+      <div class="text-right">
+        <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.amount)}</span>
+        <span class="text-[10px] theme-text-dim block font-mono">+${formatLKR(item.commissionAmount)} comm.</span>
+      </div>
+    `;
+    feed.appendChild(div);
+  });
+}
+
+// =============================================================================
+// 15. SETTINGS CATALOG EDITOR & SERVICE/BILL TOGGLE (Requirements 4.1 & 4.2)
+// =============================================================================
+
+function initSettingsCatalog() {
   const form = document.getElementById('catalogItemForm');
+  const docIdInput = document.getElementById('catalogDocId');
   const codeInput = document.getElementById('catalogCode');
   const nameInput = document.getElementById('catalogName');
   const categoryInput = document.getElementById('catalogCategory');
@@ -2996,54 +1998,106 @@ function setupCatalogManager() {
   const sellingPriceInput = document.getElementById('catalogSellingPrice');
   const stockInput = document.getElementById('catalogStockQuantity');
   const thresholdInput = document.getElementById('catalogLowStockThreshold');
-  const docIdInput = document.getElementById('catalogDocId');
   const formTitle = document.getElementById('catalogFormTitle');
   const saveBtn = document.getElementById('catalogSaveBtn');
   const resetBtn = document.getElementById('catalogResetFormBtn');
   const searchInput = document.getElementById('catalogSearchInput');
+  const sortSelect = document.getElementById('catalogSortSelect');
   const seedBtn = document.getElementById('seedCatalogBtn');
+
+  const stockQtyContainer = document.getElementById('catalogStockQtyContainer');
+  const thresholdContainer = document.getElementById('catalogThresholdContainer');
+  const costPriceContainer = document.getElementById('catalogCostPriceContainer');
+  const sellingPriceLabel = document.getElementById('catalogSellingPriceLabel');
+
+  // Item Type Radio Listener (Requirement 4.2)
+  const itemTypeRadios = form?.querySelectorAll('input[name="catalogItemType"]');
+  function handleItemTypeChange() {
+    const isService = form?.querySelector('input[name="catalogItemType"]:checked')?.value === 'service';
+    if (isService) {
+      if (stockQtyContainer) stockQtyContainer.classList.add('hidden');
+      if (thresholdContainer) thresholdContainer.classList.add('hidden');
+      if (costPriceContainer) costPriceContainer.classList.add('hidden');
+      if (sellingPriceLabel) sellingPriceLabel.textContent = 'Default Base Fee / Amount [Rs.]';
+      if (costPriceInput) {
+        costPriceInput.required = false;
+        costPriceInput.value = '0.00';
+      }
+      if (stockInput) {
+        stockInput.required = false;
+        stockInput.value = '0';
+      }
+      if (thresholdInput) {
+        thresholdInput.required = false;
+        thresholdInput.value = '0';
+      }
+    } else {
+      if (stockQtyContainer) stockQtyContainer.classList.remove('hidden');
+      if (thresholdContainer) thresholdContainer.classList.remove('hidden');
+      if (costPriceContainer) costPriceContainer.classList.remove('hidden');
+      if (sellingPriceLabel) sellingPriceLabel.textContent = 'Selling Price [Rs.] *';
+      if (costPriceInput) costPriceInput.required = true;
+      if (stockInput) {
+        stockInput.required = true;
+        if (!stockInput.value || stockInput.value === '0') stockInput.value = '50';
+      }
+      if (thresholdInput) {
+        thresholdInput.required = true;
+        if (!thresholdInput.value || thresholdInput.value === '0') thresholdInput.value = '5';
+      }
+    }
+  }
+
+  if (itemTypeRadios) {
+    itemTypeRadios.forEach(radio => radio.addEventListener('change', handleItemTypeChange));
+  }
+
+  // Automatic Title Case on input blur (Requirement 4.1)
+  if (nameInput) {
+    nameInput.addEventListener('blur', () => {
+      nameInput.value = toTitleCase(nameInput.value);
+    });
+  }
 
   function resetCatalogForm() {
     form.reset();
     docIdInput.value = '';
-    if (formTitle) formTitle.textContent = 'Add New Catalog Item';
+    const productRadio = form.querySelector('input[name="catalogItemType"][value="product"]');
+    if (productRadio) productRadio.checked = true;
+    handleItemTypeChange();
+    if (formTitle) formTitle.textContent = 'Add New Catalog Item / Service';
     if (saveBtn) saveBtn.textContent = 'Save Item to Catalog';
     if (resetBtn) resetBtn.classList.add('hidden');
-    if (stockInput) stockInput.value = '50';
-    if (thresholdInput) thresholdInput.value = '5';
   }
 
   if (resetBtn) resetBtn.addEventListener('click', resetCatalogForm);
 
+  // Form Submit
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const code = codeInput.value.trim().toUpperCase();
-      const name = nameInput.value.trim();
+      const rawName = nameInput.value.trim();
+      const name = toTitleCase(rawName); // Auto Title Case
       const category = categoryInput ? categoryInput.value.trim() || 'General' : 'General';
-      const costPrice = roundCurrency(costPriceInput.value);
+      const isService = form.querySelector('input[name="catalogItemType"]:checked')?.value === 'service';
+      const itemType = isService ? 'service' : 'product';
+
+      const costPrice = isService ? 0 : roundCurrency(costPriceInput.value);
       const sellingPrice = roundCurrency(sellingPriceInput.value);
-      const stockQuantity = Math.max(0, parseInt(stockInput.value, 10) || 0);
-      const lowStockThreshold = Math.max(0, parseInt(thresholdInput.value, 10) || 5);
+      const stockQuantity = isService ? 0 : Math.max(0, parseInt(stockInput.value, 10) || 0);
+      const lowStockThreshold = isService ? 0 : Math.max(0, parseInt(thresholdInput.value, 10) || 5);
       const editDocId = docIdInput.value;
 
       if (!code || !name) {
         showToast('Please provide both item code and name', 'error');
         return;
       }
-      if (costPrice < 0) {
-        showToast('Getting/Cost price cannot be negative', 'error');
-        return;
-      }
-      if (sellingPrice <= 0) {
-        showToast('Selling price must be greater than zero', 'error');
-        return;
-      }
 
-      // Check unique code
+      // Check duplicate code
       const duplicate = APP_STATE.inventoryCatalog.find(i => i.code === code && i.id !== editDocId);
       if (duplicate) {
-        showToast(`Item Code "${code}" is already assigned to "${duplicate.name}"`, 'error');
+        showToast(`Item Code "${code}" is already in use by "${duplicate.name}"`, 'error');
         return;
       }
 
@@ -3052,6 +2106,7 @@ function setupCatalogManager() {
           code,
           name,
           category,
+          itemType,
           costPrice,
           sellingPrice,
           stockQuantity,
@@ -3061,26 +2116,33 @@ function setupCatalogManager() {
 
         if (editDocId) {
           await updateDoc(doc(db, 'inventory', editDocId), itemPayload);
-          showToast(`Updated item: ${name}`, 'success');
+          showToast(`Updated: ${name}`, 'success');
         } else {
           itemPayload.createdAt = serverTimestamp();
           await addDoc(collection(db, 'inventory'), itemPayload);
-          showToast(`Added item: ${name} (Cost: ${formatLKR(costPrice)} | Sell: ${formatLKR(sellingPrice)})`, 'success');
+          showToast(`Added: ${name} (${isService ? 'Service/Bill' : 'Product'})`, 'success');
         }
         resetCatalogForm();
       } catch (err) {
-        showToast(`Failed to save catalog item: ${err.message}`, 'error');
+        showToast(`Failed to save item: ${err.message}`, 'error');
       }
     });
   }
 
-  if (searchInput) {
-    searchInput.addEventListener('input', renderCatalogTable);
+  if (searchInput) searchInput.addEventListener('input', renderCatalogTable);
+
+  if (sortSelect) {
+    sortSelect.value = APP_STATE.catalogSortOrder;
+    sortSelect.addEventListener('change', () => {
+      APP_STATE.catalogSortOrder = sortSelect.value;
+      renderCatalogTable();
+    });
   }
 
+  // Seed Button
   if (seedBtn) {
     seedBtn.addEventListener('click', async () => {
-      if (!confirm('Seed standard Sri Lankan retail stationery items into catalog with costs & stock? Existing items will not be overwritten.')) return;
+      if (!confirm('Seed standard Sri Lankan retail stationery and utility bills into your catalog? Existing codes will not be overwritten.')) return;
 
       let addedCount = 0;
       for (const item of SAMPLE_SRI_LANKAN_CATALOG) {
@@ -3094,21 +2156,21 @@ function setupCatalogManager() {
             });
             addedCount++;
           } catch (e) {
-            console.error('Seed error', e);
+            console.error('Seed item error', e);
           }
         }
       }
 
       if (addedCount > 0) {
-        showToast(`Successfully seeded ${addedCount} standard stationery products`, 'success');
+        showToast(`Seeded ${addedCount} standard catalog products & utility bills`, 'success');
       } else {
-        showToast('Standard stationery items are already in catalog', 'info');
+        showToast('Standard items are already present in catalog', 'info');
       }
     });
   }
 }
 
-function renderCatalogTable() {
+export function renderCatalogTable() {
   const tbody = document.getElementById('catalogTableBody');
   const searchInput = document.getElementById('catalogSearchInput');
   const queryStr = searchInput ? searchInput.value.trim().toLowerCase() : '';
@@ -3116,17 +2178,20 @@ function renderCatalogTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  const filtered = APP_STATE.inventoryCatalog.filter(item => {
+  let filtered = APP_STATE.inventoryCatalog.filter(item => {
     if (!queryStr) return true;
     return (item.code || '').toLowerCase().includes(queryStr) ||
            (item.name || '').toLowerCase().includes(queryStr) ||
            (item.category || '').toLowerCase().includes(queryStr);
   });
 
+  // Natural Numerical Sorting (Requirement 4.3)
+  filtered = sortCatalogList(filtered, APP_STATE.catalogSortOrder);
+
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" class="py-8 text-center theme-text-dim text-xs">
+        <td colspan="8" class="py-8 text-center theme-text-dim text-xs">
           No catalog records found.
         </td>
       </tr>
@@ -3138,66 +2203,69 @@ function renderCatalogTable() {
     const tr = document.createElement('tr');
     tr.className = 'hover:theme-bg-subtle transition';
 
-    const costDisplay = (item.costPrice !== undefined && item.costPrice > 0)
-      ? `<span class="font-mono font-bold text-amber-400">${formatLKR(item.costPrice)}</span>`
-      : `<span class="badge-cost-missing px-2 py-0.5 rounded text-[10px] font-bold" title="Cost price missing! Please edit to ensure accurate profit tracking.">Cost missing</span>`;
+    const isService = item.itemType === 'service';
+    const typeBadge = isService
+      ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service/Bill</span>`
+      : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">Product</span>`;
 
-    const unitProfit = roundCurrency(item.sellingPrice - (item.costPrice || 0));
-    const profitClass = unitProfit >= 0 ? 'text-emerald-400' : 'text-red-400';
+    const costDisplay = isService ? '<span class="theme-text-dim font-mono">N/A</span>' : `<span class="font-mono font-bold text-amber-400">${formatLKR(item.costPrice)}</span>`;
+    const profitDisplay = isService ? '<span class="theme-text-dim font-mono">Custom</span>' : `<span class="font-mono font-bold text-sky-400">+${formatLKR(item.sellingPrice - item.costPrice)}</span>`;
+    const stockDisplay = isService ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[11px] font-bold">No Qty</span>` : `<span class="font-mono font-bold ${item.stockQuantity <= 5 ? 'text-red-400' : 'theme-text-main'}">${item.stockQuantity}</span>`;
 
     tr.innerHTML = `
-      <td class="py-2.5 px-3 font-mono font-bold text-sky-400 text-xs">${item.code}</td>
-      <td class="py-2.5 px-3 font-medium theme-text-main text-xs">
-        <div>${item.name}</div>
-        <div class="text-[10px] theme-text-dim">${item.category || 'General'}</div>
+      <td class="py-2.5 px-3 font-mono font-bold text-xs theme-text-main">${escapeHTML(item.code)}</td>
+      <td class="py-2.5 px-3">
+        <div class="font-bold text-xs theme-text-main">${escapeHTML(item.name)}</div>
+        <div class="text-[10px] theme-text-dim">${escapeHTML(item.category || 'General')}</div>
       </td>
-      <td class="py-2.5 px-3 text-right font-mono text-xs">${costDisplay}</td>
-      <td class="py-2.5 px-3 text-right font-mono font-bold text-xs theme-text-main">${formatLKR(item.sellingPrice)}</td>
-      <td class="py-2.5 px-3 text-right font-mono font-bold text-xs ${profitClass}">+${formatLKR(unitProfit)}</td>
-      <td class="py-2.5 px-3 text-center font-mono font-bold text-xs">${item.stockQuantity}</td>
-      <td class="py-2.5 px-3 text-center whitespace-nowrap space-x-1">
-        <button type="button" data-edit-catalog="${item.id}" class="p-1 text-sky-400 hover:text-sky-300 transition" title="Edit Catalog Item">
-          <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-        </button>
-        <button type="button" data-delete-catalog="${item.id}" class="p-1 text-red-400 hover:text-red-300 transition" title="Delete Catalog Item">
-          <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
+      <td class="py-2.5 px-3">${typeBadge}</td>
+      <td class="py-2.5 px-3 text-right text-xs">${costDisplay}</td>
+      <td class="py-2.5 px-3 text-right text-xs font-mono font-bold text-emerald-400">${formatLKR(item.sellingPrice)}</td>
+      <td class="py-2.5 px-3 text-right text-xs">${profitDisplay}</td>
+      <td class="py-2.5 px-3 text-center text-xs">${stockDisplay}</td>
+      <td class="py-2.5 px-3 text-center">
+        <div class="flex items-center justify-center gap-1.5">
+          <button type="button" class="edit-cat-btn px-2 py-1 rounded bg-sky-500/15 text-sky-400 hover:bg-sky-500 hover:text-white text-[11px] font-bold transition">Edit</button>
+          <button type="button" class="del-cat-btn px-2 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-[11px] font-bold transition">Delete</button>
+        </div>
       </td>
     `;
 
     // Edit Item
-    const editBtn = tr.querySelector(`[data-edit-catalog="${item.id}"]`);
+    const editBtn = tr.querySelector('.edit-cat-btn');
     if (editBtn) {
       editBtn.addEventListener('click', () => {
         document.getElementById('catalogDocId').value = item.id;
         document.getElementById('catalogCode').value = item.code;
         document.getElementById('catalogName').value = item.name;
-        document.getElementById('catalogCategory').value = item.category || 'General';
-        document.getElementById('catalogCostPrice').value = Number(item.costPrice || 0).toFixed(2);
-        document.getElementById('catalogSellingPrice').value = Number(item.sellingPrice).toFixed(2);
-        document.getElementById('catalogStockQuantity').value = item.stockQuantity;
+        document.getElementById('catalogCategory').value = item.category || '';
+        document.getElementById('catalogCostPrice').value = item.costPrice || 0;
+        document.getElementById('catalogSellingPrice').value = item.sellingPrice || 0;
+        document.getElementById('catalogStockQuantity').value = item.stockQuantity || 0;
         document.getElementById('catalogLowStockThreshold').value = item.lowStockThreshold || 5;
 
-        const formTitle = document.getElementById('catalogFormTitle');
-        const saveBtn = document.getElementById('catalogSaveBtn');
-        const resetBtn = document.getElementById('catalogResetFormBtn');
+        const isServ = item.itemType === 'service';
+        const typeRadio = document.querySelector(`input[name="catalogItemType"][value="${isServ ? 'service' : 'product'}"]`);
+        if (typeRadio) {
+          typeRadio.checked = true;
+          typeRadio.dispatchEvent(new Event('change'));
+        }
 
-        if (formTitle) formTitle.textContent = `Edit Catalog Item (${item.code})`;
-        if (saveBtn) saveBtn.textContent = 'Update Catalog Item';
-        if (resetBtn) resetBtn.classList.remove('hidden');
-
+        document.getElementById('catalogFormTitle').textContent = `Edit Catalog Item: ${item.code}`;
+        document.getElementById('catalogSaveBtn').textContent = 'Update Item';
+        document.getElementById('catalogResetFormBtn').classList.remove('hidden');
         document.getElementById('catalogCode').focus();
       });
     }
 
     // Delete Item
-    const delBtn = tr.querySelector(`[data-delete-catalog="${item.id}"]`);
+    const delBtn = tr.querySelector('.del-cat-btn');
     if (delBtn) {
       delBtn.addEventListener('click', async () => {
-        if (!confirm(`Delete catalog item "${item.name}" (${item.code})? Historical transaction logs will remain preserved.`)) return;
+        if (!confirm(`Delete "${item.name}" (${item.code}) from master inventory catalog?`)) return;
         try {
           await deleteDoc(doc(db, 'inventory', item.id));
-          showToast(`Deleted ${item.name}`, 'info');
+          showToast(`Deleted ${item.name}`, 'success');
         } catch (err) {
           showToast(`Delete failed: ${err.message}`, 'error');
         }
@@ -3209,181 +2277,606 @@ function renderCatalogTable() {
 }
 
 // =============================================================================
-// 17. COMMISSION RATES & DEVELOPER DIAGNOSTICS
+// 16. SETTINGS BACKUP & RESTORE SYSTEM (Requirement 6.1)
 // =============================================================================
 
-function setupRatesManager() {
-  const form = document.getElementById('commissionsForm');
-  if (form) {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const airtel = roundCurrency(document.getElementById('rateAirtelInput').value);
-      const dialog = roundCurrency(document.getElementById('rateDialogInput').value);
-      const mobitel = roundCurrency(document.getElementById('rateMobitelInput').value);
-      const hutch = roundCurrency(document.getElementById('rateHutchInput').value);
+function updateBackupStatusDisplay() {
+  const statCatalog = document.getElementById('backupStatCatalogCount');
+  const statPresets = document.getElementById('backupStatPresetCount');
+  const statLastSaved = document.getElementById('backupStatLastSaved');
+  const badge = document.getElementById('backupStatusBadge');
+
+  if (statCatalog) statCatalog.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
+  if (statPresets) statPresets.textContent = `${APP_STATE.reloadPresets.length} Presets`;
+
+  const savedRaw = localStorage.getItem('al_settings_backup_snapshot');
+  if (savedRaw) {
+    try {
+      const snap = JSON.parse(savedRaw);
+      if (statLastSaved) statLastSaved.textContent = snap.formattedDate || snap.timestamp?.substring(0, 16) || 'Saved';
+      if (badge) {
+        badge.textContent = `Snapshot Ready (${snap.catalog?.length || 0} items)`;
+        badge.className = 'text-xs px-2.5 py-1 rounded-full font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+      }
+    } catch (e) {
+      if (statLastSaved) statLastSaved.textContent = 'Invalid snapshot';
+    }
+  } else {
+    if (statLastSaved) statLastSaved.textContent = 'None saved yet';
+    if (badge) {
+      badge.textContent = 'No Snapshot Stored';
+      badge.className = 'text-xs px-2.5 py-1 rounded-full font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20';
+    }
+  }
+}
+
+function createConfigurationSnapshot() {
+  return {
+    version: '5.0',
+    appName: 'AL Communication',
+    timestamp: new Date().toISOString(),
+    formattedDate: new Date().toLocaleString(),
+    catalog: APP_STATE.inventoryCatalog.map(item => ({
+      code: item.code,
+      name: item.name,
+      category: item.category || 'General',
+      itemType: item.itemType || 'product',
+      costPrice: Number(item.costPrice) || 0,
+      sellingPrice: Number(item.sellingPrice) || 0,
+      stockQuantity: Number(item.stockQuantity) || 0,
+      lowStockThreshold: Number(item.lowStockThreshold) || 5
+    })),
+    commissionRates: { ...APP_STATE.commissionRates },
+    reloadPresets: [...APP_STATE.reloadPresets],
+    activeTheme: APP_STATE.activeTheme
+  };
+}
+
+export async function applyConfigurationBackup(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') {
+    showToast('Invalid backup file or snapshot structure', 'error');
+    return false;
+  }
+
+  try {
+    // 1. Restore Commission Rates
+    if (snapshot.commissionRates) {
+      APP_STATE.commissionRates = { ...snapshot.commissionRates };
+      await setDoc(doc(db, 'settings', 'rates'), APP_STATE.commissionRates, { merge: true });
+    }
+
+    // 2. Restore Reload Presets
+    if (Array.isArray(snapshot.reloadPresets)) {
+      APP_STATE.reloadPresets = [...snapshot.reloadPresets];
+      await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
+      renderPresetPills();
+    }
+
+    // 3. Restore Theme
+    if (snapshot.activeTheme) {
+      applyTheme(snapshot.activeTheme);
+    }
+
+    // 4. Restore / Sync Catalog Items in Firestore
+    if (Array.isArray(snapshot.catalog)) {
+      let restoredCount = 0;
+      for (const item of snapshot.catalog) {
+        if (!item.code || !item.name) continue;
+        const existing = APP_STATE.inventoryCatalog.find(i => i.code === item.code);
+        const itemData = {
+          code: item.code,
+          name: toTitleCase(item.name),
+          category: item.category || 'General',
+          itemType: item.itemType || 'product',
+          costPrice: Number(item.costPrice) || 0,
+          sellingPrice: Number(item.sellingPrice) || 0,
+          stockQuantity: item.itemType === 'service' ? 0 : (Number(item.stockQuantity) || 0),
+          lowStockThreshold: item.itemType === 'service' ? 0 : (Number(item.lowStockThreshold) || 5),
+          updatedAt: serverTimestamp()
+        };
+
+        if (existing && existing.id) {
+          await updateDoc(doc(db, 'inventory', existing.id), itemData);
+        } else {
+          itemData.createdAt = serverTimestamp();
+          await addDoc(collection(db, 'inventory'), itemData);
+        }
+        restoredCount++;
+      }
+      showToast(`Restored configuration: ${restoredCount} catalog items, rates & presets`, 'success');
+    }
+
+    updateBackupStatusDisplay();
+    renderCatalogTable();
+    renderStockTable();
+    updateDashboardMetrics();
+    return true;
+  } catch (err) {
+    logDebug(`Restore error: ${err.message}`, 'ERROR');
+    showToast(`Restore failed: ${err.message}`, 'error');
+    return false;
+  }
+}
+
+function initBackupRestoreSystem() {
+  const saveSnapshotBtn = document.getElementById('backupSaveSnapshotBtn');
+  const downloadJsonBtn = document.getElementById('backupDownloadJsonBtn');
+  const restoreSnapshotBtn = document.getElementById('backupRestoreSnapshotBtn');
+  const uploadInput = document.getElementById('backupUploadInput');
+
+  // Save Snapshot to localStorage
+  if (saveSnapshotBtn) {
+    saveSnapshotBtn.addEventListener('click', () => {
+      const snap = createConfigurationSnapshot();
+      localStorage.setItem('al_settings_backup_snapshot', JSON.stringify(snap));
+      updateBackupStatusDisplay();
+      showToast(`Snapshot saved to local storage (${snap.catalog.length} items)`, 'success');
+    });
+  }
+
+  // Download .JSON Backup File
+  if (downloadJsonBtn) {
+    downloadJsonBtn.addEventListener('click', () => {
+      const snap = createConfigurationSnapshot();
+      const jsonStr = JSON.stringify(snap, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `AL_Communication_Backup_${getTodayDateString()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Downloaded .JSON backup file', 'success');
+    });
+  }
+
+  // Restore from localStorage Snapshot
+  if (restoreSnapshotBtn) {
+    restoreSnapshotBtn.addEventListener('click', async () => {
+      const savedRaw = localStorage.getItem('al_settings_backup_snapshot');
+      if (!savedRaw) {
+        showToast('No saved snapshot found in local storage. Save one first or upload a JSON backup file.', 'error');
+        return;
+      }
 
       try {
-        await setDoc(doc(db, 'settings', 'commissions'), {
-          airtel,
-          dialog,
-          mobitel,
-          hutch,
-          updatedAt: serverTimestamp()
-        });
-        showToast('Commission percentages saved', 'success');
-      } catch (err) {
-        showToast(`Failed to save rates: ${err.message}`, 'error');
+        const snap = JSON.parse(savedRaw);
+        const confirmMsg = `Restore configuration snapshot saved on ${snap.formattedDate || 'earlier'}?\nThis will restore ${snap.catalog?.length || 0} catalog items, network commissions, and reload presets.`;
+        if (!confirm(confirmMsg)) return;
+
+        await applyConfigurationBackup(snap);
+      } catch (e) {
+        showToast(`Failed to parse stored snapshot: ${e.message}`, 'error');
       }
+    });
+  }
+
+  // Upload and Restore from JSON file
+  if (uploadInput) {
+    uploadInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const snap = JSON.parse(evt.target.result);
+          if (!snap.catalog && !snap.commissionRates) {
+            throw new Error('Unrecognized backup format. Missing catalog or rates.');
+          }
+
+          if (confirm(`Restore configuration from "${file.name}" (${snap.catalog?.length || 0} items)?`)) {
+            await applyConfigurationBackup(snap);
+          }
+        } catch (err) {
+          showToast(`Invalid backup file: ${err.message}`, 'error');
+        } finally {
+          uploadInput.value = '';
+        }
+      };
+      reader.readAsText(file);
     });
   }
 }
 
-function setupDeveloperConsole() {
+// =============================================================================
+// 17. SETTINGS PRESETS, COMMISSIONS & SECURITY FORMS
+// =============================================================================
+
+function initSettingsPanels() {
+  // Preset Amounts Manager
+  const addPresetForm = document.getElementById('addPresetForm');
+  const resetPresetsBtn = document.getElementById('resetPresetsDefaultBtn');
+
+  function renderSettingsPresetsTags() {
+    const list = document.getElementById('settingsPresetsList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    APP_STATE.reloadPresets.sort((a, b) => a - b).forEach(val => {
+      const span = document.createElement('span');
+      span.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border theme-border theme-bg-surface text-xs font-bold font-mono';
+      span.innerHTML = `
+        <span>Rs. ${val}</span>
+        <button type="button" class="del-preset-btn text-red-400 hover:text-red-300 ml-1 text-sm font-bold">✕</button>
+      `;
+      span.querySelector('.del-preset-btn')?.addEventListener('click', async () => {
+        APP_STATE.reloadPresets = APP_STATE.reloadPresets.filter(p => p !== val);
+        await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
+        renderSettingsPresetsTags();
+        renderPresetPills();
+        showToast(`Removed preset Rs. ${val}`, 'info');
+      });
+      list.appendChild(span);
+    });
+  }
+
+  renderSettingsPresetsTags();
+
+  if (addPresetForm) {
+    addPresetForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('newPresetAmountInput');
+      const val = parseInt(input?.value, 10);
+      if (!val || val < 10) return;
+
+      if (!APP_STATE.reloadPresets.includes(val)) {
+        APP_STATE.reloadPresets.push(val);
+        await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
+        renderSettingsPresetsTags();
+        renderPresetPills();
+        showToast(`Added preset Rs. ${val}`, 'success');
+      }
+      input.value = '';
+    });
+  }
+
+  if (resetPresetsBtn) {
+    resetPresetsBtn.addEventListener('click', async () => {
+      APP_STATE.reloadPresets = [50, 100, 200, 500, 1000];
+      await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
+      renderSettingsPresetsTags();
+      renderPresetPills();
+      showToast('Reset presets to default', 'info');
+    });
+  }
+
+  // Commission Rates Form
+  const commForm = document.getElementById('commissionsForm');
+  if (commForm) {
+    commForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const airtel = parseFloat(document.getElementById('rateAirtelInput')?.value) || 6.80;
+      const dialog = parseFloat(document.getElementById('rateDialogInput')?.value) || 3.80;
+      const mobitel = parseFloat(document.getElementById('rateMobitelInput')?.value) || 6.80;
+      const hutch = parseFloat(document.getElementById('rateHutchInput')?.value) || 5.00;
+
+      APP_STATE.commissionRates = { AIRTEL: airtel, DIALOG: dialog, MOBITEL: mobitel, HUTCH: hutch };
+
+      try {
+        await setDoc(doc(db, 'settings', 'rates'), APP_STATE.commissionRates, { merge: true });
+        // Update badges in reload view
+        const bAirtel = document.getElementById('rateBadgeAirtel');
+        const bDialog = document.getElementById('rateBadgeDialog');
+        const bMobitel = document.getElementById('rateBadgeMobitel');
+        const bHutch = document.getElementById('rateBadgeHutch');
+        if (bAirtel) bAirtel.textContent = `${airtel.toFixed(2)}%`;
+        if (bDialog) bDialog.textContent = `${dialog.toFixed(2)}%`;
+        if (bMobitel) bMobitel.textContent = `${mobitel.toFixed(2)}%`;
+        if (bHutch) bHutch.textContent = `${hutch.toFixed(2)}%`;
+        showToast('Commission rates saved', 'success');
+      } catch (err) {
+        showToast(`Save failed: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  // Account Security Form (Email & Password Updates)
+  const updateEmailForm = document.getElementById('updateEmailForm');
+  if (updateEmailForm) {
+    updateEmailForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const newEmail = document.getElementById('newEmailInput')?.value.trim();
+      if (!newEmail || !auth.currentUser) return;
+      try {
+        await updateEmail(auth.currentUser, newEmail);
+        showToast(`Email updated to ${newEmail}`, 'success');
+        const badge = document.getElementById('userEmailBadge');
+        if (badge) badge.textContent = newEmail;
+        updateEmailForm.reset();
+      } catch (err) {
+        showToast(`Email update failed: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  const updatePasswordForm = document.getElementById('updatePasswordForm');
+  if (updatePasswordForm) {
+    updatePasswordForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pass = document.getElementById('newPasswordInput')?.value;
+      const confirmPass = document.getElementById('confirmPasswordInput')?.value;
+      if (pass !== confirmPass) {
+        showToast('Passwords do not match', 'error');
+        return;
+      }
+      try {
+        await updatePassword(auth.currentUser, pass);
+        showToast('Master password updated successfully', 'success');
+        updatePasswordForm.reset();
+      } catch (err) {
+        showToast(`Password update failed: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  // Sign Out
+  const signOutBtn = document.getElementById('signOutBtn');
+  if (signOutBtn) {
+    signOutBtn.addEventListener('click', async () => {
+      try {
+        await signOut(auth);
+        showToast('Signed out of session', 'info');
+      } catch (err) {
+        showToast(`Sign out notice: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  // Diagnostics Drawer
   const devToggle = document.getElementById('devConsoleToggle');
   const devBody = document.getElementById('devConsoleBody');
-  const testWriteBtn = document.getElementById('dbgTestWriteBtn');
-  const exportDataBtn = document.getElementById('dbgExportDataBtn');
-  const clearCacheBtn = document.getElementById('dbgClearCacheBtn');
-  const clearLogsBtn = document.getElementById('dbgClearLogsBtn');
-
   if (devToggle && devBody) {
-    devToggle.addEventListener('click', () => {
-      devBody.classList.toggle('hidden');
-    });
+    devToggle.addEventListener('click', () => devBody.classList.toggle('hidden'));
   }
 
-  if (testWriteBtn) {
-    testWriteBtn.addEventListener('click', async () => {
+  const dbgTestWrite = document.getElementById('dbgTestWriteBtn');
+  if (dbgTestWrite) {
+    dbgTestWrite.addEventListener('click', async () => {
       try {
-        const start = performance.now();
-        const testRef = await addDoc(collection(db, 'diagnostics'), {
-          test: true,
-          timestamp: serverTimestamp(),
-          agent: navigator.userAgent
+        await addDoc(collection(db, 'diagnostics'), {
+          test: 'AL Communication v5.0 Cloud Write',
+          timestamp: serverTimestamp()
         });
-        await deleteDoc(testRef);
-        const latency = Math.round(performance.now() - start);
-        showToast(`Cloud round-trip test successful (${latency}ms)`, 'success');
-        logDebug(`Diagnostic test write succeeded in ${latency}ms`, 'SUCCESS');
-      } catch (err) {
-        showToast(`Diagnostic test failed: ${err.message}`, 'error');
-        logDebug(`Diagnostic test failed: ${err.message}`, 'ERROR');
+        showToast('Cloud Firestore write test passed!', 'success');
+      } catch (e) {
+        showToast(`Cloud write test failed: ${e.message}`, 'error');
       }
     });
   }
 
-  if (exportDataBtn) {
-    exportDataBtn.addEventListener('click', () => {
-      const exportObject = {
-        exportedAt: new Date().toISOString(),
-        system: 'AL Communication Ledger v3.1',
-        catalog: APP_STATE.inventoryCatalog,
-        stationeryTransactions: APP_STATE.masterStationeryRecords,
-        reloadTransactions: APP_STATE.masterReloadRecords,
-        commissionRates: APP_STATE.commissionRates,
-        reloadPresets: APP_STATE.reloadPresets,
-        dashboardCardOrder: APP_STATE.dashboardCardOrder
-      };
-
-      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportObject, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute('href', dataStr);
-      downloadAnchor.setAttribute('download', `al-communication-backup-${getTodayDateString()}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-
-      showToast('Exported full database backup (JSON)', 'success');
-    });
-  }
-
-  if (clearCacheBtn) {
-    clearCacheBtn.addEventListener('click', () => {
-      if (confirm('Clear local application cache and layout preferences?')) {
-        localStorage.removeItem('al_dashboard_order');
-        localStorage.removeItem('al_metrics_order');
-        localStorage.removeItem('al_metrics_sizes');
-        localStorage.removeItem('al_theme');
-        localStorage.removeItem('al_ui_style');
-        showToast('Local application storage preferences cleared', 'info');
-      }
-    });
-  }
-
-  if (clearLogsBtn) {
-    clearLogsBtn.addEventListener('click', () => {
+  const dbgClearLogs = document.getElementById('dbgClearLogsBtn');
+  if (dbgClearLogs) {
+    dbgClearLogs.addEventListener('click', () => {
       APP_STATE.devLogs = [];
-      const term = document.getElementById('dbgTerminalLogs');
-      if (term) term.innerHTML = '<div class="text-gray-500">[System] Logs cleared.</div>';
+      const terminal = document.getElementById('dbgTerminalLogs');
+      if (terminal) terminal.innerHTML = '<div class="text-emerald-400">[System] Terminal cleared.</div>';
     });
-  }
-}
-
-function updateCacheMetrics() {
-  const healthEl = document.getElementById('dbgFirestoreHealth');
-  const authEl = document.getElementById('dbgAuthState');
-  const cacheEl = document.getElementById('dbgCacheMetrics');
-
-  if (healthEl) {
-    healthEl.textContent = isFirebaseInitialized ? 'Online & Connected' : `Init Failure: ${initError || 'Config error'}`;
-    healthEl.className = isFirebaseInitialized ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold';
-  }
-
-  if (authEl) {
-    authEl.textContent = APP_STATE.currentUser ? `Logged In (${APP_STATE.currentUser.email})` : 'Unauthenticated';
-  }
-
-  if (cacheEl) {
-    const totalRecords = APP_STATE.masterStationeryRecords.length + APP_STATE.masterReloadRecords.length;
-    cacheEl.textContent = `${APP_STATE.inventoryCatalog.length} catalog items • ${totalRecords} cached logs`;
   }
 }
 
 // =============================================================================
-// 18. APPLICATION BOOTSTRAP INITIALIZATION
+// 18. AUTHENTICATION & SESSION PERSISTENCE (Requirement 7)
+// =============================================================================
+
+function initAuthentication() {
+  const gateScreen = document.getElementById('authGateScreen');
+  const loginScreen = document.getElementById('loginScreen');
+  const appShell = document.getElementById('appShell');
+  const loginForm = document.getElementById('loginForm');
+  const loginAlert = document.getElementById('loginAlert');
+  const togglePassBtn = document.getElementById('togglePasswordBtn');
+  const passInput = document.getElementById('loginPassword');
+  const forgotPassBtn = document.getElementById('forgotPasswordBtn');
+  const resetModal = document.getElementById('passwordResetModal');
+  const closeResetBtn = document.getElementById('closeResetModalBtn');
+  const cancelResetBtn = document.getElementById('cancelResetBtn');
+  const resetForm = document.getElementById('passwordResetForm');
+
+  if (togglePassBtn && passInput) {
+    togglePassBtn.addEventListener('click', () => {
+      passInput.type = passInput.type === 'password' ? 'text' : 'password';
+    });
+  }
+
+  if (forgotPassBtn && resetModal) {
+    forgotPassBtn.addEventListener('click', () => resetModal.classList.remove('hidden'));
+  }
+  if (closeResetBtn && resetModal) {
+    closeResetBtn.addEventListener('click', () => resetModal.classList.add('hidden'));
+  }
+  if (cancelResetBtn && resetModal) {
+    cancelResetBtn.addEventListener('click', () => resetModal.classList.add('hidden'));
+  }
+
+  if (resetForm) {
+    resetForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('resetEmailInput')?.value.trim();
+      if (!email) return;
+      try {
+        await sendPasswordResetEmail(auth, email);
+        showToast(`Password reset link sent to ${email}`, 'success');
+        resetModal?.classList.add('hidden');
+      } catch (err) {
+        showToast(`Reset error: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  // Firebase Auth State Listener (Persistent)
+  onAuthStateChanged(auth, (user) => {
+    if (gateScreen) gateScreen.classList.add('hidden');
+
+    if (user) {
+      APP_STATE.currentUser = user;
+      if (loginScreen) loginScreen.classList.add('hidden');
+      if (appShell) appShell.classList.remove('hidden');
+
+      const userBadge = document.getElementById('userEmailBadge');
+      if (userBadge) userBadge.textContent = user.email || 'Store Owner';
+
+      logDebug(`Persistent session confirmed: ${user.email}`);
+      initCloudSyncListeners();
+    } else {
+      APP_STATE.currentUser = null;
+      if (appShell) appShell.classList.add('hidden');
+      if (loginScreen) loginScreen.classList.remove('hidden');
+      logDebug('Awaiting owner authentication...');
+    }
+  });
+
+  // Login Submit
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail')?.value.trim();
+      const password = document.getElementById('loginPassword')?.value;
+      const btnText = document.getElementById('loginBtnText');
+      const spinner = document.getElementById('loginBtnSpinner');
+
+      if (!email || !password) return;
+
+      if (loginAlert) loginAlert.classList.add('hidden');
+      if (btnText) btnText.textContent = 'Verifying Credentials...';
+      if (spinner) spinner.classList.remove('hidden');
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        showToast('Login successful. Session established.', 'success');
+      } catch (err) {
+        if (loginAlert) {
+          loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-red-500/15 border border-red-500/30 text-red-400 block';
+          loginAlert.textContent = `Authentication Failed: ${err.message}`;
+        }
+        showToast(`Login failed: ${err.message}`, 'error');
+      } finally {
+        if (btnText) btnText.textContent = 'Sign In to Counter Ledger';
+        if (spinner) spinner.classList.add('hidden');
+      }
+    });
+  }
+}
+
+// =============================================================================
+// 19. REAL-TIME FIRESTORE CLOUD LISTENERS
+// =============================================================================
+
+function initCloudSyncListeners() {
+  const todayStr = getTodayDateString();
+
+  // 1. Inventory Catalog Listener
+  onSnapshot(collection(db, 'inventory'), (snapshot) => {
+    const items = [];
+    snapshot.forEach(docSnap => {
+      items.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    APP_STATE.inventoryCatalog = items;
+    renderStockTable();
+    renderCatalogTable();
+    updateDashboardMetrics();
+    updateBackupStatusDisplay();
+    logDebug(`Inventory catalog updated: ${items.length} records`);
+  }, (err) => {
+    logDebug(`Catalog sync notice: ${err.message}`, 'WARN');
+  });
+
+  // 2. Today's Stationery & Bills Listener
+  const statQuery = query(
+    collection(db, 'stationery_transactions'),
+    where('date', '==', todayStr)
+  );
+  onSnapshot(statQuery, (snapshot) => {
+    const txs = [];
+    snapshot.forEach(docSnap => {
+      txs.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    txs.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+    APP_STATE.todayStationeryTransactions = txs;
+    renderRecentStationeryFeed();
+    updateDashboardMetrics();
+  }, (err) => {
+    logDebug(`Stationery sync notice: ${err.message}`, 'WARN');
+  });
+
+  // 3. Today's Reloads Listener
+  const reloadQuery = query(
+    collection(db, 'reload_transactions'),
+    where('date', '==', todayStr)
+  );
+  onSnapshot(reloadQuery, (snapshot) => {
+    const reloads = [];
+    snapshot.forEach(docSnap => {
+      reloads.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    reloads.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+    APP_STATE.todayReloadTransactions = reloads;
+    renderRecentReloadsFeed();
+    updateDashboardMetrics();
+  }, (err) => {
+    logDebug(`Reloads sync notice: ${err.message}`, 'WARN');
+  });
+
+  // 4. Master All-Time Records (For Ledger & PDF)
+  onSnapshot(collection(db, 'stationery_transactions'), (snapshot) => {
+    const list = [];
+    snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
+    APP_STATE.masterStationeryRecords = list;
+    applyMasterLogFilters();
+  });
+
+  onSnapshot(collection(db, 'reload_transactions'), (snapshot) => {
+    const list = [];
+    snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
+    APP_STATE.masterReloadRecords = list;
+    applyMasterLogFilters();
+  });
+
+  // 5. System Settings Listener (Rates & Presets)
+  onSnapshot(doc(db, 'settings', 'rates'), (docSnap) => {
+    if (docSnap.exists()) {
+      APP_STATE.commissionRates = { ...APP_STATE.commissionRates, ...docSnap.data() };
+      const bA = document.getElementById('rateBadgeAirtel');
+      const bD = document.getElementById('rateBadgeDialog');
+      const bM = document.getElementById('rateBadgeMobitel');
+      const bH = document.getElementById('rateBadgeHutch');
+      if (bA) bA.textContent = `${(APP_STATE.commissionRates.AIRTEL || 6.8).toFixed(2)}%`;
+      if (bD) bD.textContent = `${(APP_STATE.commissionRates.DIALOG || 3.8).toFixed(2)}%`;
+      if (bM) bM.textContent = `${(APP_STATE.commissionRates.MOBITEL || 6.8).toFixed(2)}%`;
+      if (bH) bH.textContent = `${(APP_STATE.commissionRates.HUTCH || 5.0).toFixed(2)}%`;
+      updateReloadCommissionPreview();
+    }
+  });
+
+  onSnapshot(doc(db, 'settings', 'presets'), (docSnap) => {
+    if (docSnap.exists() && Array.isArray(docSnap.data()?.list)) {
+      APP_STATE.reloadPresets = docSnap.data().list;
+      renderPresetPills();
+    }
+  });
+}
+
+// =============================================================================
+// 20. BOOTSTRAP INITIALIZATION
 // =============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  logDebug('AL Communication System Initializing (V3.1 Profit & Glass Engine)...', 'INFO');
+  logDebug('AL Communication System Initializing (V5.0 High-Contrast Modern Default UI)...', 'INFO');
 
-  // 1. Theme and UI Style Setup
-  initThemeAndStyle();
-
-  // 2. Glass Click Ripple
-  initGlassRippleFeedback();
-
-  // 3. Live Clock & Online Status
+  initThemeSystem();
   startLiveClock();
-  initNetworkMonitor();
-
-  // 4. Navigation & View Routing
   initNavigation();
+  initGlobalSearch();
+  initStationeryPOS();
+  initMobileReloads();
+  initStockInventory();
+  initMasterLogs();
+  initSettingsCatalog();
+  initSettingsPanels();
+  initBackupRestoreSystem();
+  initAuthentication();
 
-  // 5. Presets Management Controls
-  setupPresetControls();
-
-  // 6. Stationery POS Module
-  setupStationeryModule();
-
-  // 7. Mobile Reloads Module
-  setupReloadModule();
-
-  // 8. Stock Inventory Module
-  setupStockModule();
-
-  // 9. Dashboard Drag-and-Drop Controller
-  setupDashboardDragAndDrop();
-
-  // 10. Master Logs & Consolidated Financials
-  setupMasterLogsModule();
-
-  // 11. Settings Managers (Catalog, Rates, Developer)
-  setupCatalogManager();
-  setupRatesManager();
-  setupDeveloperConsole();
-
-  // 12. Auth Flow Initiation
-  setupAuth();
-
-  logDebug('AL Communication System Bootstrap Complete (V3.1).', 'SUCCESS');
+  logDebug('AL Communication System v5.0 Ready.', 'SUCCESS');
 });

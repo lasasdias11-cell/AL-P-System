@@ -1,3 +1,7 @@
+// =============================================================================
+// AL COMMUNICATION — CLOUD FIRESTORE SECURITY RULES (VERSION 5.0)
+// Single-Owner Production Authorization & Strict Data Validations
+// =============================================================================
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -24,7 +28,7 @@ service cloud.firestore {
       return val is number && val >= 0;
     }
 
-    // 1. Master Inventory Catalog Collection
+    // 1. Master Inventory Catalog Collection (Physical Products & Services/Bills)
     match /inventory/{itemId} {
       allow read: if isAuthorizedUser();
       allow create, update: if isAuthorizedUser() &&
@@ -33,12 +37,11 @@ service cloud.firestore {
         request.resource.data.itemName is string &&
         request.resource.data.itemName.size() > 0 &&
         isValidPrice(request.resource.data.sellingPrice) &&
-        isValidPrice(request.resource.data.costPrice) &&
-        request.resource.data.stockQuantity is number;
+        isValidPrice(request.resource.data.costPrice);
       allow delete: if isAuthorizedUser();
     }
 
-    // 2. Stationery Daily Sales & Profit Logs
+    // 2. Stationery Daily Sales, Bills & Profit Logs
     match /stationery_transactions/{transactionId} {
       allow read: if isAuthorizedUser();
       allow create: if isAuthorizedUser() &&
@@ -72,7 +75,7 @@ service cloud.firestore {
       allow update, delete: if isAuthorizedUser();
     }
 
-    // 4. System Settings & Custom Preferences (Rates, Presets, Card Order)
+    // 4. System Settings, Snapshots, Backups & Preferences
     match /settings/{settingDoc} {
       allow read, write: if isAuthorizedUser();
     }
