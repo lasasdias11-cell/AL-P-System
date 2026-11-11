@@ -7,10 +7,10 @@
   <meta name="description" content="Production-ready retail point of sale, mobile reloads ledger, inventory management, utility bills and financial profit tracking for AL Communication.">
   <meta name="theme-color" content="#0b1120">
 
-  <!-- Inter & JetBrains Mono Fonts -->
+  <!-- Inter, Plus Jakarta Sans & Outfit Rounded Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -21,6 +21,8 @@
         extend: {
           fontFamily: {
             sans: ['Inter', 'sans-serif'],
+            rounded: ['Plus Jakarta Sans', 'Outfit', 'sans-serif'],
+            display: ['Outfit', 'Plus Jakarta Sans', 'sans-serif'],
             mono: ['JetBrains Mono', 'monospace'],
           }
         }
@@ -32,7 +34,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-  <!-- App Styles (Version 5.0 High-Contrast Modern Default UI) -->
+  <!-- App Styles (Version 5.1 Rounded Typography & Expandable Search) -->
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body class="theme-bg-app theme-text-main antialiased selection:bg-sky-500 selection:text-white pb-24 md:pb-6 relative overflow-x-hidden min-h-screen">
@@ -44,7 +46,7 @@
     <div class="w-16 h-16 rounded-2xl p-1 mb-4 theme-bg-surface border theme-border flex items-center justify-center shadow-lg">
       <img src="./images/logo.png" alt="AL Communication Logo" class="brand-logo-img w-12 h-12">
     </div>
-    <div class="text-xl font-bold tracking-tight theme-text-main">AL Communication</div>
+    <div class="text-xl font-bold tracking-tight theme-text-main font-rounded">AL Communication</div>
     <div class="text-xs theme-text-muted mt-2 font-mono flex items-center gap-2">
       <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
       <span>Verifying Secure Session...</span>
@@ -62,7 +64,7 @@
         <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl theme-bg-subtle border theme-border mb-3 shadow-md">
           <img src="./images/logo.png" alt="AL Communication" class="w-12 h-12 object-contain">
         </div>
-        <h1 class="text-2xl font-bold tracking-tight theme-text-main">AL Communication</h1>
+        <h1 class="text-2xl font-bold tracking-tight theme-text-main font-rounded">AL Communication</h1>
         <p class="text-xs theme-text-muted mt-1">Retail Stationery, Utility Bills & Mobile Reload Ledger</p>
       </div>
 
@@ -72,7 +74,7 @@
       <!-- Authentication Form -->
       <form id="loginForm" class="space-y-4">
         <div>
-          <label for="loginEmail" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5">Email</label>
+          <label for="loginEmail" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5 font-rounded">Email</label>
           <div class="relative">
             <input 
               type="email" 
@@ -90,7 +92,7 @@
         </div>
 
         <div>
-          <label for="loginPassword" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5">Password</label>
+          <label for="loginPassword" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5 font-rounded">Password</label>
           <div class="relative">
             <input 
               type="password" 
@@ -117,7 +119,7 @@
         <button 
           type="submit" 
           id="loginSubmitBtn"
-          class="w-full py-3.5 px-4 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer btn-action"
+          class="w-full py-3.5 px-4 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer btn-action font-rounded"
         >
           <span id="loginBtnText">Sign In to Counter Ledger</span>
           <span id="loginBtnSpinner" class="hidden animate-spin">
@@ -135,12 +137,12 @@
       <!-- Optional Custom API Key Drawer -->
       <div class="mt-6 pt-4 border-t theme-border text-center">
         <details class="text-[11px] theme-text-dim cursor-pointer">
-          <summary class="hover:theme-text-main transition">Configure Firebase API Key Override</summary>
+          <summary class="hover:theme-text-main transition font-rounded">Configure Firebase API Key Override</summary>
           <div class="mt-2.5 p-3 rounded-xl theme-bg-subtle border theme-border text-left space-y-2">
             <label for="customApiKeyInput" class="block font-semibold">Custom API Key</label>
             <div class="flex gap-2">
               <input type="text" id="customApiKeyInput" placeholder="AIzaSy..." class="form-input text-xs py-1.5 px-2">
-              <button type="button" id="saveApiKeyBtn" class="px-3 py-1.5 rounded-lg theme-bg-accent text-white font-medium text-xs whitespace-nowrap btn-action">
+              <button type="button" id="saveApiKeyBtn" class="px-3 py-1.5 rounded-lg theme-bg-accent text-white font-medium text-xs whitespace-nowrap btn-action font-rounded">
                 Save & Reload
               </button>
             </div>
@@ -156,17 +158,17 @@
        ========================================================================= -->
   <div id="appShell" class="hidden min-h-screen flex flex-col relative z-10">
 
-    <!-- STICKY TOP BRANDED HEADER (Z-INDEX 50) -->
-    <header class="sticky top-0 z-50 theme-header border-b theme-border px-3 sm:px-6 py-2.5 shadow-sm">
-      <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
+    <!-- STICKY TOP BRANDED HEADER (Z-INDEX 50) WITH EXPANDABLE MOTION SEARCH -->
+    <header id="mainHeader" class="sticky top-0 z-50 theme-header border-b theme-border px-3 sm:px-6 py-2.5 shadow-sm transition-all duration-300">
+      <div class="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-3 header-inner">
         
         <!-- Left: Official Brand Logo & Title -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 brand-group transition-all duration-300">
           <button type="button" id="headerHomeBtn" class="flex items-center gap-2.5 text-left group">
             <img src="./images/logo.png" alt="AL Communication" class="brand-logo-img group-hover:scale-105 transition shadow-sm">
             <div>
               <div class="flex items-center gap-2">
-                <span class="font-bold text-base sm:text-lg leading-tight theme-text-main">AL Communication</span>
+                <span class="font-bold text-base sm:text-lg leading-tight theme-text-main font-rounded tracking-tight">AL Communication</span>
                 <span id="syncBadge" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot"></span>
                   <span id="syncStatusText">Cloud Live</span>
@@ -177,62 +179,75 @@
         </div>
 
         <!-- Center: Desktop Nav Tabs -->
-        <div class="hidden lg:flex items-center gap-4">
+        <div class="hidden lg:flex items-center gap-4 nav-group transition-all duration-300">
           <nav class="flex items-center p-1 rounded-xl theme-bg-subtle border theme-border text-sm font-medium">
-            <button type="button" data-view="dashboard" class="nav-tab-btn active px-3.5 py-1.5 rounded-lg transition">
+            <button type="button" data-view="dashboard" class="nav-tab-btn active px-3.5 py-1.5 rounded-lg transition font-rounded">
               Dashboard
             </button>
-            <button type="button" data-view="stationery" class="nav-tab-btn px-3.5 py-1.5 rounded-lg transition">
+            <button type="button" data-view="stationery" class="nav-tab-btn px-3.5 py-1.5 rounded-lg transition font-rounded">
               Stationery Entry
             </button>
-            <button type="button" data-view="reloads" class="nav-tab-btn px-3.5 py-1.5 rounded-lg transition">
+            <button type="button" data-view="reloads" class="nav-tab-btn px-3.5 py-1.5 rounded-lg transition font-rounded">
               Mobile Reloads
             </button>
-            <button type="button" data-view="stock" class="nav-tab-btn px-3.5 py-1.5 rounded-lg transition">
+            <button type="button" data-view="stock" class="nav-tab-btn px-3.5 py-1.5 rounded-lg transition font-rounded">
               Stock Inventory
             </button>
-            <button type="button" data-view="logs" class="nav-tab-btn px-3.5 py-1.5 rounded-lg transition">
+            <button type="button" data-view="logs" class="nav-tab-btn px-3.5 py-1.5 rounded-lg transition font-rounded">
               Master Logs
             </button>
           </nav>
         </div>
 
-        <!-- Center-Right: Interactive Global Search Bar -->
-        <div class="hidden md:block flex-1 max-w-sm mx-2">
-          <div class="global-search-container">
-            <span class="absolute left-3 top-2.5 theme-text-dim pointer-events-none">
-              <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            </span>
-            <input 
-              type="text" 
-              id="globalSearchInput" 
-              class="global-search-input" 
-              placeholder="Search items, stock, reloads, bills... (Ctrl+K)" 
-              autocomplete="off"
+        <!-- Right: Expandable Search Wrapper + Live Clock + Quick Theme + Settings Gear -->
+        <div class="flex items-center gap-2 sm:gap-2.5 actions-group">
+          
+          <!-- Interactive Expandable Search Container (Task 1) -->
+          <div id="headerSearchWrapper" class="relative flex items-center search-wrapper transition-all duration-300">
+            
+            <!-- Expandable Search Input Box (Smoothly expands on click) -->
+            <div id="searchExpandBox" class="search-expand-box flex items-center overflow-hidden">
+              <div class="relative w-full flex items-center">
+                <span class="absolute left-3 theme-text-dim pointer-events-none">
+                  <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </span>
+                <input 
+                  type="text" 
+                  id="globalSearchInput" 
+                  class="global-search-input pl-9 pr-8" 
+                  placeholder="Search items, stock, reloads, bills..." 
+                  autocomplete="off"
+                >
+                <button 
+                  type="button" 
+                  id="searchCloseBtn" 
+                  class="absolute right-2.5 theme-text-dim hover:theme-text-main transition p-0.5 rounded"
+                  title="Close Search"
+                  aria-label="Close Search"
+                >
+                  <svg class="icon-svg-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Search Icon Trigger Button -->
+            <button 
+              type="button" 
+              id="headerSearchToggleBtn" 
+              class="tap-target w-9 h-9 sm:w-10 sm:h-10 rounded-xl theme-bg-subtle border theme-border hover:theme-bg-elevated active:scale-95 transition flex items-center justify-center theme-text-muted hover:theme-text-main flex-shrink-0"
+              title="Search System"
+              aria-label="Search System"
             >
-            <span class="absolute right-2.5 top-2 px-1.5 py-0.5 rounded text-[10px] font-mono theme-bg-elevated theme-text-dim border theme-border pointer-events-none">
-              Ctrl+K
-            </span>
-            <!-- Categorized Results Dropdown -->
+              <svg id="searchIconOpen" class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <svg id="searchIconClose" class="icon-svg-sm hidden" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+
+            <!-- Categorized Results Dropdown (Generous Width & Padding) -->
             <div id="globalSearchResults" class="global-search-results hidden"></div>
           </div>
-        </div>
-
-        <!-- Right: Mobile Search Toggle + Sri Lanka Clock + Quick Theme + Settings Gear -->
-        <div class="flex items-center gap-2 sm:gap-3">
-          
-          <!-- Mobile Search Toggle Button -->
-          <button 
-            type="button" 
-            id="mobileSearchToggleBtn" 
-            class="md:hidden tap-target w-9 h-9 rounded-xl theme-bg-subtle border theme-border flex items-center justify-center theme-text-muted hover:theme-text-main transition"
-            aria-label="Toggle Global Search"
-          >
-            <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          </button>
 
           <!-- Sri Lanka Live Clock -->
-          <div class="text-right hidden sm:block">
+          <div class="text-right hidden sm:block clock-group transition-all duration-300">
             <div id="liveClock" class="font-mono text-xs sm:text-sm font-semibold tracking-wider theme-text-main currency-lkr">
               --:--:-- LK
             </div>
@@ -273,23 +288,6 @@
         </div>
 
       </div>
-
-      <!-- Mobile Search Drawer (Toggled on Mobile) -->
-      <div id="mobileSearchContainer" class="hidden md:hidden pt-2.5 pb-1 max-w-7xl mx-auto">
-        <div class="relative">
-          <input 
-            type="text" 
-            id="mobileSearchInput" 
-            class="global-search-input pl-9" 
-            placeholder="Search catalog, reloads, bills, numbers..." 
-            autocomplete="off"
-          >
-          <span class="absolute left-3 top-2.5 theme-text-dim">
-            <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          </span>
-          <div id="mobileSearchResults" class="global-search-results hidden"></div>
-        </div>
-      </div>
     </header>
 
     <!-- MAIN VIEW CONTAINER -->
@@ -307,15 +305,15 @@
               <svg class="icon-svg" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
             </div>
             <div>
-              <h2 class="text-xl sm:text-2xl font-bold tracking-tight theme-text-main">Dashboard</h2>
+              <h2 class="text-xl sm:text-2xl font-bold tracking-tight theme-text-main font-rounded">Dashboard</h2>
               <span class="text-xs theme-text-dim">Real-time store ledger & instant profit tracking</span>
             </div>
           </div>
           <div class="flex items-center gap-3">
             <div class="px-4 py-2.5 rounded-xl theme-bg-subtle border theme-border flex items-center gap-3">
               <div class="text-xs">
-                <div class="theme-text-dim uppercase tracking-wider font-semibold">Today's Combined Revenue</div>
-                <div id="dashTodayCombinedRevenue" class="text-xl sm:text-2xl font-bold text-emerald-400 currency-lkr">
+                <div class="theme-text-dim uppercase tracking-wider font-semibold font-rounded">Today's Combined Revenue</div>
+                <div id="dashTodayCombinedRevenue" class="text-xl sm:text-2xl font-extrabold text-emerald-400 currency-lkr">
                   Rs. 0.00
                 </div>
               </div>
@@ -329,10 +327,10 @@
           <!-- Card 1: Today's Stationery Sales -->
           <div class="dash-card" data-card-id="card-dash-stationery">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted">Today's Stationery Sales</span>
+              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">Today's Stationery Sales</span>
               <span class="w-2 h-2 rounded-full bg-sky-400"></span>
             </div>
-            <div id="dashStationerySales" class="text-xl sm:text-2xl font-bold theme-text-main currency-lkr">Rs. 0.00</div>
+            <div id="dashStationerySales" class="text-xl sm:text-2xl font-extrabold theme-text-main currency-lkr">Rs. 0.00</div>
             <div class="text-[11px] theme-text-dim font-mono mt-1">
               <span id="dashStationeryUnits">0</span> units sold today
             </div>
@@ -341,50 +339,50 @@
           <!-- Card 2: Today's Reload Sales -->
           <div class="dash-card" data-card-id="card-dash-reloads">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted">Today's Reload Sales</span>
+              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">Today's Reload Sales</span>
               <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
             </div>
-            <div id="dashReloadVolume" class="text-xl sm:text-2xl font-bold theme-text-main currency-lkr">Rs. 0.00</div>
+            <div id="dashReloadVolume" class="text-xl sm:text-2xl font-extrabold theme-text-main currency-lkr">Rs. 0.00</div>
             <div class="text-[11px] theme-text-dim font-mono mt-1">Total customer top-ups</div>
           </div>
 
           <!-- Card 3: Today's Reload Commissions (Strictly NO "Comm." text) -->
           <div class="dash-card" data-card-id="card-dash-commission">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted">Today's Reload Commissions</span>
+              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">Today's Reload Commissions</span>
               <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
             </div>
-            <div id="dashReloadCommission" class="text-xl sm:text-2xl font-bold text-emerald-400 currency-lkr">Rs. 0.00</div>
+            <div id="dashReloadCommission" class="text-xl sm:text-2xl font-extrabold text-emerald-400 currency-lkr">Rs. 0.00</div>
             <div class="text-[11px] theme-text-dim font-mono mt-1">Earned operator commission</div>
           </div>
 
           <!-- Card 4: Today's Stationery Profit -->
           <div class="dash-card" data-card-id="card-dash-stationery-profit">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted">Today's Stationery Profit</span>
+              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">Today's Stationery Profit</span>
               <span class="w-2 h-2 rounded-full bg-amber-400"></span>
             </div>
-            <div id="dashStationeryProfit" class="text-xl sm:text-2xl font-bold text-amber-400 currency-lkr">Rs. 0.00</div>
+            <div id="dashStationeryProfit" class="text-xl sm:text-2xl font-extrabold text-amber-400 currency-lkr">Rs. 0.00</div>
             <div class="text-[11px] theme-text-dim font-mono mt-1">Calculated stationery net margin</div>
           </div>
 
           <!-- Card 5: Total Active Catalog -->
           <div class="dash-card" data-card-id="card-dash-catalog">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted">Total Active Catalog</span>
+              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">Total Active Catalog</span>
               <span class="w-2 h-2 rounded-full bg-blue-400"></span>
             </div>
-            <div id="dashCatalogCount" class="text-xl sm:text-2xl font-bold text-sky-400 font-mono">0 Items</div>
+            <div id="dashCatalogCount" class="text-xl sm:text-2xl font-extrabold text-sky-400 font-mono">0 Items</div>
             <div class="text-[11px] theme-text-dim font-mono mt-1">Products & services in system</div>
           </div>
 
           <!-- Card 6: Combined Total Profit -->
           <div class="dash-card" data-card-id="card-dash-combined-profit">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400 font-bold">Combined Total Profit</span>
+              <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400 font-bold font-rounded">Combined Total Profit</span>
               <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
             </div>
-            <div id="dashCombinedTotalProfit" class="text-xl sm:text-2xl font-bold text-emerald-400 currency-lkr">Rs. 0.00</div>
+            <div id="dashCombinedTotalProfit" class="text-xl sm:text-2xl font-extrabold text-emerald-400 currency-lkr">Rs. 0.00</div>
             <div class="text-[11px] theme-text-dim font-mono mt-1">Reload commissions + Stationery profit</div>
           </div>
 
@@ -393,7 +391,7 @@
         <!-- OPERATIONAL QUICK-ACCESS ACTION BUTTONS (Neatly Arranged Below Metrics) -->
         <div class="space-y-3 pt-2">
           <div class="flex items-center justify-between px-1">
-            <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Operational Quick Actions</span>
+            <span class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded">Operational Quick Actions</span>
           </div>
 
           <div class="quick-action-grid">
@@ -405,7 +403,7 @@
                   <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                 </div>
                 <div>
-                  <div class="font-bold text-base theme-text-main">Stationery Entry</div>
+                  <div class="font-bold text-base theme-text-main font-rounded">Stationery Entry</div>
                   <div class="text-xs theme-text-dim">POS item sales & utility bills</div>
                 </div>
               </div>
@@ -419,7 +417,7 @@
                   <svg class="icon-svg" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
                 </div>
                 <div>
-                  <div class="font-bold text-base theme-text-main">Mobile Reloads</div>
+                  <div class="font-bold text-base theme-text-main font-rounded">Mobile Reloads</div>
                   <div class="text-xs theme-text-dim">4-network instant airtime</div>
                 </div>
               </div>
@@ -433,7 +431,7 @@
                   <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
                 </div>
                 <div>
-                  <div class="font-bold text-base theme-text-main">Stock Inventory</div>
+                  <div class="font-bold text-base theme-text-main font-rounded">Stock Inventory</div>
                   <div class="text-xs theme-text-dim">Real-time stock & sorting</div>
                 </div>
               </div>
@@ -447,7 +445,7 @@
                   <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                 </div>
                 <div>
-                  <div class="font-bold text-base theme-text-main">Master Logs</div>
+                  <div class="font-bold text-base theme-text-main font-rounded">Master Logs</div>
                   <div class="text-xs theme-text-dim">Ledger & stamped PDF export</div>
                 </div>
               </div>
@@ -471,15 +469,15 @@
               <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
             </div>
             <div>
-              <h2 class="text-xl font-bold theme-text-main">Stationery Entry & Bill Payments</h2>
+              <h2 class="text-xl font-bold theme-text-main font-rounded">Stationery Entry & Bill Payments</h2>
               <span class="text-xs theme-text-dim">Counter POS sales, stock deduction and utility bill logging</span>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button type="button" data-view="stock" class="nav-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition">
+            <button type="button" data-view="stock" class="nav-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition font-rounded">
               Stock Levels
             </button>
-            <button type="button" data-view="logs" class="nav-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition">
+            <button type="button" data-view="logs" class="nav-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition font-rounded">
               Master Logs
             </button>
           </div>
@@ -492,7 +490,7 @@
             <!-- Autocomplete Search Input & Stock Preview Badge -->
             <div class="autocomplete-container">
               <div class="flex items-center justify-between mb-1.5">
-                <label for="posItemInput" class="text-xs font-semibold uppercase tracking-wider theme-text-muted">
+                <label for="posItemInput" class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">
                   Item Code or Product Name (Auto-formats to Title Case)
                 </label>
                 <!-- Real-Time Stock Status Badge -->
@@ -513,7 +511,7 @@
                 <span class="absolute left-3.5 top-3.5 theme-text-dim">
                   <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                 </span>
-                <span id="posItemBadge" class="hidden absolute right-3 top-2.5 px-2 py-0.5 rounded text-xs font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                <span id="posItemBadge" class="hidden absolute right-3 top-2.5 px-2 py-0.5 rounded text-xs font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">
                   CODE
                 </span>
               </div>
@@ -527,7 +525,7 @@
               
               <!-- Selling Price (Or Custom Bill Amount) -->
               <div>
-                <label for="posSellingPrice" id="posSellingPriceLabel" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5">
+                <label for="posSellingPrice" id="posSellingPriceLabel" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5 font-rounded">
                   Selling Price / Amount [Rs.]
                 </label>
                 <div class="relative">
@@ -546,7 +544,7 @@
 
               <!-- Quantity Adder with Stepper Controls -->
               <div id="posQtyContainer">
-                <label for="posQuantity" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5">
+                <label for="posQuantity" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5 font-rounded">
                   Quantity
                 </label>
                 <div class="flex items-center gap-2">
@@ -567,7 +565,7 @@
 
               <!-- Live Total Amount Preview -->
               <div>
-                <label class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5">
+                <label class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5 font-rounded">
                   Total Charge
                 </label>
                 <div class="p-2.5 rounded-xl theme-bg-subtle border theme-border flex items-center justify-between min-h-[46px]">
@@ -583,7 +581,7 @@
               <button 
                 type="submit" 
                 id="posSubmitBtn"
-                class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition shadow-md flex items-center justify-center gap-2 cursor-pointer btn-action"
+                class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition shadow-md flex items-center justify-center gap-2 cursor-pointer btn-action font-rounded"
               >
                 <svg class="icon-svg-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 <span id="posSubmitBtnText">Log Stationery Sale</span>
@@ -595,7 +593,7 @@
         <!-- Recent Sales Quick Feed (Last 5 transactions) -->
         <div class="p-5 sm:p-6 rounded-2xl theme-bg-surface theme-border border theme-shadow space-y-3">
           <div class="flex items-center justify-between">
-            <h3 class="font-bold text-base theme-text-main">Recent Stationery & Bill Transactions</h3>
+            <h3 class="font-bold text-base theme-text-main font-rounded">Recent Stationery & Bill Transactions</h3>
             <button type="button" data-view="logs" class="text-xs font-semibold text-sky-400 hover:underline">
               View All in Master Logs →
             </button>
@@ -622,12 +620,12 @@
               <svg class="icon-svg" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
             </div>
             <div>
-              <h2 class="text-xl font-bold theme-text-main">Mobile Reloads</h2>
+              <h2 class="text-xl font-bold theme-text-main font-rounded">Mobile Reloads</h2>
               <span class="text-xs theme-text-dim">4-network instant airtime ledger & operator commission logging</span>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button type="button" data-view="logs" class="nav-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition">
+            <button type="button" data-view="logs" class="nav-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition font-rounded">
               Master Logs
             </button>
           </div>
@@ -639,7 +637,7 @@
             
             <!-- Operator Selection Grid -->
             <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-2">
+              <label class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-2 font-rounded">
                 Select Network Operator
               </label>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -648,7 +646,7 @@
                 <button 
                   type="button" 
                   data-operator="AIRTEL" 
-                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated"
+                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated font-rounded"
                 >
                   <span class="font-bold text-sm tracking-wide text-red-400">AIRTEL</span>
                   <span class="text-[11px] theme-text-dim font-mono" id="rateBadgeAirtel">6.80%</span>
@@ -658,7 +656,7 @@
                 <button 
                   type="button" 
                   data-operator="DIALOG" 
-                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated"
+                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated font-rounded"
                 >
                   <span class="font-bold text-sm tracking-wide text-orange-400">DIALOG</span>
                   <span class="text-[11px] theme-text-dim font-mono" id="rateBadgeDialog">3.80%</span>
@@ -668,7 +666,7 @@
                 <button 
                   type="button" 
                   data-operator="MOBITEL" 
-                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated"
+                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated font-rounded"
                 >
                   <span class="font-bold text-sm tracking-wide text-blue-400">MOBITEL</span>
                   <span class="text-[11px] theme-text-dim font-mono" id="rateBadgeMobitel">6.80%</span>
@@ -678,7 +676,7 @@
                 <button 
                   type="button" 
                   data-operator="HUTCH" 
-                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated"
+                  class="op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated font-rounded"
                 >
                   <span class="font-bold text-sm tracking-wide text-amber-300">HUTCH</span>
                   <span class="text-[11px] theme-text-dim font-mono" id="rateBadgeHutch">5.00%</span>
@@ -692,7 +690,7 @@
               
               <!-- Mobile Number -->
               <div>
-                <label for="reloadPhone" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5">
+                <label for="reloadPhone" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5 font-rounded">
                   Mobile Number (Auto-Detects Operator)
                 </label>
                 <div class="relative">
@@ -707,13 +705,13 @@
                   <span class="absolute left-3.5 top-3.5 theme-text-dim">
                     <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                   </span>
-                  <span id="detectedOperatorBadge" class="hidden absolute right-3 top-2.5 px-2 py-0.5 rounded text-xs font-bold border"></span>
+                  <span id="detectedOperatorBadge" class="hidden absolute right-3 top-2.5 px-2 py-0.5 rounded text-xs font-bold border font-rounded"></span>
                 </div>
               </div>
 
               <!-- Reload Amount -->
               <div>
-                <label for="reloadAmount" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5">
+                <label for="reloadAmount" class="block text-xs font-semibold uppercase tracking-wider theme-text-muted mb-1.5 font-rounded">
                   Reload Amount [Rs.]
                 </label>
                 <div class="relative">
@@ -735,7 +733,7 @@
             <!-- Quick Preset Amount Buttons -->
             <div>
               <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted">
+                <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">
                   Quick Amount Presets
                 </span>
                 <button type="button" id="openPresetConfigBtn" class="text-xs text-sky-400 hover:underline">
@@ -764,7 +762,7 @@
               <button 
                 type="submit" 
                 id="reloadSubmitBtn"
-                class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition shadow-md flex items-center justify-center gap-2 cursor-pointer btn-action"
+                class="w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition shadow-md flex items-center justify-center gap-2 cursor-pointer btn-action font-rounded"
               >
                 <svg class="icon-svg-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
                 <span>Record Mobile Reload</span>
@@ -776,7 +774,7 @@
         <!-- Recent Reloads Quick Feed -->
         <div class="p-5 sm:p-6 rounded-2xl theme-bg-surface theme-border border theme-shadow space-y-3">
           <div class="flex items-center justify-between">
-            <h3 class="font-bold text-base theme-text-main">Recent Reload Transactions</h3>
+            <h3 class="font-bold text-base theme-text-main font-rounded">Recent Reload Transactions</h3>
             <button type="button" data-view="logs" class="text-xs font-semibold text-sky-400 hover:underline">
               View All in Master Logs →
             </button>
@@ -803,11 +801,11 @@
               <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
             </div>
             <div>
-              <h2 class="text-xl font-bold theme-text-main">Stock Inventory</h2>
+              <h2 class="text-xl font-bold theme-text-main font-rounded">Stock Inventory</h2>
               <span class="text-xs theme-text-dim">Physical products, utility bills & numeric catalog sorting</span>
             </div>
           </div>
-          <button type="button" id="stockOpenCatalogSettingsBtn" class="px-3.5 py-2 rounded-xl text-xs font-semibold theme-bg-accent text-white hover:opacity-90 transition btn-action">
+          <button type="button" id="stockOpenCatalogSettingsBtn" class="px-3.5 py-2 rounded-xl text-xs font-semibold theme-bg-accent text-white hover:opacity-90 transition btn-action font-rounded">
             Manage Catalog & Costs
           </button>
         </div>
@@ -831,8 +829,8 @@
 
             <!-- Sorting Dropdown (Requirement 4.3) -->
             <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold theme-text-muted whitespace-nowrap">Sort:</span>
-              <select id="stockSortSelect" class="form-select text-xs py-1.5 px-3 max-w-[220px]">
+              <span class="text-xs font-semibold theme-text-muted whitespace-nowrap font-rounded">Sort:</span>
+              <select id="stockSortSelect" class="form-select text-xs py-1.5 px-3 max-w-[220px] font-rounded">
                 <option value="code-asc" selected>Item Number: Low to High (Default)</option>
                 <option value="code-desc">Item Number: High to Low</option>
                 <option value="price-asc">Price: Low to High</option>
@@ -845,16 +843,16 @@
 
             <!-- Stock Filter Pills -->
             <div class="flex items-center gap-1.5 text-xs font-semibold overflow-x-auto pb-1 sm:pb-0">
-              <button type="button" data-stock-filter="ALL" class="stock-filter-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-subtle transition">
+              <button type="button" data-stock-filter="ALL" class="stock-filter-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-subtle transition font-rounded">
                 All Items
               </button>
-              <button type="button" data-stock-filter="LOW" class="stock-filter-btn px-3 py-1.5 rounded-lg border theme-border transition text-amber-400">
+              <button type="button" data-stock-filter="LOW" class="stock-filter-btn px-3 py-1.5 rounded-lg border theme-border transition text-amber-400 font-rounded">
                 Low Stock (≤5)
               </button>
-              <button type="button" data-stock-filter="OUT" class="stock-filter-btn px-3 py-1.5 rounded-lg border theme-border transition text-red-400">
+              <button type="button" data-stock-filter="OUT" class="stock-filter-btn px-3 py-1.5 rounded-lg border theme-border transition text-red-400 font-rounded">
                 Out of Stock (0)
               </button>
-              <button type="button" data-stock-filter="SERVICE" class="stock-filter-btn px-3 py-1.5 rounded-lg border theme-border transition text-indigo-400">
+              <button type="button" data-stock-filter="SERVICE" class="stock-filter-btn px-3 py-1.5 rounded-lg border theme-border transition text-indigo-400 font-rounded">
                 Services & Bills
               </button>
             </div>
@@ -865,7 +863,7 @@
           <div class="overflow-x-auto rounded-xl border theme-border">
             <table class="w-full text-left text-xs border-collapse">
               <thead>
-                <tr class="theme-bg-subtle border-b theme-border uppercase theme-text-muted">
+                <tr class="theme-bg-subtle border-b theme-border uppercase theme-text-muted font-rounded">
                   <th class="py-3 px-3 sm:px-4 font-semibold">Item Code</th>
                   <th class="py-3 px-3 sm:px-4 font-semibold">Item Name</th>
                   <th class="py-3 px-3 sm:px-4 font-semibold">Type</th>
@@ -897,7 +895,7 @@
               <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
             </div>
             <div>
-              <h2 class="text-xl font-bold theme-text-main">Master Logs</h2>
+              <h2 class="text-xl font-bold theme-text-main font-rounded">Master Logs</h2>
               <span class="text-xs theme-text-dim">Consolidated Transaction Ledger & Stamped PDF Reports</span>
             </div>
           </div>
@@ -906,7 +904,7 @@
             <button 
               type="button" 
               id="downloadPdfReportBtn"
-              class="px-4 py-2.5 rounded-xl font-bold text-xs text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition shadow-md flex items-center gap-2 cursor-pointer btn-action"
+              class="px-4 py-2.5 rounded-xl font-bold text-xs text-white theme-bg-accent hover:opacity-90 active:scale-[0.98] transition shadow-md flex items-center gap-2 cursor-pointer btn-action font-rounded"
             >
               <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               <span>Download Stamped PDF Report</span>
@@ -914,45 +912,46 @@
           </div>
         </div>
 
-        <!-- UNIFIED PAIRED SUMMARY SECTION (Requirement 5.1) -->
+        <!-- UNIFIED SUMMARY SECTION WITH 3 DEDICATED HIGH-CONTRAST PROFIT CARDS (V5.3) -->
         <div class="space-y-2">
           <div class="flex items-center justify-between px-1">
-            <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Today's Performance Summary</span>
+            <span class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded" id="masterLogsSummaryTitle">Filtered Performance & Profit Summary</span>
+            <span class="text-[11px] theme-text-dim font-mono" id="masterLogsDateScopeLabel">All Active Records</span>
           </div>
 
           <div class="logs-summary-grid">
             
-            <!-- PAIRED BLOCK 1: TODAY'S RELOADS CARD -->
+            <!-- CARD 1: FILTERED RELOADS -->
             <div class="log-paired-card border theme-border">
               <!-- Top: Total Reload Amount -->
               <div class="log-paired-top">
                 <div class="flex items-center justify-between mb-1">
-                  <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Today's Reload Sales</span>
+                  <span class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded">Filtered Reload Sales</span>
                   <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
                 </div>
                 <div class="text-2xl sm:text-3xl font-extrabold theme-text-main currency-lkr" id="logPairedReloadVol">Rs. 0.00</div>
                 <div class="text-xs theme-text-dim font-mono mt-1" id="logPairedReloadStats">0 reload transactions</div>
               </div>
 
-              <!-- Bottom: Reload Profit (Commission) Directly Below -->
+              <!-- Bottom: Reload Profit (Commission) Directly Below - NO "Comm." text -->
               <div class="log-paired-bottom pt-1">
                 <div>
-                  <span class="text-xs font-semibold theme-text-dim block">Reload Profit (Commission):</span>
-                  <span class="text-lg sm:text-xl font-bold text-emerald-400 currency-lkr" id="logPairedReloadComm">+Rs. 0.00</span>
+                  <span class="text-xs font-semibold theme-text-dim block font-rounded">Reload Profit:</span>
+                  <span class="text-lg sm:text-xl font-extrabold text-emerald-400 currency-lkr" id="logPairedReloadComm">+Rs. 0.00</span>
                 </div>
                 <div class="text-right">
                   <span class="text-[11px] theme-text-dim block">Operator Margin</span>
-                  <span class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">Commission</span>
+                  <span class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">Profit</span>
                 </div>
               </div>
             </div>
 
-            <!-- PAIRED BLOCK 2: TODAY'S STATIONERY & BILLS CARD -->
+            <!-- CARD 2: FILTERED STATIONERY & BILLS -->
             <div class="log-paired-card border theme-border">
               <!-- Top: Total Stationery/Bill Amount -->
               <div class="log-paired-top">
                 <div class="flex items-center justify-between mb-1">
-                  <span class="text-xs font-bold uppercase tracking-wider theme-text-muted">Today's Stationery & Bills</span>
+                  <span class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded">Stationery & Bills Sales</span>
                   <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
                 </div>
                 <div class="text-2xl sm:text-3xl font-extrabold theme-text-main currency-lkr" id="logPairedStatSales">Rs. 0.00</div>
@@ -962,8 +961,8 @@
               <!-- Bottom: Stationery Profit Directly Below -->
               <div class="log-paired-bottom pt-1">
                 <div>
-                  <span class="text-xs font-semibold theme-text-dim block">Stationery Net Profit:</span>
-                  <span class="text-lg sm:text-xl font-bold text-sky-400 currency-lkr" id="logPairedStatProfit">+Rs. 0.00</span>
+                  <span class="text-xs font-semibold theme-text-dim block font-rounded">Stationery Net Profit:</span>
+                  <span class="text-lg sm:text-xl font-extrabold text-sky-400 currency-lkr" id="logPairedStatProfit">+Rs. 0.00</span>
                 </div>
                 <div class="text-right">
                   <span class="text-[11px] theme-text-dim block">Sales Margin</span>
@@ -972,46 +971,87 @@
               </div>
             </div>
 
+            <!-- CARD 3: TOTAL PROFIT SUMMARY (PROMINENT STANDALONE) -->
+            <div class="log-paired-card border theme-border theme-border-accent" style="border-color: rgba(56, 189, 248, 0.4);">
+              <!-- Top: Combined Total Net Profit -->
+              <div class="log-paired-top">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold uppercase tracking-wider text-sky-400 font-rounded">Combined Total Profit</span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-sky-400 pulse-dot"></span>
+                </div>
+                <div class="text-2xl sm:text-3xl font-extrabold text-sky-400 currency-lkr" id="logCombinedTotalProfit">Rs. 0.00</div>
+                <div class="text-xs theme-text-dim font-mono mt-1" id="logCombinedProfitStats">Reloads + Stationery combined</div>
+              </div>
+
+              <!-- Bottom: Total Store Turnover / Revenue -->
+              <div class="log-paired-bottom pt-1">
+                <div>
+                  <span class="text-xs font-semibold theme-text-dim block font-rounded">Combined Turnover:</span>
+                  <span class="text-lg sm:text-xl font-extrabold theme-text-main currency-lkr" id="logCombinedRevenue">Rs. 0.00</span>
+                </div>
+                <div class="text-right">
+                  <span class="text-[11px] theme-text-dim block">Overall Yield</span>
+                  <span class="text-xs font-bold px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 font-mono">Combined</span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        <!-- Master Filter Bar: Date Filters & Scope Selection -->
-        <div class="p-4 sm:p-5 rounded-2xl theme-bg-surface theme-border border theme-shadow space-y-4">
-          <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <!-- Master Filter Bar: Date Filters & Scope Selection (V5.3) -->
+        <div class="p-4 sm:p-5 rounded-2xl theme-bg-surface theme-border border theme-shadow space-y-3">
+          
+          <!-- Primary Filter Toolbar -->
+          <div class="flex flex-wrap items-center justify-between gap-3">
             
-            <!-- Quick Date Preset Pills -->
-            <div class="flex items-center gap-1.5 text-xs font-semibold overflow-x-auto pb-1 sm:pb-0">
-              <button type="button" data-log-date="today" class="log-date-btn active px-3.5 py-1.5 rounded-lg border theme-border theme-bg-subtle transition">
-                Today
+            <!-- Left: Quick Date Preset Pills & Specific Date Picker -->
+            <div class="flex flex-wrap items-center gap-2">
+              
+              <!-- Quick Presets -->
+              <div class="flex items-center gap-1 text-xs font-semibold">
+                <button type="button" data-log-date="today" class="log-date-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-subtle transition font-rounded font-bold theme-text-main">
+                  Today
+                </button>
+                <button type="button" data-log-date="all-time" class="log-date-btn px-3 py-1.5 rounded-lg border theme-border transition font-rounded">
+                  All Time
+                </button>
+              </div>
+
+              <div class="h-4 w-px bg-slate-700/40 hidden sm:block"></div>
+
+              <!-- Direct Specific Date Input Picker -->
+              <div class="flex items-center gap-1.5">
+                <label for="logSpecificDate" class="text-xs font-semibold theme-text-dim whitespace-nowrap font-rounded">Specific Date:</label>
+                <input 
+                  type="date" 
+                  id="logSpecificDate" 
+                  class="form-input text-xs py-1 px-2.5 font-mono rounded-lg"
+                  title="Filter by specific date"
+                >
+              </div>
+
+              <!-- More Filter Options Toggle Button -->
+              <button 
+                type="button" 
+                id="toggleMoreFiltersBtn" 
+                class="px-3 py-1.5 rounded-lg border theme-border theme-bg-subtle hover:theme-bg-elevated transition flex items-center gap-1.5 text-xs font-semibold theme-text-main font-rounded cursor-pointer"
+                aria-expanded="false"
+              >
+                <svg class="icon-svg-sm" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                <span>More Filter Options</span>
+                <svg id="moreFiltersChevron" class="w-3.5 h-3.5 transition-transform duration-200" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
               </button>
-              <button type="button" data-log-date="yesterday" class="log-date-btn px-3.5 py-1.5 rounded-lg border theme-border transition">
-                Yesterday
-              </button>
-              <button type="button" data-log-date="this-month" class="log-date-btn px-3.5 py-1.5 rounded-lg border theme-border transition">
-                This Month
-              </button>
-              <button type="button" data-log-date="custom" class="log-date-btn px-3.5 py-1.5 rounded-lg border theme-border transition">
-                Custom Range
-              </button>
+
             </div>
 
-            <!-- Custom Date Inputs (Displayed when custom range selected) -->
-            <div id="logCustomDateRange" class="hidden flex items-center gap-2">
-              <input type="date" id="logDateFrom" class="form-input text-xs py-1.5 px-2 font-mono">
-              <span class="text-xs theme-text-dim">to</span>
-              <input type="date" id="logDateTo" class="form-input text-xs py-1.5 px-2 font-mono">
-              <button type="button" id="applyCustomDateBtn" class="px-3 py-1.5 rounded-lg text-xs font-bold theme-bg-accent text-white btn-action">
-                Filter
-              </button>
-            </div>
-
-            <!-- Search Filter Input -->
-            <div class="relative max-w-xs flex-1">
+            <!-- Right: Search Filter Input -->
+            <div class="relative w-full sm:w-64">
               <input 
                 type="text" 
                 id="logSearchFilter" 
-                placeholder="Search transactions, mobile numbers..." 
-                class="form-input pl-8 text-xs py-1.5"
+                placeholder="Search txs, mobile, item..." 
+                class="form-input pl-8 text-xs py-1.5 w-full"
               >
               <span class="absolute left-2.5 top-2 theme-text-dim">
                 <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -1020,15 +1060,54 @@
 
           </div>
 
+          <!-- Collapsible "More Filter Options" Drawer (Task 1) -->
+          <div id="moreFiltersDrawer" class="more-filters-drawer hidden border-t theme-border pt-3 mt-1">
+            <div class="p-3.5 rounded-xl theme-bg-subtle border theme-border flex flex-wrap items-center justify-between gap-3 text-xs">
+              
+              <!-- Date Range Selectors -->
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-bold theme-text-main font-rounded flex items-center gap-1">
+                  <svg class="icon-svg-sm text-sky-400" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                  Custom Range:
+                </span>
+                <div class="flex items-center gap-1.5">
+                  <label for="logDateFrom" class="theme-text-dim">From:</label>
+                  <input type="date" id="logDateFrom" class="form-input text-xs py-1 px-2 font-mono rounded-lg">
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <label for="logDateTo" class="theme-text-dim">To:</label>
+                  <input type="date" id="logDateTo" class="form-input text-xs py-1 px-2 font-mono rounded-lg">
+                </div>
+                <button type="button" id="applyCustomDateBtn" class="px-3 py-1 rounded-lg text-xs font-bold theme-bg-accent text-white btn-action font-rounded">
+                  Apply Range
+                </button>
+              </div>
+
+              <!-- Additional Range Quick Presets & Reset -->
+              <div class="flex items-center gap-1.5">
+                <button type="button" data-log-date="yesterday" class="log-date-btn px-2.5 py-1 rounded-md border theme-border hover:theme-bg-elevated transition font-rounded text-[11px]">
+                  Yesterday
+                </button>
+                <button type="button" data-log-date="this-month" class="log-date-btn px-2.5 py-1 rounded-md border theme-border hover:theme-bg-elevated transition font-rounded text-[11px]">
+                  This Month
+                </button>
+                <button type="button" id="resetLogFiltersBtn" class="px-2.5 py-1 rounded-md border theme-border text-red-400 hover:bg-red-500/10 transition font-rounded text-[11px] font-semibold cursor-pointer">
+                  Reset to Today
+                </button>
+              </div>
+
+            </div>
+          </div>
+
           <!-- Transaction Category Tabs -->
           <div class="flex items-center gap-2 border-b theme-border pt-2 text-xs font-semibold">
-            <button type="button" data-log-tab="all" class="log-tab-btn active pb-2 border-b-2 border-sky-400 theme-text-main transition">
+            <button type="button" data-log-tab="all" class="log-tab-btn active pb-2 border-b-2 border-sky-400 theme-text-main font-rounded font-bold transition">
               Combined Ledger (<span id="countLogAll">0</span>)
             </button>
-            <button type="button" data-log-tab="stationery" class="log-tab-btn pb-2 border-b-2 border-transparent theme-text-muted hover:theme-text-main transition">
+            <button type="button" data-log-tab="stationery" class="log-tab-btn pb-2 border-b-2 border-transparent theme-text-muted hover:theme-text-main font-rounded transition">
               Stationery & Bills (<span id="countLogStat">0</span>)
             </button>
-            <button type="button" data-log-tab="reloads" class="log-tab-btn pb-2 border-b-2 border-transparent theme-text-muted hover:theme-text-main transition">
+            <button type="button" data-log-tab="reloads" class="log-tab-btn pb-2 border-b-2 border-transparent theme-text-muted hover:theme-text-main font-rounded transition">
               Mobile Reloads (<span id="countLogReloads">0</span>)
             </button>
           </div>
@@ -1037,7 +1116,7 @@
           <div class="overflow-x-auto rounded-xl border theme-border">
             <table class="w-full text-left text-xs border-collapse">
               <thead>
-                <tr class="theme-bg-subtle border-b theme-border uppercase theme-text-muted">
+                <tr class="theme-bg-subtle border-b theme-border uppercase theme-text-muted font-rounded">
                   <th class="py-2.5 px-3 font-semibold">Time / Date</th>
                   <th class="py-2.5 px-3 font-semibold">Category / Item</th>
                   <th class="py-2.5 px-3 font-semibold">Reference / Number</th>
@@ -1062,27 +1141,27 @@
 
     <!-- MOBILE BOTTOM NAVIGATION BAR -->
     <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 theme-header border-t theme-border px-2 py-1.5 flex items-center justify-around safe-bottom">
-      <button type="button" data-view="dashboard" class="mobile-nav-btn active flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold">
+      <button type="button" data-view="dashboard" class="mobile-nav-btn active flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold font-rounded">
         <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
         <span>Dashboard</span>
       </button>
-      <button type="button" data-view="stationery" class="mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted">
+      <button type="button" data-view="stationery" class="mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted font-rounded">
         <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
         <span>Stationery</span>
       </button>
-      <button type="button" data-view="reloads" class="mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted">
+      <button type="button" data-view="reloads" class="mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted font-rounded">
         <svg class="icon-svg-sm" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
         <span>Reloads</span>
       </button>
-      <button type="button" data-view="stock" class="mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted">
+      <button type="button" data-view="stock" class="mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted font-rounded">
         <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
         <span>Stock</span>
       </button>
-      <button type="button" data-view="logs" class="mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted">
+      <button type="button" data-view="logs" class="mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted font-rounded">
         <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
         <span>Logs</span>
       </button>
-      <button type="button" id="mobileSettingsBtn" class="flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted">
+      <button type="button" id="mobileSettingsBtn" class="flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted font-rounded">
         <svg class="icon-svg-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
         <span>Settings</span>
       </button>
@@ -1091,54 +1170,54 @@
   </div>
 
   <!-- =========================================================================
-       MODULE 4: SYSTEM SETTINGS, CATALOG EDITOR & BACKUP / RESTORE MODAL
+       MODULE 4: SYSTEM SETTINGS, CATALOG EDITOR & BACKUP / RESTORE MODAL (Task 2: Widened max-w-6xl & Compact Row)
        ========================================================================= -->
-  <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 modal-backdrop overflow-y-auto">
-    <div class="modal-content w-full max-w-4xl rounded-2xl theme-bg-surface theme-border border theme-shadow relative max-h-[90vh] flex flex-col overflow-hidden">
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 modal-backdrop overflow-y-auto">
+    <div class="modal-content w-full max-w-6xl rounded-2xl theme-bg-surface theme-border border theme-shadow relative max-h-[92vh] flex flex-col overflow-hidden">
       
       <!-- Modal Header -->
-      <div class="px-5 py-4 border-b theme-border flex items-center justify-between theme-bg-subtle">
+      <div class="px-5 py-3.5 border-b theme-border flex items-center justify-between theme-bg-subtle flex-shrink-0">
         <div class="flex items-center gap-2.5">
           <img src="./images/logo.png" alt="AL Communication" class="w-7 h-7 object-contain">
-          <h3 class="font-bold text-base sm:text-lg theme-text-main">System Settings & Store Configuration</h3>
+          <h3 class="font-bold text-base sm:text-lg theme-text-main font-rounded">System Settings & Store Configuration</h3>
         </div>
         <button type="button" id="closeSettingsBtn" class="tap-target w-8 h-8 rounded-lg hover:theme-bg-elevated theme-text-dim hover:theme-text-main transition text-lg font-bold flex items-center justify-center">
           ✕
         </button>
       </div>
 
-      <!-- Settings Sub-Navigation Tabs -->
-      <div class="px-4 py-2 border-b theme-border flex items-center gap-2 overflow-x-auto text-xs font-semibold select-none theme-bg-subtle">
-        <button type="button" data-settings-tab="catalog" class="settings-tab-btn active px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
+      <!-- Compact Single-Row Settings Sub-Navigation Tabs (Task 2) -->
+      <div class="settings-tabs-wrapper px-3 py-1.5 border-b theme-border flex items-center gap-1.5 overflow-x-auto text-[11px] font-semibold select-none theme-bg-subtle flex-shrink-0">
+        <button type="button" data-settings-tab="catalog" class="settings-tab-btn active px-2.5 py-1 rounded-md border theme-border transition whitespace-nowrap font-rounded">
           Inventory Catalog & Costs
         </button>
-        <button type="button" data-settings-tab="presets" class="settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
+        <button type="button" data-settings-tab="presets" class="settings-tab-btn px-2.5 py-1 rounded-md border theme-border transition whitespace-nowrap font-rounded">
           Reload Presets
         </button>
-        <button type="button" data-settings-tab="rates" class="settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
+        <button type="button" data-settings-tab="rates" class="settings-tab-btn px-2.5 py-1 rounded-md border theme-border transition whitespace-nowrap font-rounded">
           Commission Rates
         </button>
-        <button type="button" data-settings-tab="backup" class="settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap text-sky-400">
+        <button type="button" data-settings-tab="backup" class="settings-tab-btn px-2.5 py-1 rounded-md border theme-border transition whitespace-nowrap text-sky-400 font-rounded">
           Backup & Restore
         </button>
-        <button type="button" data-settings-tab="themes" class="settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
+        <button type="button" data-settings-tab="themes" class="settings-tab-btn px-2.5 py-1 rounded-md border theme-border transition whitespace-nowrap font-rounded">
           UI Style & Themes
         </button>
-        <button type="button" data-settings-tab="security" class="settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
+        <button type="button" data-settings-tab="security" class="settings-tab-btn px-2.5 py-1 rounded-md border theme-border transition whitespace-nowrap font-rounded">
           Account Security
         </button>
-        <button type="button" data-settings-tab="developer" class="settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap">
+        <button type="button" data-settings-tab="developer" class="settings-tab-btn px-2.5 py-1 rounded-md border theme-border transition whitespace-nowrap font-rounded">
           Debug Console
         </button>
       </div>
 
       <!-- Settings Modal Content Body -->
-      <div class="p-5 overflow-y-auto flex-1 space-y-6">
+      <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6">
 
         <!-- SUB-PANEL 1: MASTER INVENTORY CATALOG & UTILITY BILLS MANAGER -->
         <div id="settingsPanelCatalog" class="settings-panel space-y-5">
           <div class="p-4 rounded-xl theme-bg-subtle border theme-border">
-            <h4 class="font-bold text-sm theme-text-main mb-3 flex items-center justify-between">
+            <h4 class="font-bold text-sm theme-text-main mb-3 flex items-center justify-between font-rounded">
               <span id="catalogFormTitle">Add New Catalog Item / Service</span>
               <button type="button" id="catalogResetFormBtn" class="hidden text-xs text-sky-400 hover:underline">
                 Reset Form
@@ -1150,13 +1229,13 @@
               
               <!-- Item Type Toggle (Requirement 4.2) -->
               <div class="sm:col-span-2 lg:col-span-4">
-                <label class="block text-[11px] font-semibold uppercase theme-text-muted mb-1.5">Item Classification</label>
+                <label class="block text-[11px] font-semibold uppercase theme-text-muted mb-1.5 font-rounded">Item Classification</label>
                 <div class="flex items-center gap-4 p-2.5 rounded-xl border theme-border theme-bg-surface">
-                  <label class="inline-flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                  <label class="inline-flex items-center gap-2 text-xs font-semibold cursor-pointer font-rounded">
                     <input type="radio" name="catalogItemType" value="product" checked class="text-sky-500 focus:ring-sky-400">
                     <span>Physical Product (Track Stock)</span>
                   </label>
-                  <label class="inline-flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                  <label class="inline-flex items-center gap-2 text-xs font-semibold cursor-pointer font-rounded">
                     <input type="radio" name="catalogItemType" value="service" class="text-indigo-500 focus:ring-indigo-400">
                     <span class="text-indigo-400">Service / Utility Bill (No Quantity Required)</span>
                   </label>
@@ -1164,23 +1243,23 @@
               </div>
 
               <div>
-                <label for="catalogCode" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1">Item Code / Number *</label>
+                <label for="catalogCode" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1 font-rounded">Item Code / Number *</label>
                 <input type="text" id="catalogCode" required placeholder="e.g. 1, 2, ST-001" class="form-input text-xs font-mono">
               </div>
 
               <div>
-                <label for="catalogName" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1">Item Name (Auto Title Case) *</label>
-                <input type="text" id="catalogName" required placeholder="e.g. A4 Cr Books, Electricity Bill" class="form-input text-xs">
+                <label for="catalogName" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1 font-rounded">Item Name (Auto Title Case) *</label>
+                <input type="text" id="catalogName" required placeholder="e.g. A4 Cr Books, Electricity Bill" class="form-input text-xs font-rounded">
               </div>
 
               <div>
-                <label for="catalogCategory" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1">Category (Optional)</label>
-                <input type="text" id="catalogCategory" placeholder="e.g. Books, Utility Bills, Pens" class="form-input text-xs">
+                <label for="catalogCategory" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1 font-rounded">Category (Optional)</label>
+                <input type="text" id="catalogCategory" placeholder="e.g. Books, Utility Bills, Pens" class="form-input text-xs font-rounded">
               </div>
 
               <!-- Cost / Getting Price -->
               <div id="catalogCostPriceContainer">
-                <label for="catalogCostPrice" class="block text-[11px] font-semibold uppercase text-amber-400 mb-1">
+                <label for="catalogCostPrice" class="block text-[11px] font-semibold uppercase text-amber-400 mb-1 font-rounded">
                   Getting / Cost Price [Rs.] *
                 </label>
                 <input type="number" step="0.01" min="0" id="catalogCostPrice" required placeholder="0.00" class="form-input text-xs font-mono font-bold text-amber-400">
@@ -1188,7 +1267,7 @@
 
               <!-- Selling Price -->
               <div>
-                <label for="catalogSellingPrice" id="catalogSellingPriceLabel" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1">
+                <label for="catalogSellingPrice" id="catalogSellingPriceLabel" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1 font-rounded">
                   Selling Price [Rs.] *
                 </label>
                 <input type="number" step="0.01" min="0" id="catalogSellingPrice" required placeholder="0.00" class="form-input text-xs font-mono font-bold text-emerald-400">
@@ -1196,21 +1275,21 @@
 
               <!-- Stock Quantity (Hidden for Service / Utility Bills) -->
               <div id="catalogStockQtyContainer">
-                <label for="catalogStockQuantity" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1">Stock Quantity</label>
+                <label for="catalogStockQuantity" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1 font-rounded">Stock Quantity</label>
                 <input type="number" step="1" min="0" id="catalogStockQuantity" required placeholder="0" value="50" class="form-input text-xs font-mono font-bold">
               </div>
 
               <!-- Low Stock Threshold (Hidden for Service / Utility Bills) -->
               <div id="catalogThresholdContainer">
-                <label for="catalogLowStockThreshold" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1">Low Stock Alert (≤)</label>
+                <label for="catalogLowStockThreshold" class="block text-[11px] font-semibold uppercase theme-text-muted mb-1 font-rounded">Low Stock Alert (≤)</label>
                 <input type="number" step="1" min="0" id="catalogLowStockThreshold" required placeholder="5" value="5" class="form-input text-xs font-mono">
               </div>
 
               <div class="sm:col-span-2 lg:col-span-4 flex items-center justify-between pt-2">
-                <button type="button" id="seedCatalogBtn" class="text-xs theme-text-dim hover:theme-accent transition underline">
+                <button type="button" id="seedCatalogBtn" class="text-xs theme-text-dim hover:theme-accent transition underline font-rounded">
                   Seed Standard Stationery & Utility Bills
                 </button>
-                <button type="submit" id="catalogSaveBtn" class="px-5 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action">
+                <button type="submit" id="catalogSaveBtn" class="px-5 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action font-rounded">
                   Save Item to Catalog
                 </button>
               </div>
@@ -1220,11 +1299,11 @@
           <!-- Stored Inventory Items Table & Toolbar -->
           <div>
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-3">
-              <h5 class="text-xs font-bold uppercase tracking-wider theme-text-muted">Master Inventory Catalog Records</h5>
+              <h5 class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded">Master Inventory Catalog Records</h5>
               
               <div class="flex items-center gap-2">
                 <!-- Sorting Dropdown in Settings Catalog (Requirement 4.3) -->
-                <select id="catalogSortSelect" class="form-select text-xs py-1 px-2.5 max-w-[210px]">
+                <select id="catalogSortSelect" class="form-select text-xs py-1 px-2.5 max-w-[210px] font-rounded">
                   <option value="code-asc" selected>Item Number: Low to High (Default)</option>
                   <option value="code-desc">Item Number: High to Low</option>
                   <option value="price-asc">Price: Low to High</option>
@@ -1241,7 +1320,7 @@
             <div class="overflow-x-auto rounded-xl border theme-border">
               <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr class="theme-bg-subtle border-b theme-border uppercase theme-text-muted">
+                  <tr class="theme-bg-subtle border-b theme-border uppercase theme-text-muted font-rounded">
                     <th class="py-2.5 px-3 font-semibold">Item Code</th>
                     <th class="py-2.5 px-3 font-semibold">Item Name</th>
                     <th class="py-2.5 px-3 font-semibold">Type</th>
@@ -1265,14 +1344,14 @@
         <!-- SUB-PANEL 2: QUICK PRESET AMOUNT CUSTOMIZATION -->
         <div id="settingsPanelPresets" class="settings-panel hidden space-y-5">
           <div class="p-4 rounded-xl theme-bg-subtle border theme-border space-y-4">
-            <h4 class="font-bold text-sm theme-text-main">Quick Preset Reload Amounts</h4>
+            <h4 class="font-bold text-sm theme-text-main font-rounded">Quick Preset Reload Amounts</h4>
             <p class="text-xs theme-text-muted">
               Configure the quick-preset amount buttons displayed in the Mobile Reloads interface.
             </p>
 
             <!-- Active Presets Display -->
             <div>
-              <span class="block text-xs font-semibold theme-text-muted mb-2">Active Reload Presets</span>
+              <span class="block text-xs font-semibold theme-text-muted mb-2 font-rounded">Active Reload Presets</span>
               <div id="settingsPresetsList" class="flex flex-wrap gap-2">
                 <!-- Dynamically populated tags with delete button -->
               </div>
@@ -1292,10 +1371,10 @@
                 >
                 <span class="absolute left-2.5 top-2.5 text-xs font-bold theme-text-dim">Rs.</span>
               </div>
-              <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action">
+              <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action font-rounded">
                 Add Preset
               </button>
-              <button type="button" id="resetPresetsDefaultBtn" class="px-3 py-2 rounded-xl text-xs font-semibold theme-bg-surface border theme-border hover:theme-bg-elevated transition btn-action">
+              <button type="button" id="resetPresetsDefaultBtn" class="px-3 py-2 rounded-xl text-xs font-semibold theme-bg-surface border theme-border hover:theme-bg-elevated transition btn-action font-rounded">
                 Reset Defaults
               </button>
             </form>
@@ -1305,7 +1384,7 @@
         <!-- SUB-PANEL 3: RELOAD COMMISSION RATE MANAGER -->
         <div id="settingsPanelRates" class="settings-panel hidden space-y-5">
           <div class="p-4 rounded-xl theme-bg-subtle border theme-border">
-            <h4 class="font-bold text-sm theme-text-main mb-1">Network Commission Percentages</h4>
+            <h4 class="font-bold text-sm theme-text-main mb-1 font-rounded">Network Commission Percentages</h4>
             <p class="text-xs theme-text-muted mb-4">
               Configure default commission rates for all Sri Lankan network operators.
             </p>
@@ -1313,28 +1392,28 @@
             <form id="commissionsForm" class="space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label for="rateAirtelInput" class="block text-xs font-semibold theme-text-muted mb-1">
+                  <label for="rateAirtelInput" class="block text-xs font-semibold theme-text-muted mb-1 font-rounded">
                     Airtel Commission (%)
                   </label>
                   <input type="number" step="0.01" min="0" max="100" id="rateAirtelInput" value="6.80" required class="form-input font-mono font-bold">
                 </div>
 
                 <div>
-                  <label for="rateDialogInput" class="block text-xs font-semibold theme-text-muted mb-1">
+                  <label for="rateDialogInput" class="block text-xs font-semibold theme-text-muted mb-1 font-rounded">
                     Dialog Commission (%)
                   </label>
                   <input type="number" step="0.01" min="0" max="100" id="rateDialogInput" value="3.80" required class="form-input font-mono font-bold">
                 </div>
 
                 <div>
-                  <label for="rateMobitelInput" class="block text-xs font-semibold theme-text-muted mb-1">
+                  <label for="rateMobitelInput" class="block text-xs font-semibold theme-text-muted mb-1 font-rounded">
                     Mobitel Commission (%)
                   </label>
                   <input type="number" step="0.01" min="0" max="100" id="rateMobitelInput" value="6.80" required class="form-input font-mono font-bold">
                 </div>
 
                 <div>
-                  <label for="rateHutchInput" class="block text-xs font-semibold theme-text-muted mb-1">
+                  <label for="rateHutchInput" class="block text-xs font-semibold theme-text-muted mb-1 font-rounded">
                     Hutch Commission (%)
                   </label>
                   <input type="number" step="0.01" min="0" max="100" id="rateHutchInput" value="5.00" required class="form-input font-mono font-bold">
@@ -1342,7 +1421,7 @@
               </div>
 
               <div class="flex justify-end pt-2">
-                <button type="submit" class="px-5 py-2.5 rounded-xl font-bold text-xs text-white theme-bg-accent hover:opacity-90 transition btn-action">
+                <button type="submit" class="px-5 py-2.5 rounded-xl font-bold text-xs text-white theme-bg-accent hover:opacity-90 transition btn-action font-rounded">
                   Save Commission Rates
                 </button>
               </div>
@@ -1357,14 +1436,14 @@
           <div class="p-4 rounded-xl theme-bg-subtle border theme-border space-y-3">
             <div class="flex items-center justify-between">
               <div>
-                <h4 class="font-bold text-sm theme-text-main flex items-center gap-2">
+                <h4 class="font-bold text-sm theme-text-main flex items-center gap-2 font-rounded">
                   <span>Configuration Snapshot & Backup Engine</span>
                 </h4>
                 <p class="text-xs theme-text-muted mt-0.5">
                   Safeguard catalog items, custom commissions, reload presets, and store preferences.
                 </p>
               </div>
-              <span id="backupStatusBadge" class="text-xs px-2.5 py-1 rounded-full font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">
+              <span id="backupStatusBadge" class="text-xs px-2.5 py-1 rounded-full font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20 font-rounded">
                 Active Snapshot Ready
               </span>
             </div>
@@ -1372,19 +1451,19 @@
             <!-- Stats Overview -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
               <div class="p-3 rounded-lg theme-bg-surface border theme-border">
-                <span class="text-[11px] theme-text-dim block">Catalog Items</span>
-                <span id="backupStatCatalogCount" class="font-bold text-sm theme-text-main">0 Items</span>
+                <span class="text-[11px] theme-text-dim block font-rounded">Catalog Items</span>
+                <span id="backupStatCatalogCount" class="font-bold text-sm theme-text-main font-rounded">0 Items</span>
               </div>
               <div class="p-3 rounded-lg theme-bg-surface border theme-border">
-                <span class="text-[11px] theme-text-dim block">Active Presets</span>
-                <span id="backupStatPresetCount" class="font-bold text-sm theme-text-main">0 Presets</span>
+                <span class="text-[11px] theme-text-dim block font-rounded">Active Presets</span>
+                <span id="backupStatPresetCount" class="font-bold text-sm theme-text-main font-rounded">0 Presets</span>
               </div>
               <div class="p-3 rounded-lg theme-bg-surface border theme-border">
-                <span class="text-[11px] theme-text-dim block">Commission Rates</span>
-                <span class="font-bold text-sm text-emerald-400">4 Networks</span>
+                <span class="text-[11px] theme-text-dim block font-rounded">Commission Rates</span>
+                <span class="font-bold text-sm text-emerald-400 font-rounded">4 Networks</span>
               </div>
               <div class="p-3 rounded-lg theme-bg-surface border theme-border">
-                <span class="text-[11px] theme-text-dim block">Last Saved</span>
+                <span class="text-[11px] theme-text-dim block font-rounded">Last Saved</span>
                 <span id="backupStatLastSaved" class="font-bold text-[11px] font-mono theme-text-main">Not saved yet</span>
               </div>
             </div>
@@ -1395,16 +1474,16 @@
             
             <!-- Block 1: Save & Export Backup -->
             <div class="p-4 rounded-xl theme-bg-subtle border theme-border space-y-3">
-              <h5 class="font-bold text-xs uppercase tracking-wider theme-text-muted">1. Save / Export Configuration</h5>
+              <h5 class="font-bold text-xs uppercase tracking-wider theme-text-muted font-rounded">1. Save / Export Configuration</h5>
               <p class="text-xs theme-text-dim">
                 Create a fresh timestamped snapshot in local storage and download a standalone JSON backup file.
               </p>
               <div class="flex flex-col gap-2 pt-1">
-                <button type="button" id="backupSaveSnapshotBtn" class="w-full px-4 py-2.5 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action flex items-center justify-center gap-2">
+                <button type="button" id="backupSaveSnapshotBtn" class="w-full px-4 py-2.5 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action flex items-center justify-center gap-2 font-rounded">
                   <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
                   <span>Save Snapshot to Local Storage</span>
                 </button>
-                <button type="button" id="backupDownloadJsonBtn" class="w-full px-4 py-2.5 rounded-xl text-xs font-bold theme-bg-surface border theme-border hover:theme-bg-elevated transition btn-action flex items-center justify-center gap-2">
+                <button type="button" id="backupDownloadJsonBtn" class="w-full px-4 py-2.5 rounded-xl text-xs font-bold theme-bg-surface border theme-border hover:theme-bg-elevated transition btn-action flex items-center justify-center gap-2 font-rounded">
                   <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                   <span>Download .JSON Backup File</span>
                 </button>
@@ -1413,17 +1492,17 @@
 
             <!-- Block 2: Restore Previous Settings -->
             <div class="p-4 rounded-xl theme-bg-subtle border theme-border space-y-3">
-              <h5 class="font-bold text-xs uppercase tracking-wider theme-text-muted">2. Restore Configuration</h5>
+              <h5 class="font-bold text-xs uppercase tracking-wider theme-text-muted font-rounded">2. Restore Configuration</h5>
               <p class="text-xs theme-text-dim">
                 Instantly roll back settings to the previous working snapshot or upload an existing backup JSON file.
               </p>
               <div class="flex flex-col gap-2 pt-1">
-                <button type="button" id="backupRestoreSnapshotBtn" class="w-full px-4 py-2.5 rounded-xl text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition btn-action flex items-center justify-center gap-2">
+                <button type="button" id="backupRestoreSnapshotBtn" class="w-full px-4 py-2.5 rounded-xl text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition btn-action flex items-center justify-center gap-2 font-rounded">
                   <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
                   <span>Restore Previous Settings</span>
                 </button>
                 
-                <label for="backupUploadInput" class="w-full px-4 py-2.5 rounded-xl text-xs font-bold theme-bg-surface border theme-border hover:theme-bg-elevated transition btn-action flex items-center justify-center gap-2 cursor-pointer">
+                <label for="backupUploadInput" class="w-full px-4 py-2.5 rounded-xl text-xs font-bold theme-bg-surface border theme-border hover:theme-bg-elevated transition btn-action flex items-center justify-center gap-2 cursor-pointer font-rounded">
                   <svg class="icon-svg-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                   <span>Upload & Restore from .JSON File</span>
                 </label>
@@ -1439,13 +1518,13 @@
         <div id="settingsPanelThemes" class="settings-panel hidden space-y-5">
           
           <div class="space-y-3">
-            <h5 class="text-xs font-bold uppercase tracking-wider theme-text-muted">Solid Theme Palettes</h5>
+            <h5 class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded">Solid Theme Palettes</h5>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               
               <!-- Modern Slate (Default Dark Mode) -->
               <button type="button" data-theme-choice="modern-slate" class="theme-choice-card text-left p-4 rounded-xl border theme-border hover:border-sky-500 transition relative">
                 <div class="flex items-center justify-between mb-2">
-                  <span class="font-bold text-sm">Modern Slate (Default)</span>
+                  <span class="font-bold text-sm font-rounded">Modern Slate (Default)</span>
                   <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-mono">Dark</span>
                 </div>
                 <div class="flex gap-1.5 mt-2">
@@ -1458,7 +1537,7 @@
               <!-- Emerald Light (Clean Solid Light Mode) -->
               <button type="button" data-theme-choice="emerald-store" class="theme-choice-card text-left p-4 rounded-xl border theme-border hover:border-emerald-500 transition relative">
                 <div class="flex items-center justify-between mb-2">
-                  <span class="font-bold text-sm">Emerald Clean</span>
+                  <span class="font-bold text-sm font-rounded">Emerald Clean</span>
                   <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-600 font-mono">Light Mode</span>
                 </div>
                 <div class="flex gap-1.5 mt-2">
@@ -1471,7 +1550,7 @@
               <!-- Sapphire Blue -->
               <button type="button" data-theme-choice="sapphire-blue" class="theme-choice-card text-left p-4 rounded-xl border theme-border hover:border-blue-500 transition relative">
                 <div class="flex items-center justify-between mb-2">
-                  <span class="font-bold text-sm">Sapphire Blue</span>
+                  <span class="font-bold text-sm font-rounded">Sapphire Blue</span>
                   <span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">Midnight Dark</span>
                 </div>
                 <div class="flex gap-1.5 mt-2">
@@ -1484,7 +1563,7 @@
               <!-- Warm Amber -->
               <button type="button" data-theme-choice="warm-amber" class="theme-choice-card text-left p-4 rounded-xl border theme-border hover:border-amber-500 transition relative">
                 <div class="flex items-center justify-between mb-2">
-                  <span class="font-bold text-sm">Warm Amber</span>
+                  <span class="font-bold text-sm font-rounded">Warm Amber</span>
                   <span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 font-mono">Commercial Dark</span>
                 </div>
                 <div class="flex gap-1.5 mt-2">
@@ -1501,38 +1580,38 @@
         <!-- SUB-PANEL 6: ACCOUNT & SECURITY -->
         <div id="settingsPanelSecurity" class="settings-panel hidden space-y-5">
           <div class="p-4 rounded-xl theme-bg-subtle border theme-border space-y-3">
-            <h4 class="font-bold text-sm theme-text-main">Update Login Email</h4>
+            <h4 class="font-bold text-sm theme-text-main font-rounded">Update Login Email</h4>
             <form id="updateEmailForm" class="space-y-3">
               <div>
-                <label for="newEmailInput" class="block text-xs font-semibold theme-text-muted mb-1">New Email</label>
+                <label for="newEmailInput" class="block text-xs font-semibold theme-text-muted mb-1 font-rounded">New Email</label>
                 <input type="email" id="newEmailInput" required placeholder="newemail@example.com" class="form-input text-xs">
               </div>
-              <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action">
+              <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action font-rounded">
                 Update Email
               </button>
             </form>
           </div>
 
           <div class="p-4 rounded-xl theme-bg-subtle border theme-border space-y-3">
-            <h4 class="font-bold text-sm theme-text-main">Change Password</h4>
+            <h4 class="font-bold text-sm theme-text-main font-rounded">Change Password</h4>
             <form id="updatePasswordForm" class="space-y-3">
               <div>
-                <label for="newPasswordInput" class="block text-xs font-semibold theme-text-muted mb-1">New Password</label>
+                <label for="newPasswordInput" class="block text-xs font-semibold theme-text-muted mb-1 font-rounded">New Password</label>
                 <input type="password" id="newPasswordInput" required minlength="6" placeholder="••••••••" class="form-input text-xs">
               </div>
               <div>
-                <label for="confirmPasswordInput" class="block text-xs font-semibold theme-text-muted mb-1">Confirm New Password</label>
+                <label for="confirmPasswordInput" class="block text-xs font-semibold theme-text-muted mb-1 font-rounded">Confirm New Password</label>
                 <input type="password" id="confirmPasswordInput" required minlength="6" placeholder="••••••••" class="form-input text-xs">
               </div>
-              <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action">
+              <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action font-rounded">
                 Update Password
               </button>
             </form>
           </div>
 
           <div class="pt-2 border-t theme-border flex justify-between items-center">
-            <span class="text-xs theme-text-dim">Active Owner: <strong id="userEmailBadge" class="theme-text-main">lasasdias11@gmail.com</strong></span>
-            <button type="button" id="signOutBtn" class="px-4 py-2 rounded-xl text-xs font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 transition btn-action">
+            <span class="text-xs theme-text-dim">Active Owner: <strong id="userEmailBadge" class="theme-text-main font-rounded">lasasdias11@gmail.com</strong></span>
+            <button type="button" id="signOutBtn" class="px-4 py-2 rounded-xl text-xs font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 transition btn-action font-rounded">
               Sign Out
             </button>
           </div>
@@ -1542,10 +1621,10 @@
         <div id="settingsPanelDeveloper" class="settings-panel hidden space-y-4">
           <div class="flex items-center justify-between p-3 rounded-xl theme-bg-subtle border theme-border">
             <div>
-              <div class="font-bold text-xs theme-text-main">System Health & Diagnostics</div>
+              <div class="font-bold text-xs theme-text-main font-rounded">System Health & Diagnostics</div>
               <div class="text-[11px] theme-text-dim">Firestore connection, local cache, and error logs</div>
             </div>
-            <button type="button" id="devConsoleToggle" class="text-xs text-sky-400 font-semibold hover:underline">
+            <button type="button" id="devConsoleToggle" class="text-xs text-sky-400 font-semibold hover:underline font-rounded">
               Toggle Drawer
             </button>
           </div>
@@ -1553,36 +1632,36 @@
           <div id="devConsoleBody" class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div class="p-3 rounded-xl theme-bg-subtle border theme-border">
-                <span class="theme-text-dim block">Cloud Firestore Status</span>
-                <span id="dbgFirestoreHealth" class="font-bold text-emerald-400">Connected</span>
+                <span class="theme-text-dim block font-rounded">Cloud Firestore Status</span>
+                <span id="dbgFirestoreHealth" class="font-bold text-emerald-400 font-rounded">Connected</span>
               </div>
               <div class="p-3 rounded-xl theme-bg-subtle border theme-border">
-                <span class="theme-text-dim block">Auth State</span>
+                <span class="theme-text-dim block font-rounded">Auth State</span>
                 <span id="dbgAuthState" class="font-bold theme-text-main font-mono">Verified</span>
               </div>
               <div class="p-3 rounded-xl theme-bg-subtle border theme-border">
-                <span class="theme-text-dim block">Local Storage Cache</span>
+                <span class="theme-text-dim block font-rounded">Local Storage Cache</span>
                 <span id="dbgCacheMetrics" class="font-bold theme-text-main font-mono">Active</span>
               </div>
             </div>
 
             <div class="flex flex-wrap gap-2">
-              <button type="button" id="dbgTestWriteBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition btn-action">
+              <button type="button" id="dbgTestWriteBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition btn-action font-rounded">
                 Test Cloud Write
               </button>
-              <button type="button" id="dbgExportDataBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-accent text-white hover:opacity-90 transition btn-action">
+              <button type="button" id="dbgExportDataBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-accent text-white hover:opacity-90 transition btn-action font-rounded">
                 Export Full Backup (JSON)
               </button>
-              <button type="button" id="dbgClearCacheBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition btn-action">
+              <button type="button" id="dbgClearCacheBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition btn-action font-rounded">
                 Clear Local Cache
               </button>
-              <button type="button" id="dbgClearLogsBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition btn-action">
+              <button type="button" id="dbgClearLogsBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition btn-action font-rounded">
                 Clear Log Terminal
               </button>
             </div>
 
             <div class="p-3 rounded-xl bg-black/60 border theme-border font-mono text-[11px] h-48 overflow-y-auto space-y-1" id="dbgTerminalLogs">
-              <div class="text-emerald-400">[System] AL Communication v5.0 Engine Initialized.</div>
+              <div class="text-emerald-400">[System] AL Communication v5.1 Engine Initialized.</div>
             </div>
           </div>
         </div>
@@ -1598,7 +1677,7 @@
   <div id="editStationeryModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
     <div class="modal-content w-full max-w-md rounded-2xl theme-bg-surface theme-border border theme-shadow p-6 space-y-4">
       <div class="flex items-center justify-between border-b theme-border pb-3">
-        <h4 class="font-bold text-base theme-text-main">Edit Stationery Record</h4>
+        <h4 class="font-bold text-base theme-text-main font-rounded">Edit Stationery Record</h4>
         <button type="button" id="closeEditStatModalBtn" class="text-lg font-bold theme-text-dim hover:theme-text-main">✕</button>
       </div>
 
@@ -1606,36 +1685,36 @@
         <input type="hidden" id="editStatDocId">
 
         <div>
-          <label for="editStatName" class="block text-xs font-semibold theme-text-muted mb-1">Item Name</label>
-          <input type="text" id="editStatName" required class="form-input text-xs">
+          <label for="editStatName" class="block text-xs font-semibold theme-text-muted mb-1 font-rounded">Item Name</label>
+          <input type="text" id="editStatName" required class="form-input text-xs font-rounded">
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label for="editStatCost" class="block text-xs font-semibold theme-text-muted mb-1">Cost Price [Rs.]</label>
+            <label for="editStatCost" class="block text-xs font-semibold theme-text-muted mb-1 font-rounded">Cost Price [Rs.]</label>
             <input type="number" step="0.01" min="0" id="editStatCost" required class="form-input text-xs font-mono">
           </div>
           <div>
-            <label for="editStatSell" class="block text-xs font-semibold theme-text-muted mb-1">Selling Price [Rs.]</label>
+            <label for="editStatSell" class="block text-xs font-semibold theme-text-muted mb-1 font-rounded">Selling Price [Rs.]</label>
             <input type="number" step="0.01" min="0" id="editStatSell" required class="form-input text-xs font-mono">
           </div>
         </div>
 
         <div>
-          <label for="editStatQty" class="block text-xs font-semibold theme-text-muted mb-1">Quantity</label>
+          <label for="editStatQty" class="block text-xs font-semibold theme-text-muted mb-1 font-rounded">Quantity</label>
           <input type="number" min="1" step="1" id="editStatQty" required class="form-input text-xs font-mono">
         </div>
 
         <div class="p-3 rounded-xl theme-bg-subtle border theme-border flex justify-between items-center text-xs">
-          <span class="theme-text-dim">New Net Profit:</span>
+          <span class="theme-text-dim font-rounded">New Net Profit:</span>
           <span id="editStatProfitPreview" class="font-bold text-emerald-400 currency-lkr">Rs. 0.00</span>
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
-          <button type="button" id="cancelEditStatBtn" class="px-4 py-2 rounded-xl font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition btn-action text-xs">
+          <button type="button" id="cancelEditStatBtn" class="px-4 py-2 rounded-xl font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition btn-action text-xs font-rounded">
             Cancel
           </button>
-          <button type="submit" class="px-4 py-2 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action text-xs">
+          <button type="submit" class="px-4 py-2 rounded-xl font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action text-xs font-rounded">
             Save Record
           </button>
         </div>
@@ -1649,7 +1728,7 @@
   <div id="passwordResetModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
     <div class="modal-content w-full max-w-sm rounded-2xl theme-bg-surface theme-border border theme-shadow p-6 space-y-4">
       <div class="flex items-center justify-between border-b theme-border pb-3">
-        <h4 class="font-bold text-sm theme-text-main">Reset Master Password</h4>
+        <h4 class="font-bold text-sm theme-text-main font-rounded">Reset Master Password</h4>
         <button type="button" id="closeResetModalBtn" class="text-lg font-bold theme-text-dim hover:theme-text-main">✕</button>
       </div>
 
@@ -1659,15 +1738,15 @@
 
       <form id="passwordResetForm" class="space-y-3">
         <div>
-          <label for="resetEmailInput" class="block text-xs font-semibold theme-text-muted mb-1">Store Owner Email</label>
-          <input type="email" id="resetEmailInput" required value="lasasdias11@gmail.com" class="form-input text-xs">
+          <label for="resetEmailInput" class="block text-xs font-semibold theme-text-muted mb-1 font-rounded">Store Owner Email</label>
+          <input type="email" id="resetEmailInput" required value="lasasdias11@gmail.com" class="form-input text-xs font-rounded">
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
-          <button type="button" id="cancelResetBtn" class="px-3 py-2 rounded-xl text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition btn-action">
+          <button type="button" id="cancelResetBtn" class="px-3 py-2 rounded-xl text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition btn-action font-rounded">
             Cancel
           </button>
-          <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action">
+          <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white theme-bg-accent hover:opacity-90 transition btn-action font-rounded">
             Send Reset Link
           </button>
         </div>
@@ -1676,7 +1755,7 @@
   </div>
 
   <!-- TOAST NOTIFICATION CONTAINER -->
-  <div id="toastContainer" class="fixed bottom-20 md:bottom-6 right-4 z-[90] flex flex-col gap-2 pointer-events-none max-w-sm"></div>
+  <div id="toastContainer" class="fixed bottom-20 md:bottom-6 right-4 z-[90] flex flex-col gap-2 pointer-events-none max-w-sm font-rounded"></div>
 
   <!-- APPLICATION CORE LOGIC -->
   <script type="module" src="./app.js"></script>

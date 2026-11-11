@@ -1,5 +1,5 @@
-// =============================================================================
-// AL COMMUNICATION — PRODUCTION RETAIL MANAGEMENT SYSTEM (VERSION 5.0)
+﻿// =============================================================================
+// AL COMMUNICATION â€” PRODUCTION RETAIL MANAGEMENT SYSTEM (VERSION 5.0)
 // High-Contrast Solid Modern Default UI | Branded Sticky Navigation
 // Universal Global Search Engine | Service/Utility Bills (No Qty)
 // Auto Title Case Formatting | Natural Numeric Inventory Sorting
@@ -413,6 +413,7 @@ function initNavigation() {
   }
 
   // Stock inventory -> Open Settings Catalog
+  // Stock inventory -> Open Settings Catalog
   const stockOpenCatalogSettingsBtn = document.getElementById('stockOpenCatalogSettingsBtn');
   if (stockOpenCatalogSettingsBtn) {
     stockOpenCatalogSettingsBtn.addEventListener('click', () => {
@@ -474,7 +475,7 @@ export function switchSettingsTab(tabId) {
 
   document.querySelectorAll('.settings-panel').forEach(p => p.classList.add('hidden'));
   document.querySelectorAll('[data-settings-tab]').forEach(b => {
-    b.className = 'settings-tab-btn px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap';
+    b.className = 'settings-tab-btn px-2.5 py-1 rounded-md border theme-border transition whitespace-nowrap font-rounded';
   });
 
   const targetPanel = document.getElementById(`settingsPanel${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
@@ -482,7 +483,7 @@ export function switchSettingsTab(tabId) {
 
   if (targetPanel) targetPanel.classList.remove('hidden');
   if (targetBtn) {
-    targetBtn.className = 'settings-tab-btn active px-3 py-1.5 rounded-lg border theme-border transition whitespace-nowrap theme-bg-accent text-white font-bold';
+    targetBtn.className = 'settings-tab-btn active px-2.5 py-1 rounded-md border theme-border transition whitespace-nowrap theme-bg-accent text-white font-bold font-rounded shadow-sm';
   }
 
   if (tabId === 'catalog') {
@@ -493,77 +494,103 @@ export function switchSettingsTab(tabId) {
 }
 
 // =============================================================================
-// 7. UNIVERSAL GLOBAL SEARCH ENGINE (Requirement 2.3)
+// 7. UNIVERSAL GLOBAL SEARCH ENGINE (Requirement 2.3 & V5.1 Expandable Motion)
 // =============================================================================
 
 function initGlobalSearch() {
-  const desktopInput = document.getElementById('globalSearchInput');
-  const desktopResults = document.getElementById('globalSearchResults');
-  const mobileInput = document.getElementById('mobileSearchInput');
-  const mobileResults = document.getElementById('mobileSearchResults');
-  const mobileToggleBtn = document.getElementById('mobileSearchToggleBtn');
-  const mobileContainer = document.getElementById('mobileSearchContainer');
+  const input = document.getElementById('globalSearchInput');
+  const results = document.getElementById('globalSearchResults');
+  const toggleBtn = document.getElementById('headerSearchToggleBtn');
+  const closeBtn = document.getElementById('searchCloseBtn');
+  const header = document.getElementById('mainHeader');
+  const searchIconOpen = document.getElementById('searchIconOpen');
+  const searchIconClose = document.getElementById('searchIconClose');
+  const headerSearchWrapper = document.getElementById('headerSearchWrapper');
 
-  // Mobile drawer toggle
-  if (mobileToggleBtn && mobileContainer) {
-    mobileToggleBtn.addEventListener('click', () => {
-      mobileContainer.classList.toggle('hidden');
-      if (!mobileContainer.classList.contains('hidden') && mobileInput) {
-        mobileInput.focus();
+  // Open search
+  function openSearch() {
+    if (!header) return;
+    header.classList.add('search-active');
+    if (searchIconOpen) searchIconOpen.classList.add('hidden');
+    if (searchIconClose) searchIconClose.classList.remove('hidden');
+    if (input) {
+      input.focus();
+      input.select();
+      if (input.value.trim() && results) {
+        performSearch(input.value.trim().toLowerCase(), results);
+      }
+    }
+  }
+
+  // Close search
+  function closeSearch() {
+    if (!header) return;
+    header.classList.remove('search-active');
+    if (searchIconOpen) searchIconOpen.classList.remove('hidden');
+    if (searchIconClose) searchIconClose.classList.add('hidden');
+    if (results) {
+      results.classList.add('hidden');
+      results.innerHTML = '';
+    }
+  }
+
+  // Toggle button click
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (header && header.classList.contains('search-active')) {
+        closeSearch();
+      } else {
+        openSearch();
       }
     });
   }
 
-  // Keyboard shortcut Ctrl+K or / to focus search
+  // Close button inside search box
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeSearch();
+    });
+  }
+
+  // Keyboard shortcuts: Ctrl+K or '/' to open, Escape to close
   window.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey && e.key === 'k') || (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA')) {
+    if ((e.ctrlKey && e.key.toLowerCase() === 'k') || (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA')) {
       e.preventDefault();
-      if (window.innerWidth >= 768 && desktopInput) {
-        desktopInput.focus();
-        desktopInput.select();
-      } else if (mobileInput) {
-        if (mobileContainer) mobileContainer.classList.remove('hidden');
-        mobileInput.focus();
-        mobileInput.select();
-      }
+      openSearch();
     } else if (e.key === 'Escape') {
-      if (desktopResults) desktopResults.classList.add('hidden');
-      if (mobileResults) mobileResults.classList.add('hidden');
+      closeSearch();
     }
   });
 
-  function setupSearchField(input, resultsEl) {
-    if (!input || !resultsEl) return;
-
+  // Search field logic
+  if (input && results) {
     input.addEventListener('input', () => {
       const queryStr = input.value.trim().toLowerCase();
       if (!queryStr) {
-        resultsEl.classList.add('hidden');
-        resultsEl.innerHTML = '';
+        results.classList.add('hidden');
+        results.innerHTML = '';
         return;
       }
-      performSearch(queryStr, resultsEl);
+      performSearch(queryStr, results);
     });
 
     input.addEventListener('focus', () => {
       const queryStr = input.value.trim().toLowerCase();
-      if (queryStr) performSearch(queryStr, resultsEl);
+      if (queryStr) performSearch(queryStr, results);
     });
   }
 
-  setupSearchField(desktopInput, desktopResults);
-  setupSearchField(mobileInput, mobileResults);
-
-  // Close results when clicking outside
+  // Click outside to close results and collapse search bar if empty
   document.addEventListener('click', (e) => {
-    if (desktopResults && !desktopResults.contains(e.target) && e.target !== desktopInput) {
-      desktopResults.classList.add('hidden');
+    if (results && !results.contains(e.target) && e.target !== input) {
+      results.classList.add('hidden');
     }
-    if (mobileResults && !mobileResults.contains(e.target) && e.target !== mobileInput) {
-      mobileResults.classList.add('hidden');
+    if (headerSearchWrapper && !headerSearchWrapper.contains(e.target) && header && header.classList.contains('search-active')) {
+      closeSearch();
     }
   });
-
   function performSearch(q, container) {
     container.innerHTML = '';
     container.classList.remove('hidden');
@@ -723,7 +750,7 @@ function initGlobalSearch() {
             <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(s.itemCode || 'ST')}</span>
             <div class="truncate">
               <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(s.itemName)}</div>
-              <div class="text-[10px] theme-text-dim">${escapeHTML(s.date || '')} • Qty: ${s.quantity || 1}</div>
+              <div class="text-[10px] theme-text-dim">${escapeHTML(s.date || '')} â€¢ Qty: ${s.quantity || 1}</div>
             </div>
           </div>
           <div class="text-right flex-shrink-0">
@@ -839,7 +866,7 @@ export function updateDashboardMetrics() {
   if (elStatSales) elStatSales.textContent = formatLKR(statSales);
   if (elStatUnits) elStatUnits.textContent = String(statUnits);
   if (elReloadVol) elReloadVol.textContent = formatLKR(reloadVolume);
-  // Clean LKR amount only — Strictly NO "Comm." text
+  // Clean LKR amount only â€” Strictly NO "Comm." text
   if (elReloadComm) elReloadComm.textContent = formatLKR(reloadCommission);
   if (elStatProfit) elStatProfit.textContent = formatLKR(statProfitToday);
   if (elCatalogCount) elCatalogCount.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
@@ -850,109 +877,125 @@ export function updateDashboardMetrics() {
 }
 
 // =============================================================================
-// 10. MASTER LOGS REFINEMENT & SUMMARY BLOCKS (Requirement 5.1)
+// 10. MASTER LOGS REFINEMENT & 3 DEDICATED PROFIT CARDS (V5.3)
 // =============================================================================
 
 export function updateMasterLogsPairedCards() {
-  // Compute Today's Reloads
-  let todayReloadVol = 0;
-  let todayReloadComm = 0;
-  let todayReloadCount = APP_STATE.todayReloadTransactions.length;
-
-  APP_STATE.todayReloadTransactions.forEach(r => {
-    todayReloadVol += Number(r.amount || 0);
-    todayReloadComm += Number(r.commissionAmount || 0);
-  });
-
-  // Compute Today's Stationery & Bills
-  let todayStatSales = 0;
-  let todayStatProfit = 0;
-  let todayStatUnits = 0;
-  let todayStatCount = APP_STATE.todayStationeryTransactions.length;
-
-  APP_STATE.todayStationeryTransactions.forEach(s => {
-    const total = Number(s.totalAmount || s.sellingPrice || 0);
-    const qty = Number(s.quantity || 1);
-    todayStatSales += total;
-    todayStatUnits += qty;
-
-    if (s.profit !== undefined) {
-      todayStatProfit += Number(s.profit);
-    } else {
-      const cost = Number(s.costPrice || 0);
-      const sell = Number(s.sellingPrice || 0);
-      todayStatProfit += (sell - cost) * qty;
-    }
-  });
-
-  // Paired Block 1: Today's Reloads Card
-  const elLogReloadVol = document.getElementById('logPairedReloadVol');
-  const elLogReloadComm = document.getElementById('logPairedReloadComm');
-  const elLogReloadStats = document.getElementById('logPairedReloadStats');
-
-  if (elLogReloadVol) elLogReloadVol.textContent = formatLKR(todayReloadVol);
-  if (elLogReloadComm) elLogReloadComm.textContent = `+${formatLKR(todayReloadComm)}`;
-  if (elLogReloadStats) elLogReloadStats.textContent = `${todayReloadCount} reload transactions today`;
-
-  // Paired Block 2: Today's Stationery & Bills Card
-  const elLogStatSales = document.getElementById('logPairedStatSales');
-  const elLogStatProfit = document.getElementById('logPairedStatProfit');
-  const elLogStatStats = document.getElementById('logPairedStatStats');
-
-  if (elLogStatSales) elLogStatSales.textContent = formatLKR(todayStatSales);
-  if (elLogStatProfit) elLogStatProfit.textContent = `+${formatLKR(todayStatProfit)}`;
-  if (elLogStatStats) elLogStatStats.textContent = `${todayStatUnits} units sold • ${todayStatCount} txs today`;
+  applyMasterLogFilters();
 }
 
 function initMasterLogs() {
-  // Date preset pills
+  const specificDateInput = document.getElementById('logSpecificDate');
+  const toggleMoreFiltersBtn = document.getElementById('toggleMoreFiltersBtn');
+  const moreFiltersDrawer = document.getElementById('moreFiltersDrawer');
+  const moreFiltersChevron = document.getElementById('moreFiltersChevron');
+  const fromInput = document.getElementById('logDateFrom');
+  const toInput = document.getElementById('logDateTo');
+  const applyCustomDateBtn = document.getElementById('applyCustomDateBtn');
+  const resetLogFiltersBtn = document.getElementById('resetLogFiltersBtn');
+
+  // Set default specific date to today
+  if (specificDateInput) {
+    specificDateInput.value = getTodayDateString();
+    specificDateInput.addEventListener('change', () => {
+      const val = specificDateInput.value;
+      if (val) {
+        APP_STATE.logDateScope = 'specific';
+        APP_STATE.logDateFrom = val;
+        APP_STATE.logDateTo = val;
+        document.querySelectorAll('[data-log-date]').forEach(b => {
+          b.className = 'log-date-btn px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border transition font-rounded text-xs';
+        });
+        applyMasterLogFilters();
+      }
+    });
+  }
+
+  // Toggle "More Filter Options"
+  if (toggleMoreFiltersBtn && moreFiltersDrawer) {
+    toggleMoreFiltersBtn.addEventListener('click', () => {
+      const isHidden = moreFiltersDrawer.classList.contains('hidden');
+      if (isHidden) {
+        moreFiltersDrawer.classList.remove('hidden');
+        toggleMoreFiltersBtn.setAttribute('aria-expanded', 'true');
+        if (moreFiltersChevron) moreFiltersChevron.classList.add('rotate-180');
+      } else {
+        moreFiltersDrawer.classList.add('hidden');
+        toggleMoreFiltersBtn.setAttribute('aria-expanded', 'false');
+        if (moreFiltersChevron) moreFiltersChevron.classList.remove('rotate-180');
+      }
+    });
+  }
+
+  // Preset pills (Today, All Time, Yesterday, This Month)
   document.querySelectorAll('[data-log-date]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('[data-log-date]').forEach(b => {
-        b.className = 'log-date-btn px-3.5 py-1.5 rounded-lg border theme-border transition';
+        b.className = 'log-date-btn px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border transition font-rounded text-xs';
       });
-      btn.className = 'log-date-btn active px-3.5 py-1.5 rounded-lg border theme-border theme-bg-subtle transition font-bold theme-text-main';
+      btn.className = 'log-date-btn active px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border theme-bg-subtle transition font-bold theme-text-main font-rounded text-xs';
 
       const scope = btn.getAttribute('data-log-date');
       APP_STATE.logDateScope = scope;
-      const customRangeBox = document.getElementById('logCustomDateRange');
 
       if (scope === 'today') {
-        if (customRangeBox) customRangeBox.classList.add('hidden');
         APP_STATE.logDateFrom = getTodayDateString();
         APP_STATE.logDateTo = getTodayDateString();
+        if (specificDateInput) specificDateInput.value = getTodayDateString();
+      } else if (scope === 'all-time') {
+        APP_STATE.logDateFrom = '1970-01-01';
+        APP_STATE.logDateTo = '2099-12-31';
+        if (specificDateInput) specificDateInput.value = '';
       } else if (scope === 'yesterday') {
-        if (customRangeBox) customRangeBox.classList.add('hidden');
         APP_STATE.logDateFrom = getYesterdayDateString();
         APP_STATE.logDateTo = getYesterdayDateString();
+        if (specificDateInput) specificDateInput.value = getYesterdayDateString();
       } else if (scope === 'this-month') {
-        if (customRangeBox) customRangeBox.classList.add('hidden');
         const today = getTodayDateString();
         APP_STATE.logDateFrom = today.substring(0, 8) + '01';
         APP_STATE.logDateTo = today;
-      } else if (scope === 'custom') {
-        if (customRangeBox) {
-          customRangeBox.classList.remove('hidden');
-          const fromInput = document.getElementById('logDateFrom');
-          const toInput = document.getElementById('logDateTo');
-          if (fromInput) fromInput.value = APP_STATE.logDateFrom || getTodayDateString();
-          if (toInput) toInput.value = APP_STATE.logDateTo || getTodayDateString();
-        }
+        if (specificDateInput) specificDateInput.value = '';
       }
       applyMasterLogFilters();
     });
   });
 
-  const applyCustomDateBtn = document.getElementById('applyCustomDateBtn');
+  // Apply Custom Range button
   if (applyCustomDateBtn) {
     applyCustomDateBtn.addEventListener('click', () => {
-      const fromInput = document.getElementById('logDateFrom');
-      const toInput = document.getElementById('logDateTo');
-      if (fromInput && toInput) {
-        APP_STATE.logDateFrom = fromInput.value || getTodayDateString();
-        APP_STATE.logDateTo = toInput.value || APP_STATE.logDateFrom;
+      if (fromInput && fromInput.value) {
+        APP_STATE.logDateScope = 'custom';
+        APP_STATE.logDateFrom = fromInput.value;
+        APP_STATE.logDateTo = (toInput && toInput.value) ? toInput.value : fromInput.value;
+        if (specificDateInput) specificDateInput.value = '';
+        document.querySelectorAll('[data-log-date]').forEach(b => {
+          b.className = 'log-date-btn px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border transition font-rounded text-xs';
+        });
         applyMasterLogFilters();
       }
+    });
+  }
+
+  // Reset to Today button
+  if (resetLogFiltersBtn) {
+    resetLogFiltersBtn.addEventListener('click', () => {
+      APP_STATE.logDateScope = 'today';
+      APP_STATE.logDateFrom = getTodayDateString();
+      APP_STATE.logDateTo = getTodayDateString();
+      APP_STATE.logSearchQuery = '';
+      if (specificDateInput) specificDateInput.value = getTodayDateString();
+      if (fromInput) fromInput.value = '';
+      if (toInput) toInput.value = '';
+      const searchInput = document.getElementById('logSearchFilter');
+      if (searchInput) searchInput.value = '';
+      document.querySelectorAll('[data-log-date]').forEach(b => {
+        if (b.getAttribute('data-log-date') === 'today') {
+          b.className = 'log-date-btn active px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border theme-bg-subtle transition font-bold theme-text-main font-rounded text-xs';
+        } else {
+          b.className = 'log-date-btn px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border transition font-rounded text-xs';
+        }
+      });
+      applyMasterLogFilters();
     });
   }
 
@@ -983,9 +1026,9 @@ function setMasterLogCategoryTab(tabId) {
   APP_STATE.logTab = tabId;
   document.querySelectorAll('[data-log-tab]').forEach(btn => {
     if (btn.getAttribute('data-log-tab') === tabId) {
-      btn.className = 'log-tab-btn active pb-2 border-b-2 border-sky-400 theme-text-main font-bold transition';
+      btn.className = 'log-tab-btn active pb-2 border-b-2 border-sky-400 theme-text-main font-bold transition font-rounded';
     } else {
-      btn.className = 'log-tab-btn pb-2 border-b-2 border-transparent theme-text-muted hover:theme-text-main transition';
+      btn.className = 'log-tab-btn pb-2 border-b-2 border-transparent theme-text-muted hover:theme-text-main transition font-rounded';
     }
   });
   applyMasterLogFilters();
@@ -994,12 +1037,16 @@ function setMasterLogCategoryTab(tabId) {
 export function applyMasterLogFilters() {
   const fromDate = APP_STATE.logDateFrom || getTodayDateString();
   const toDate = APP_STATE.logDateTo || fromDate;
+  const isAllTime = fromDate === '1970-01-01' || APP_STATE.logDateScope === 'all-time';
   const q = APP_STATE.logSearchQuery || '';
 
   // Filter Stationery & Bills
   const filteredStationery = APP_STATE.masterStationeryRecords.filter(s => {
     const d = s.date || '';
-    if (d < fromDate || d > toDate) return false;
+    if (!isAllTime) {
+      if (fromDate && d < fromDate) return false;
+      if (toDate && d > toDate) return false;
+    }
     if (!q) return true;
     return (s.itemName || '').toLowerCase().includes(q) ||
            (s.itemCode || '').toLowerCase().includes(q) ||
@@ -1009,12 +1056,88 @@ export function applyMasterLogFilters() {
   // Filter Reloads
   const filteredReloads = APP_STATE.masterReloadRecords.filter(r => {
     const d = r.date || '';
-    if (d < fromDate || d > toDate) return false;
+    if (!isAllTime) {
+      if (fromDate && d < fromDate) return false;
+      if (toDate && d > toDate) return false;
+    }
     if (!q) return true;
     return (r.phone || '').includes(q) ||
            (r.operator || '').toLowerCase().includes(q) ||
            String(r.amount).includes(q);
   });
+
+  // Calculate Filtered Summaries
+  let filteredStatSales = 0;
+  let filteredStatProfit = 0;
+  let filteredStatUnits = 0;
+  let filteredStatCount = filteredStationery.length;
+
+  filteredStationery.forEach(s => {
+    const total = Number(s.totalAmount || s.sellingPrice || 0);
+    const qty = Number(s.quantity || 1);
+    filteredStatSales += total;
+    filteredStatUnits += qty;
+
+    if (s.profit !== undefined) {
+      filteredStatProfit += Number(s.profit);
+    } else {
+      const cost = Number(s.costPrice || 0);
+      const sell = Number(s.sellingPrice || 0);
+      filteredStatProfit += (sell - cost) * qty;
+    }
+  });
+
+  let filteredReloadVol = 0;
+  let filteredReloadComm = 0;
+  let filteredReloadCount = filteredReloads.length;
+
+  filteredReloads.forEach(r => {
+    filteredReloadVol += Number(r.amount || 0);
+    filteredReloadComm += Number(r.commissionAmount || 0);
+  });
+
+  const filteredTotalProfit = roundCurrency(filteredStatProfit + filteredReloadComm);
+  const filteredCombinedRevenue = roundCurrency(filteredStatSales + filteredReloadVol);
+
+  // Card 1: Filtered Reloads Card
+  const elLogReloadVol = document.getElementById('logPairedReloadVol');
+  const elLogReloadComm = document.getElementById('logPairedReloadComm');
+  const elLogReloadStats = document.getElementById('logPairedReloadStats');
+
+  if (elLogReloadVol) elLogReloadVol.textContent = formatLKR(filteredReloadVol);
+  // Clean LKR amount only - strictly NO "Comm." text
+  if (elLogReloadComm) elLogReloadComm.textContent = `+${formatLKR(filteredReloadComm)}`;
+  if (elLogReloadStats) elLogReloadStats.textContent = `${filteredReloadCount} reload transactions`;
+
+  // Card 2: Filtered Stationery & Bills Card
+  const elLogStatSales = document.getElementById('logPairedStatSales');
+  const elLogStatProfit = document.getElementById('logPairedStatProfit');
+  const elLogStatStats = document.getElementById('logPairedStatStats');
+
+  if (elLogStatSales) elLogStatSales.textContent = formatLKR(filteredStatSales);
+  if (elLogStatProfit) elLogStatProfit.textContent = `+${formatLKR(filteredStatProfit)}`;
+  if (elLogStatStats) elLogStatStats.textContent = `${filteredStatUnits} units sold • ${filteredStatCount} txs`;
+
+  // Card 3: Dedicated Standalone Combined Total Profit Card
+  const elLogCombinedTotalProfit = document.getElementById('logCombinedTotalProfit');
+  const elLogCombinedRevenue = document.getElementById('logCombinedRevenue');
+  const elLogCombinedProfitStats = document.getElementById('logCombinedProfitStats');
+
+  if (elLogCombinedTotalProfit) elLogCombinedTotalProfit.textContent = formatLKR(filteredTotalProfit);
+  if (elLogCombinedRevenue) elLogCombinedRevenue.textContent = formatLKR(filteredCombinedRevenue);
+  if (elLogCombinedProfitStats) elLogCombinedProfitStats.textContent = `Reloads (${formatLKR(filteredReloadComm)}) + Stationery (${formatLKR(filteredStatProfit)})`;
+
+  // Filter Scope Label
+  const scopeLabel = document.getElementById('masterLogsDateScopeLabel');
+  if (scopeLabel) {
+    if (isAllTime) {
+      scopeLabel.textContent = 'All Time Records';
+    } else if (fromDate === toDate) {
+      scopeLabel.textContent = fromDate === getTodayDateString() ? `Today (${fromDate})` : fromDate;
+    } else {
+      scopeLabel.textContent = `${fromDate} to ${toDate}`;
+    }
+  }
 
   // Update Category Badge Counts
   const countAll = document.getElementById('countLogAll');
@@ -1064,7 +1187,6 @@ export function applyMasterLogFilters() {
 
   renderMasterLogsTable(displayRows);
 }
-
 function renderMasterLogsTable(rows) {
   const tbody = document.getElementById('masterLogsTableBody');
   if (!tbody) return;
@@ -1179,14 +1301,15 @@ export async function generateProfessionalPdfReport() {
 
   const fromDate = APP_STATE.logDateFrom || getTodayDateString();
   const toDate = APP_STATE.logDateTo || fromDate;
-  const dateRangeStr = fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`;
+  const isAllTime = fromDate === '1970-01-01' || APP_STATE.logDateScope === 'all-time';
+  const dateRangeStr = isAllTime ? 'All Time Transaction Records' : (fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`);
 
   const stationeryList = APP_STATE.masterStationeryRecords
-    .filter(s => s.date >= fromDate && s.date <= toDate)
+    .filter(s => isAllTime || (s.date >= fromDate && s.date <= toDate))
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
 
   const reloadList = APP_STATE.masterReloadRecords
-    .filter(r => r.date >= fromDate && r.date <= toDate)
+    .filter(r => isAllTime || (r.date >= fromDate && r.date <= toDate))
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
 
   let totalStatSales = 0;
@@ -1238,83 +1361,127 @@ export async function generateProfessionalPdfReport() {
 
   pdfDoc.setFont('helvetica', 'normal');
   pdfDoc.setFontSize(8.5);
-  pdfDoc.setTextColor(203, 213, 225);
-  pdfDoc.text('Retail Stationery, Utility Bill Payments & Mobile Reload Ledger', 14, 22);
-  pdfDoc.text(`Period: ${dateRangeStr} | Generated: ${new Date().toLocaleString()}`, 14, 28);
+  pdfDoc.setTextColor(148, 163, 184); // Slate-400
+  pdfDoc.text('Retail Store Management & Counter Ledger • Official Transaction Audit Report', 14, 21);
+  pdfDoc.text(`Generated: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Colombo' })} (Sri Lanka Time) • Period: ${dateRangeStr}`, 14, 26);
 
-  // 2. Summary Box
+  // 2. Executive KPI Summary Cards (3-Box Layout)
+  const boxY = 42;
+  const boxW = 58;
+  const boxH = 20;
+
+  // Box 1: Stationery Sales & Profit
   pdfDoc.setFillColor(248, 250, 252);
   pdfDoc.setDrawColor(226, 232, 240);
-  pdfDoc.roundedRect(14, 42, 182, 30, 2, 2, 'FD');
-
+  pdfDoc.roundedRect(14, boxY, boxW, boxH, 2, 2, 'FD');
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(7.5);
+  pdfDoc.setTextColor(100, 116, 139);
+  pdfDoc.text('STATIONERY & BILLS REVENUE', 17, boxY + 5);
+  pdfDoc.setFontSize(12);
   pdfDoc.setTextColor(15, 23, 42);
-  pdfDoc.setFont('helvetica', 'bold');
-  pdfDoc.setFontSize(9.5);
-  pdfDoc.text('EXECUTIVE FINANCIAL & PROFIT SUMMARY', 18, 48);
+  pdfDoc.text(formatLKR(totalStatSales), 17, boxY + 12);
+  pdfDoc.setFontSize(7);
+  pdfDoc.setTextColor(2, 132, 199);
+  pdfDoc.text(`Profit: +${formatLKR(totalStatProfit)} (${totalUnitsSold} items)`, 17, boxY + 17);
 
-  pdfDoc.setFont('helvetica', 'normal');
-  pdfDoc.setFontSize(8);
+  // Box 2: Reload Sales & Profit
+  pdfDoc.setFillColor(248, 250, 252);
+  pdfDoc.roundedRect(76, boxY, boxW, boxH, 2, 2, 'FD');
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(7.5);
+  pdfDoc.setTextColor(100, 116, 139);
+  pdfDoc.text('MOBILE RELOADS VOLUME', 79, boxY + 5);
+  pdfDoc.setFontSize(12);
+  pdfDoc.setTextColor(15, 23, 42);
+  pdfDoc.text(formatLKR(totalReloadVol), 79, boxY + 12);
+  pdfDoc.setFontSize(7);
+  pdfDoc.setTextColor(16, 185, 129);
+  pdfDoc.text(`Profit: +${formatLKR(totalReloadComm)} (${reloadList.length} txs)`, 79, boxY + 17);
+
+  // Box 3: Combined Total Profit
+  pdfDoc.setFillColor(240, 253, 244);
+  pdfDoc.setDrawColor(187, 247, 208);
+  pdfDoc.roundedRect(138, boxY, boxW, boxH, 2, 2, 'FD');
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(7.5);
+  pdfDoc.setTextColor(22, 101, 52);
+  pdfDoc.text('COMBINED TOTAL PROFIT', 141, boxY + 5);
+  pdfDoc.setFontSize(12);
+  pdfDoc.setTextColor(21, 128, 61);
+  pdfDoc.text(formatLKR(totalNetProfit), 141, boxY + 12);
+  pdfDoc.setFontSize(7);
   pdfDoc.setTextColor(71, 85, 105);
-  pdfDoc.text(`Stationery Sales: ${formatLKR(totalStatSales)} (${totalUnitsSold} items)`, 18, 55);
-  pdfDoc.text(`Reload Sales Volume: ${formatLKR(totalReloadVol)} (${reloadList.length} top-ups)`, 18, 61);
-  pdfDoc.text(`Stationery Net Profit: ${formatLKR(totalStatProfit)}`, 18, 67);
+  pdfDoc.text(`Total Turnover: ${formatLKR(totalStoreRevenue)}`, 141, boxY + 17);
 
-  pdfDoc.text(`Earned Reload Commission: ${formatLKR(totalReloadComm)}`, 105, 55);
-  pdfDoc.text(`Combined Total Revenue: ${formatLKR(totalStoreRevenue)}`, 105, 61);
-
-  pdfDoc.setFont('helvetica', 'bold');
-  pdfDoc.setTextColor(5, 150, 105);
-  pdfDoc.text(`COMBINED NET PROFIT: ${formatLKR(totalNetProfit)}`, 105, 67);
-
-  // 3. Transactions Table (AutoTable)
+  // 3. Transactions Table (autoTable)
   const tableData = [];
+
   stationeryList.forEach(s => {
     tableData.push([
-      `${s.date} ${s.time || ''}`,
+      `${s.date || ''} ${s.time || ''}`,
       s.itemType === 'service' ? 'Service/Bill' : 'Stationery',
-      s.itemName,
+      s.itemName || '-',
+      s.itemCode || '-',
       String(s.quantity || 1),
-      formatLKR(s.totalAmount),
-      formatLKR(s.profit || 0)
+      formatLKR(Number(s.totalAmount || s.sellingPrice || 0)),
+      `+${formatLKR(Number(s.profit || 0))}`
     ]);
   });
 
   reloadList.forEach(r => {
     tableData.push([
-      `${r.date} ${r.time || ''}`,
+      `${r.date || ''} ${r.time || ''}`,
       'Mobile Reload',
-      `${r.operator} (${r.phone || 'Walk-in'})`,
+      `${r.operator} Top-up`,
+      r.phone || 'Walk-in',
       '1',
-      formatLKR(r.amount),
-      formatLKR(r.commissionAmount)
+      formatLKR(Number(r.amount || 0)),
+      `+${formatLKR(Number(r.commissionAmount || 0))}`
     ]);
   });
 
+  // Sort descending by date/time
   tableData.sort((a, b) => b[0].localeCompare(a[0]));
 
   if (typeof pdfDoc.autoTable === 'function') {
     pdfDoc.autoTable({
-      startY: 78,
-      head: [['Time / Date', 'Category', 'Description / Customer', 'Qty', 'Amount [Rs.]', 'Profit / Comm']],
+      startY: boxY + boxH + 6,
+      head: [['Date / Time', 'Type', 'Description / Operator', 'Reference / Code', 'Qty', 'Amount (LKR)', 'Profit (LKR)']],
       body: tableData,
       theme: 'grid',
       headStyles: {
         fillColor: [15, 23, 42],
         textColor: [255, 255, 255],
         fontSize: 7.5,
-        fontStyle: 'bold'
-      },
-      styles: {
-        fontSize: 7,
-        cellPadding: 2
+        fontStyle: 'bold',
+        halign: 'left'
       },
       columnStyles: {
-        0: { cellWidth: 32 },
-        1: { cellWidth: 26 },
-        2: { cellWidth: 64 },
-        3: { cellWidth: 12, halign: 'center' },
-        4: { cellWidth: 24, halign: 'right' },
-        5: { cellWidth: 24, halign: 'right' }
+        0: { cellWidth: 26, fontSize: 7 },
+        1: { cellWidth: 22, fontSize: 7 },
+        2: { cellWidth: 44, fontSize: 7 },
+        3: { cellWidth: 26, fontSize: 7 },
+        4: { cellWidth: 12, halign: 'center', fontSize: 7 },
+        5: { cellWidth: 25, halign: 'right', fontSize: 7, fontStyle: 'bold' },
+        6: { cellWidth: 25, halign: 'right', fontSize: 7, fontStyle: 'bold', textColor: [16, 185, 129] }
+      },
+      styles: {
+        overflow: 'linebreak',
+        cellPadding: 2,
+        textColor: [30, 41, 59]
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
+      margin: { left: 14, right: 14, bottom: 18 },
+      didDrawPage: function(data) {
+        // Page footer
+        pdfDoc.setFont('helvetica', 'normal');
+        pdfDoc.setFontSize(7.5);
+        pdfDoc.setTextColor(148, 163, 184);
+        pdfDoc.text('AL Communication Retail Management System • Confirmed Operational Record', 14, 290);
+        pdfDoc.text(`Page ${data.pageNumber} of ${pdfDoc.internal.getNumberOfPages()}`, 180, 290);
       }
     });
   }
@@ -1701,7 +1868,7 @@ function initStationeryPOS() {
             updatedAt: serverTimestamp()
           });
           const remainingStock = Math.max(0, matchedItem.stockQuantity - quantity);
-          showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) • Stock left: ${remainingStock}`, 'success');
+          showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) â€¢ Stock left: ${remainingStock}`, 'success');
         } else if (isService) {
           showToast(`Recorded utility bill: ${itemName} (${formatLKR(totalAmount)}) [No stock deduction]`, 'success');
         } else {
@@ -1762,7 +1929,7 @@ function renderRecentStationeryFeed() {
         ${badge}
         <div>
           <span class="font-bold theme-text-main">${escapeHTML(item.itemName)}</span>
-          <span class="text-[11px] theme-text-dim"> × ${item.quantity || 1} • ${escapeHTML(item.time || '')}</span>
+          <span class="text-[11px] theme-text-dim"> Ã— ${item.quantity || 1} â€¢ ${escapeHTML(item.time || '')}</span>
         </div>
       </div>
       <div class="text-right">
@@ -2500,7 +2667,7 @@ function initSettingsPanels() {
       span.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border theme-border theme-bg-surface text-xs font-bold font-mono';
       span.innerHTML = `
         <span>Rs. ${val}</span>
-        <button type="button" class="del-preset-btn text-red-400 hover:text-red-300 ml-1 text-sm font-bold">✕</button>
+        <button type="button" class="del-preset-btn text-red-400 hover:text-red-300 ml-1 text-sm font-bold">âœ•</button>
       `;
       span.querySelector('.del-preset-btn')?.addEventListener('click', async () => {
         APP_STATE.reloadPresets = APP_STATE.reloadPresets.filter(p => p !== val);
