@@ -983,17 +983,6 @@
                 <div class="text-xs theme-text-dim font-mono mt-1" id="logCombinedProfitStats">Reloads + Stationery combined</div>
               </div>
 
-              <!-- Bottom: Total Store Turnover / Revenue -->
-              <div class="log-paired-bottom pt-1">
-                <div>
-                  <span class="text-xs font-semibold theme-text-dim block font-rounded">Combined Turnover:</span>
-                  <span class="text-lg sm:text-xl font-extrabold theme-text-main currency-lkr" id="logCombinedRevenue">Rs. 0.00</span>
-                </div>
-                <div class="text-right">
-                  <span class="text-[11px] theme-text-dim block">Overall Yield</span>
-                  <span class="text-xs font-bold px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 font-mono">Combined</span>
-                </div>
-              </div>
             </div>
 
           </div>
@@ -1037,6 +1026,7 @@
                 id="toggleMoreFiltersBtn" 
                 class="px-3 py-1.5 rounded-lg border theme-border theme-bg-subtle hover:theme-bg-elevated transition flex items-center gap-1.5 text-xs font-semibold theme-text-main font-rounded cursor-pointer"
                 aria-expanded="false"
+                aria-controls="moreFiltersDrawer"
               >
                 <svg class="icon-svg-sm" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
                 <span>More Filter Options</span>
@@ -1061,7 +1051,7 @@
           </div>
 
           <!-- Collapsible "More Filter Options" Drawer (Task 1) -->
-          <div id="moreFiltersDrawer" class="more-filters-drawer hidden border-t theme-border pt-3 mt-1">
+          <div id="moreFiltersDrawer" class="more-filters-drawer" aria-hidden="true">
             <div class="p-3.5 rounded-xl theme-bg-subtle border theme-border flex flex-wrap items-center justify-between gap-3 text-xs">
               
               <!-- Date Range Selectors -->
@@ -1173,7 +1163,7 @@
        MODULE 4: SYSTEM SETTINGS, CATALOG EDITOR & BACKUP / RESTORE MODAL (Task 2: Widened max-w-6xl & Compact Row)
        ========================================================================= -->
   <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 modal-backdrop overflow-y-auto">
-    <div class="modal-content w-full max-w-6xl rounded-2xl theme-bg-surface theme-border border theme-shadow relative max-h-[92vh] flex flex-col overflow-hidden">
+    <div class="modal-content w-full max-w-7xl rounded-2xl theme-bg-surface theme-border border theme-shadow relative max-h-[92vh] flex flex-col overflow-hidden">
       
       <!-- Modal Header -->
       <div class="px-5 py-3.5 border-b theme-border flex items-center justify-between theme-bg-subtle flex-shrink-0">

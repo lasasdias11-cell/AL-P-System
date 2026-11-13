@@ -143,6 +143,7 @@ body {
    2. Beautiful Rounded Typography Integration (Task 3)
    -------------------------------------------------------------------------- */
 h1, h2, h3, h4, h5, h6,
+button,
 .font-rounded,
 .brand-title,
 .dash-card,
@@ -492,18 +493,35 @@ header.search-active .search-expand-box {
 }
 
 .more-filters-drawer {
-  animation: slideDownFade 0.25s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0 solid var(--border-color);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 0.25s cubic-bezier(0.25, 1, 0.5, 1),
+    margin-top 0.25s cubic-bezier(0.25, 1, 0.5, 1),
+    padding-top 0.25s cubic-bezier(0.25, 1, 0.5, 1),
+    border-top-width 0.25s ease,
+    opacity 0.2s ease,
+    visibility 0s linear 0.25s;
 }
 
-@keyframes slideDownFade {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.more-filters-drawer > div {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.more-filters-drawer.is-open {
+  grid-template-rows: 1fr;
+  margin-top: 0.25rem;
+  padding-top: 0.75rem;
+  border-top-width: 1px;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 .log-paired-card {

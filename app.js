@@ -1,5 +1,5 @@
 ﻿// =============================================================================
-// AL COMMUNICATION â€” PRODUCTION RETAIL MANAGEMENT SYSTEM (VERSION 5.0)
+// AL COMMUNICATION - PRODUCTION RETAIL MANAGEMENT SYSTEM (VERSION 5.0)
 // High-Contrast Solid Modern Default UI | Branded Sticky Navigation
 // Universal Global Search Engine | Service/Utility Bills (No Qty)
 // Auto Title Case Formatting | Natural Numeric Inventory Sorting
@@ -750,7 +750,7 @@ function initGlobalSearch() {
             <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(s.itemCode || 'ST')}</span>
             <div class="truncate">
               <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(s.itemName)}</div>
-              <div class="text-[10px] theme-text-dim">${escapeHTML(s.date || '')} â€¢ Qty: ${s.quantity || 1}</div>
+              <div class="text-[10px] theme-text-dim">${escapeHTML(s.date || '')} &bull; Qty: ${s.quantity || 1}</div>
             </div>
           </div>
           <div class="text-right flex-shrink-0">
@@ -866,7 +866,7 @@ export function updateDashboardMetrics() {
   if (elStatSales) elStatSales.textContent = formatLKR(statSales);
   if (elStatUnits) elStatUnits.textContent = String(statUnits);
   if (elReloadVol) elReloadVol.textContent = formatLKR(reloadVolume);
-  // Clean LKR amount only â€” Strictly NO "Comm." text
+  // Clean LKR amount only - strictly no "Comm." text
   if (elReloadComm) elReloadComm.textContent = formatLKR(reloadCommission);
   if (elStatProfit) elStatProfit.textContent = formatLKR(statProfitToday);
   if (elCatalogCount) elCatalogCount.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
@@ -914,16 +914,11 @@ function initMasterLogs() {
   // Toggle "More Filter Options"
   if (toggleMoreFiltersBtn && moreFiltersDrawer) {
     toggleMoreFiltersBtn.addEventListener('click', () => {
-      const isHidden = moreFiltersDrawer.classList.contains('hidden');
-      if (isHidden) {
-        moreFiltersDrawer.classList.remove('hidden');
-        toggleMoreFiltersBtn.setAttribute('aria-expanded', 'true');
-        if (moreFiltersChevron) moreFiltersChevron.classList.add('rotate-180');
-      } else {
-        moreFiltersDrawer.classList.add('hidden');
-        toggleMoreFiltersBtn.setAttribute('aria-expanded', 'false');
-        if (moreFiltersChevron) moreFiltersChevron.classList.remove('rotate-180');
-      }
+      const isOpen = !moreFiltersDrawer.classList.contains('is-open');
+      moreFiltersDrawer.classList.toggle('is-open', isOpen);
+      moreFiltersDrawer.setAttribute('aria-hidden', String(!isOpen));
+      toggleMoreFiltersBtn.setAttribute('aria-expanded', String(isOpen));
+      if (moreFiltersChevron) moreFiltersChevron.classList.toggle('rotate-180', isOpen);
     });
   }
 
@@ -1097,8 +1092,6 @@ export function applyMasterLogFilters() {
   });
 
   const filteredTotalProfit = roundCurrency(filteredStatProfit + filteredReloadComm);
-  const filteredCombinedRevenue = roundCurrency(filteredStatSales + filteredReloadVol);
-
   // Card 1: Filtered Reloads Card
   const elLogReloadVol = document.getElementById('logPairedReloadVol');
   const elLogReloadComm = document.getElementById('logPairedReloadComm');
@@ -1116,15 +1109,13 @@ export function applyMasterLogFilters() {
 
   if (elLogStatSales) elLogStatSales.textContent = formatLKR(filteredStatSales);
   if (elLogStatProfit) elLogStatProfit.textContent = `+${formatLKR(filteredStatProfit)}`;
-  if (elLogStatStats) elLogStatStats.textContent = `${filteredStatUnits} units sold • ${filteredStatCount} txs`;
+  if (elLogStatStats) elLogStatStats.textContent = `${filteredStatUnits} units sold | ${filteredStatCount} txs`;
 
   // Card 3: Dedicated Standalone Combined Total Profit Card
   const elLogCombinedTotalProfit = document.getElementById('logCombinedTotalProfit');
-  const elLogCombinedRevenue = document.getElementById('logCombinedRevenue');
   const elLogCombinedProfitStats = document.getElementById('logCombinedProfitStats');
 
   if (elLogCombinedTotalProfit) elLogCombinedTotalProfit.textContent = formatLKR(filteredTotalProfit);
-  if (elLogCombinedRevenue) elLogCombinedRevenue.textContent = formatLKR(filteredCombinedRevenue);
   if (elLogCombinedProfitStats) elLogCombinedProfitStats.textContent = `Reloads (${formatLKR(filteredReloadComm)}) + Stationery (${formatLKR(filteredStatProfit)})`;
 
   // Filter Scope Label
@@ -1868,7 +1859,7 @@ function initStationeryPOS() {
             updatedAt: serverTimestamp()
           });
           const remainingStock = Math.max(0, matchedItem.stockQuantity - quantity);
-          showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) â€¢ Stock left: ${remainingStock}`, 'success');
+          showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) | Stock left: ${remainingStock}`, 'success');
         } else if (isService) {
           showToast(`Recorded utility bill: ${itemName} (${formatLKR(totalAmount)}) [No stock deduction]`, 'success');
         } else {
@@ -1929,7 +1920,7 @@ function renderRecentStationeryFeed() {
         ${badge}
         <div>
           <span class="font-bold theme-text-main">${escapeHTML(item.itemName)}</span>
-          <span class="text-[11px] theme-text-dim"> Ã— ${item.quantity || 1} â€¢ ${escapeHTML(item.time || '')}</span>
+          <span class="text-[11px] theme-text-dim"> &times; ${item.quantity || 1} &bull; ${escapeHTML(item.time || '')}</span>
         </div>
       </div>
       <div class="text-right">
@@ -2667,7 +2658,7 @@ function initSettingsPanels() {
       span.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border theme-border theme-bg-surface text-xs font-bold font-mono';
       span.innerHTML = `
         <span>Rs. ${val}</span>
-        <button type="button" class="del-preset-btn text-red-400 hover:text-red-300 ml-1 text-sm font-bold">âœ•</button>
+        <button type="button" class="del-preset-btn text-red-400 hover:text-red-300 ml-1 text-sm font-bold">&times;</button>
       `;
       span.querySelector('.del-preset-btn')?.addEventListener('click', async () => {
         APP_STATE.reloadPresets = APP_STATE.reloadPresets.filter(p => p !== val);
