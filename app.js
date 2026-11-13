@@ -1,5 +1,5 @@
 ﻿// =============================================================================
-// AL COMMUNICATION - PRODUCTION RETAIL MANAGEMENT SYSTEM (VERSION 5.0)
+// AL COMMUNICATION â€” PRODUCTION RETAIL MANAGEMENT SYSTEM (VERSION 5.0)
 // High-Contrast Solid Modern Default UI | Branded Sticky Navigation
 // Universal Global Search Engine | Service/Utility Bills (No Qty)
 // Auto Title Case Formatting | Natural Numeric Inventory Sorting
@@ -10,10 +10,7 @@
 import {
   auth,
   db,
-  secondaryAuth,
-  authPersistenceReady,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   updateEmail,
@@ -32,23 +29,8 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
-  increment,
-  runTransaction
+  increment
 } from './firebase-config.js';
-
-const ADMIN_EMAIL = 'lasasdias11@gmail.com';
-const DEFAULT_DASHBOARD_ORDER = {
-  metrics: [
-    'card-dash-stationery',
-    'card-dash-reloads',
-    'card-dash-commission',
-    'card-dash-stationery-profit',
-    'card-dash-catalog',
-    'card-dash-reload-profit-total',
-    'card-dash-stationery-profit-total'
-  ],
-  actions: ['action-stationery', 'action-reloads', 'action-stock', 'action-logs', 'action-settings', 'action-profile']
-};
 
 // =============================================================================
 // 1. GLOBAL APPLICATION STATE (V5.0 ARCHITECTURE)
@@ -56,14 +38,8 @@ const DEFAULT_DASHBOARD_ORDER = {
 
 export const APP_STATE = {
   currentUser: null,
-  currentRole: 'user',
   activeView: 'dashboard',
-  previousView: 'dashboard',
   activeTheme: localStorage.getItem('al_theme_preference') || 'modern-slate',
-  gradientBlurEnabled: localStorage.getItem('al_gradient_blur') !== 'false',
-  dashboardOrder: DEFAULT_DASHBOARD_ORDER,
-  hiddenDashboardCards: [],
-  userProfiles: [],
   inventoryCatalog: [],
   todayStationeryTransactions: [],
   todayReloadTransactions: [],
@@ -78,8 +54,8 @@ export const APP_STATE = {
   reloadPresets: [50, 100, 200, 500, 1000],
   selectedCatalogItem: null,
   selectedOperator: 'DIALOG',
-  stockSortOrder: localStorage.getItem('al_stock_sort_order') || 'name-asc',
-  catalogSortOrder: localStorage.getItem('al_catalog_sort_order') || 'name-asc',
+  stockSortOrder: 'code-asc',
+  catalogSortOrder: 'code-asc',
   stockFilter: 'ALL',
   logTab: 'all',
   logDateScope: 'today',
@@ -128,18 +104,6 @@ export function formatLKR(amount, prefix = 'Rs. ') {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
-  document.addEventListener('click', event => {
-    if (menuDrawer && !menuDrawer.contains(event.target) && !menuToggle?.contains(event.target)) {
-      menuDrawer.classList.add('hidden');
-      menuDrawer.setAttribute('aria-hidden', 'true');
-      menuToggle?.setAttribute('aria-expanded', 'false');
-    }
-  });
-}
-
-export function formatSignedLKR(amount) {
-  const rounded = roundCurrency(amount);
-  return `${rounded < 0 ? '- ' : '+ '}${formatLKR(Math.abs(rounded))}`;
 }
 
 /**
@@ -148,11 +112,9 @@ export function formatSignedLKR(amount) {
  */
 export function toTitleCase(str) {
   if (!str) return '';
-  const acronyms = new Set(['A4', 'A5', 'LED', 'AA', 'AAA', 'USB']);
-  return String(str).trim().replace(/\s+/g, ' ').toLowerCase().replace(/[a-z0-9]+/gi, word => {
-    const upperWord = word.toUpperCase();
-    return acronyms.has(upperWord) ? upperWord : word.charAt(0).toUpperCase() + word.slice(1);
-  });
+  return String(str)
+    .toLowerCase()
+    .replace(/(?:^|\s|[-/()&])([a-z0-9])/gi, (match) => match.toUpperCase());
 }
 
 export function getTodayDateString() {
@@ -191,55 +153,6 @@ function escapeHTML(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
-
-async function removeTransaction(type, transactionRecord) {
-  const currentUser = auth.currentUser;
-  if (!currentUser) throw new Error('Sign in before deleting transactions.');
-  const currentUserId = currentUser.uid;
-  const isAdmin = APP_STATE.currentRole === 'admin';
-
-  const collectionName = type === 'RELOAD' ? 'reload_transactions' : 'stationery_transactions';
-  const transactionRef = doc(db, collectionName, transactionRecord.id);
-  const stockRestored = await runTransaction(db, async firestoreTransaction => {
-    const transactionSnapshot = await firestoreTransaction.get(transactionRef);
-    if (!transactionSnapshot.exists()) throw new Error('This transaction no longer exists.');
-
-    const data = transactionSnapshot.data();
-    if (!isAdmin && data.createdBy !== currentUserId) {
-      throw new Error('You can delete only transactions recorded by your account.');
-    }
-    const isPhysicalSale = type !== 'RELOAD' && data.itemType !== 'service';
-    let restored = false;
-    if (isPhysicalSale) {
-      const catalogItem = data.inventoryId
-        ? { id: data.inventoryId }
-        : APP_STATE.inventoryCatalog.find(item => item.code === data.itemCode);
-
-      if (catalogItem?.id) {
-        const inventoryRef = doc(db, 'inventory', catalogItem.id);
-        const inventorySnapshot = await firestoreTransaction.get(inventoryRef);
-        if (!inventorySnapshot.exists()) {
-          throw new Error('The original inventory item is missing; the transaction was not deleted.');
-        }
-        const quantity = Number(data.quantity ?? 1);
-        if (!Number.isFinite(quantity) || quantity <= 0) {
-          throw new Error('The transaction has an invalid quantity; the transaction was not deleted.');
-        }
-        firestoreTransaction.update(inventoryRef, {
-          stockQuantity: increment(quantity),
-          updatedAt: serverTimestamp()
-        });
-        restored = true;
-      } else if (data.inventoryId) {
-        throw new Error('The original inventory item is missing; the transaction was not deleted.');
-      }
-    }
-
-    firestoreTransaction.delete(transactionRef);
-    return restored;
-  });
-  return stockRestored;
 }
 
 // =============================================================================
@@ -335,7 +248,6 @@ export function applyTheme(themeName) {
 
 function initThemeSystem() {
   applyTheme(APP_STATE.activeTheme);
-  setGradientBlurEnabled(APP_STATE.gradientBlurEnabled);
 
   // Quick Header Light/Dark Toggle
   const quickToggle = document.getElementById('themeQuickToggleBtn');
@@ -343,7 +255,6 @@ function initThemeSystem() {
     quickToggle.addEventListener('click', () => {
       const nextTheme = APP_STATE.activeTheme === 'emerald-store' ? 'modern-slate' : 'emerald-store';
       applyTheme(nextTheme);
-      saveUserPreferences({ activeTheme: nextTheme });
       showToast(`Switched to ${nextTheme === 'emerald-store' ? 'Light Mode' : 'Dark Mode'}`, 'info');
     });
   }
@@ -353,33 +264,9 @@ function initThemeSystem() {
     btn.addEventListener('click', () => {
       const chosen = btn.getAttribute('data-theme-choice');
       applyTheme(chosen);
-      saveUserPreferences({ activeTheme: chosen });
       showToast(`Theme applied: ${chosen}`, 'success');
     });
   });
-
-  const blurToggle = document.getElementById('gradientBlurToggle');
-  if (blurToggle) {
-    blurToggle.checked = APP_STATE.gradientBlurEnabled;
-    blurToggle.addEventListener('change', () => {
-      setGradientBlurEnabled(blurToggle.checked, true);
-    });
-  }
-
-  document.getElementById('resetDashboardLayoutBtn')?.addEventListener('click', resetDashboardLayout);
-}
-
-function setGradientBlurEnabled(enabled, persist = false) {
-  APP_STATE.gradientBlurEnabled = Boolean(enabled);
-  document.documentElement.dataset.gradientBlur = enabled ? 'on' : 'off';
-  localStorage.setItem('al_gradient_blur', String(Boolean(enabled)));
-  const toggle = document.getElementById('gradientBlurToggle');
-  const stateLabel = document.getElementById('gradientBlurState');
-  if (toggle) toggle.checked = Boolean(enabled);
-  if (stateLabel) stateLabel.textContent = enabled ? 'On' : 'Off';
-  const profileToggle = document.getElementById('profileBlurToggleBtn');
-  if (profileToggle) profileToggle.textContent = `Gradient Blur: ${enabled ? 'On' : 'Off'}`;
-  if (persist) saveUserPreferences({ gradientBlurEnabled: Boolean(enabled) });
 }
 
 // =============================================================================
@@ -435,14 +322,9 @@ export function detectOperatorFromPrefix(phone) {
 // =============================================================================
 
 export function switchView(viewName) {
-  if (!auth.currentUser) {
-    showToast('Sign in before opening protected pages.', 'error');
-    return false;
-  }
-  const validViews = ['dashboard', 'stationery', 'reloads', 'stock', 'logs', 'profile'];
+  const validViews = ['dashboard', 'stationery', 'reloads', 'stock', 'logs'];
   if (!validViews.includes(viewName)) viewName = 'dashboard';
 
-  if (viewName !== 'profile') APP_STATE.previousView = viewName;
   APP_STATE.activeView = viewName;
 
   // Toggle view containers
@@ -472,10 +354,6 @@ export function switchView(viewName) {
       btn.className = 'mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted';
     }
   });
-  document.getElementById('openProfileBtn')?.classList.toggle('active', viewName === 'profile');
-  document.getElementById('mobileMenuDrawer')?.classList.add('hidden');
-  document.getElementById('mobileMenuToggleBtn')?.setAttribute('aria-expanded', 'false');
-  document.getElementById('mobileMenuDrawer')?.setAttribute('aria-hidden', 'true');
 
   // Contextual view refreshes
   if (viewName === 'stock') {
@@ -488,7 +366,6 @@ export function switchView(viewName) {
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
   logDebug(`Switched active view to: ${viewName}`);
-  return true;
 }
 
 function initNavigation() {
@@ -508,35 +385,11 @@ function initNavigation() {
     }
   });
 
-  document.querySelectorAll('.mobile-menu-nav-btn[data-view]').forEach(btn => {
-    btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
-  });
-
-  const menuToggle = document.getElementById('mobileMenuToggleBtn');
-  const menuDrawer = document.getElementById('mobileMenuDrawer');
-  menuToggle?.addEventListener('click', () => {
-    const opening = menuDrawer?.classList.contains('hidden');
-    menuDrawer?.classList.toggle('hidden', !opening);
-    menuDrawer?.setAttribute('aria-hidden', String(!opening));
-    menuToggle.setAttribute('aria-expanded', String(Boolean(opening)));
-  });
-  document.getElementById('mobileMenuProfileBtn')?.addEventListener('click', () => switchView('profile'));
-  document.getElementById('desktopSettingsNavBtn')?.addEventListener('click', openSettingsModal);
-  document.getElementById('mobileMenuSettingsBtn')?.addEventListener('click', () => {
-    menuDrawer?.classList.add('hidden');
-    menuToggle?.setAttribute('aria-expanded', 'false');
-    menuDrawer?.setAttribute('aria-hidden', 'true');
-    openSettingsModal();
-  });
-
   // Header Brand Logo link -> Dashboard
   const headerHomeBtn = document.getElementById('headerHomeBtn');
   if (headerHomeBtn) {
     headerHomeBtn.addEventListener('click', () => switchView('dashboard'));
   }
-  document.querySelectorAll('#headerHomeBtn img, #settingsModal img[alt="AL Communication"]').forEach(image => {
-    image.addEventListener('error', () => image.classList.add('hidden'), { once: true });
-  });
 
   // Dashboard 4 Operational Quick Actions (Below Metrics)
   const dashTileStationery = document.getElementById('dashTileStationery');
@@ -558,8 +411,6 @@ function initNavigation() {
   if (dashTileLogs) {
     dashTileLogs.addEventListener('click', () => switchView('logs'));
   }
-  document.getElementById('dashTileSettings')?.addEventListener('click', openSettingsModal);
-  document.getElementById('dashTileProfile')?.addEventListener('click', () => switchView('profile'));
 
   // Stock inventory -> Open Settings Catalog
   // Stock inventory -> Open Settings Catalog
@@ -609,7 +460,6 @@ export function openSettingsModal() {
   const modal = document.getElementById('settingsModal');
   if (modal) {
     modal.classList.remove('hidden');
-    document.getElementById('desktopSettingsNavBtn')?.classList.add('active');
     updateBackupStatusDisplay();
   }
 }
@@ -617,7 +467,6 @@ export function openSettingsModal() {
 export function closeSettingsModal() {
   const modal = document.getElementById('settingsModal');
   if (modal) modal.classList.add('hidden');
-  document.getElementById('desktopSettingsNavBtn')?.classList.remove('active');
 }
 
 export function switchSettingsTab(tabId) {
@@ -717,12 +566,6 @@ function initGlobalSearch() {
 
   // Search field logic
   if (input && results) {
-    input.addEventListener('keydown', event => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        results.querySelector('.search-result-item')?.click();
-      }
-    });
     input.addEventListener('input', () => {
       const queryStr = input.value.trim().toLowerCase();
       if (!queryStr) {
@@ -751,32 +594,6 @@ function initGlobalSearch() {
   function performSearch(q, container) {
     container.innerHTML = '';
     container.classList.remove('hidden');
-
-    const navigationTargets = [
-      { label: 'Dashboard', terms: 'home metrics cards', view: 'dashboard' },
-      { label: 'Stationery Entry', terms: 'stationery point of sale bills', view: 'stationery' },
-      { label: 'Mobile Reloads', terms: 'reload top up mobile', view: 'reloads' },
-      { label: 'Stock Inventory', terms: 'stock inventory catalog', view: 'stock' },
-      { label: 'Master Logs', terms: 'logs ledger transactions report', view: 'logs' },
-      { label: 'Account Profile', terms: 'profile account password security', view: 'profile' },
-      { label: 'Settings: Inventory Catalog', terms: 'settings catalog inventory items', tab: 'catalog' },
-      { label: 'Settings: Reload Presets', terms: 'settings reload presets amounts', tab: 'presets' },
-      { label: 'Settings: Commission Rates', terms: 'settings commission rate operator', tab: 'rates' },
-      { label: 'Settings: Backup & Restore', terms: 'settings backup restore export import', tab: 'backup' },
-      { label: 'Settings: Themes & Header Blur', terms: 'settings theme gradient blur ui', tab: 'themes' },
-      { label: 'Settings: Account Security', terms: 'settings password security account', tab: 'security' },
-      { label: 'Settings: Debug Console', terms: 'settings debug developer diagnostics', tab: 'developer' }
-    ];
-    const matchedNavigation = navigationTargets.filter(target =>
-      `${target.label} ${target.terms}`.toLowerCase().includes(q)
-    );
-    const dashboardCards = [...document.querySelectorAll('#dashboardGrid > [data-card-id]')]
-      .map(card => ({
-        label: card.querySelector('span')?.textContent?.trim() || card.textContent.trim().split('\n')[0],
-        card
-      }))
-      .filter(target => target.label && target.label.toLowerCase().includes(q))
-      .slice(0, 5);
 
     // 1. Search Catalog Items & Stock
     const matchedCatalog = APP_STATE.inventoryCatalog.filter(item => {
@@ -813,7 +630,7 @@ function initGlobalSearch() {
       }
     }
 
-    const totalMatches = matchedNavigation.length + dashboardCards.length + matchedCatalog.length + uniqueReloads.length + uniqueStats.length;
+    const totalMatches = matchedCatalog.length + uniqueReloads.length + uniqueStats.length;
 
     if (totalMatches === 0) {
       container.innerHTML = `
@@ -822,37 +639,6 @@ function initGlobalSearch() {
         </div>
       `;
       return;
-    }
-
-    if (matchedNavigation.length || dashboardCards.length) {
-      const header = document.createElement('div');
-      header.className = 'search-section-header flex items-center justify-between';
-      header.innerHTML = `<span>Pages, Settings &amp; Dashboard</span><span>${matchedNavigation.length + dashboardCards.length}</span>`;
-      container.appendChild(header);
-      [...matchedNavigation, ...dashboardCards.map(target => ({ ...target, card: target.card }))].forEach(target => {
-        const row = document.createElement('button');
-        row.type = 'button';
-        row.className = 'search-result-item w-full text-left';
-        row.innerHTML = `<div class="min-w-0"><div class="font-bold text-xs theme-text-main">${escapeHTML(target.label)}</div><div class="text-[11px] theme-text-dim">${target.tab ? 'Open settings section' : target.view ? 'Navigate to page' : 'Open dashboard card'}</div></div><span class="theme-text-dim">→</span>`;
-        row.addEventListener('click', () => {
-          container.classList.add('hidden');
-          if (target.card) {
-            const action = target.card.querySelector('button') || target.card;
-            if (target.card.closest('#dashboardActionsGrid')) {
-              action.click();
-            } else {
-              switchView('dashboard');
-              requestAnimationFrame(() => target.card.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-            }
-          } else if (target.tab) {
-            openSettingsModal();
-            switchSettingsTab(target.tab);
-          } else {
-            switchView(target.view);
-          }
-        });
-        container.appendChild(row);
-      });
     }
 
     // CATEGORY 1: CATALOG & STOCK INVENTORY
@@ -869,14 +655,14 @@ function initGlobalSearch() {
         const stockBadge = isService
           ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service/Bill</span>`
           : item.stockQuantity <= 5
-          ? `<span class="badge-stock-low px-2 py-0.5 rounded text-[10px] font-bold">${escapeHTML(item.stockQuantity)} Left</span>`
-          : `<span class="badge-stock-in px-2 py-0.5 rounded text-[10px] font-bold">${escapeHTML(item.stockQuantity)} in stock</span>`;
+          ? `<span class="badge-stock-low px-2 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} Left</span>`
+          : `<span class="badge-stock-in px-2 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} in stock</span>`;
 
         row.innerHTML = `
           <div class="flex items-center gap-2.5 min-w-0">
             <span class="px-2 py-0.5 rounded text-[11px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">${escapeHTML(item.code)}</span>
             <div class="truncate">
-              <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(toTitleCase(item.name))}</div>
+              <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(item.name)}</div>
               <div class="text-[11px] theme-text-dim">${escapeHTML(item.category || 'General')}</div>
             </div>
           </div>
@@ -930,7 +716,7 @@ function initGlobalSearch() {
           </div>
           <div class="text-right flex-shrink-0">
             <div class="font-bold text-xs text-emerald-400 font-mono">${formatLKR(r.amount)}</div>
-            <div class="text-[10px] theme-text-dim font-mono">${formatSignedLKR(r.commissionAmount)}</div>
+            <div class="text-[10px] theme-text-dim font-mono">+${formatLKR(r.commissionAmount)}</div>
           </div>
         `;
 
@@ -963,13 +749,13 @@ function initGlobalSearch() {
           <div class="flex items-center gap-2.5 min-w-0">
             <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(s.itemCode || 'ST')}</span>
             <div class="truncate">
-              <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(toTitleCase(s.itemName))}</div>
-              <div class="text-[10px] theme-text-dim">${escapeHTML(s.date || '')} &bull; Qty: ${escapeHTML(s.quantity || 1)}</div>
+              <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(s.itemName)}</div>
+              <div class="text-[10px] theme-text-dim">${escapeHTML(s.date || '')} â€¢ Qty: ${s.quantity || 1}</div>
             </div>
           </div>
           <div class="text-right flex-shrink-0">
             <div class="font-bold text-xs theme-text-main font-mono">${formatLKR(s.totalAmount)}</div>
-            <div class="text-[10px] text-sky-400 font-mono">Profit: ${formatSignedLKR(s.profit ?? ((Number(s.sellingPrice || 0) - Number(s.costPrice || 0)) * Number(s.quantity || 1)))}</div>
+            <div class="text-[10px] text-sky-400 font-mono">Profit: +${formatLKR(s.profit || 0)}</div>
           </div>
         `;
 
@@ -1000,52 +786,31 @@ function initGlobalSearch() {
  */
 export function sortCatalogList(items, sortKey) {
   const list = [...items];
-  const compareName = (a, b) => toTitleCase(a.name).localeCompare(toTitleCase(b.name), undefined, { numeric: true, sensitivity: 'base' });
-  const addedAt = item => {
-    const value = item.createdAt;
-    if (value?.toMillis) return value.toMillis();
-    const parsed = value ? new Date(value).getTime() : 0;
-    return Number.isFinite(parsed) ? parsed : 0;
-  };
   switch (sortKey) {
     case 'code-asc':
       return list.sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
     case 'code-desc':
       return list.sort((a, b) => String(b.code || '').localeCompare(String(a.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
-    case 'selling-asc':
     case 'price-asc':
       return list.sort((a, b) => (Number(a.sellingPrice) || 0) - (Number(b.sellingPrice) || 0));
-    case 'selling-desc':
     case 'price-desc':
       return list.sort((a, b) => (Number(b.sellingPrice) || 0) - (Number(a.sellingPrice) || 0));
-    case 'cost-asc':
-      return list.sort((a, b) => (Number(a.costPrice) || 0) - (Number(b.costPrice) || 0));
-    case 'cost-desc':
-      return list.sort((a, b) => (Number(b.costPrice) || 0) - (Number(a.costPrice) || 0));
     case 'stock-asc':
       return list.sort((a, b) => {
-        if (a.itemType === 'service' || b.itemType === 'service') {
-          return a.itemType === b.itemType ? 0 : a.itemType === 'service' ? 1 : -1;
-        }
+        if (a.itemType === 'service') return 1;
+        if (b.itemType === 'service') return -1;
         return (Number(a.stockQuantity) || 0) - (Number(b.stockQuantity) || 0);
       });
     case 'stock-desc':
       return list.sort((a, b) => {
-        if (a.itemType === 'service' || b.itemType === 'service') {
-          return a.itemType === b.itemType ? 0 : a.itemType === 'service' ? 1 : -1;
-        }
+        if (a.itemType === 'service') return 1;
+        if (b.itemType === 'service') return -1;
         return (Number(b.stockQuantity) || 0) - (Number(a.stockQuantity) || 0);
       });
     case 'name-asc':
-      return list.sort(compareName);
-    case 'name-desc':
-      return list.sort((a, b) => compareName(b, a));
-    case 'newest':
-      return list.sort((a, b) => addedAt(b) - addedAt(a));
-    case 'oldest':
-      return list.sort((a, b) => addedAt(a) - addedAt(b));
+      return list.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }));
     default:
-      return list.sort(compareName);
+      return list;
   }
 }
 
@@ -1083,32 +848,29 @@ export function updateDashboardMetrics() {
     reloadCommission += Number(r.commissionAmount || 0);
   });
 
-  const lifetimeReloadCommission = roundCurrency(APP_STATE.masterReloadRecords
-    .reduce((sum, record) => sum + Number(record.commissionAmount || 0), 0));
-  const lifetimeStationeryProfit = roundCurrency(APP_STATE.masterStationeryRecords
-    .reduce((sum, record) => sum + Number(
-      record.profit !== undefined
-        ? record.profit
-        : (Number(record.sellingPrice || 0) - Number(record.costPrice || 0)) * Number(record.quantity || 1)
-    ), 0));
+  // Combined Totals
+  const combinedRevenue = roundCurrency(statSales + reloadVolume);
+  const combinedTotalProfit = roundCurrency(statProfitToday + reloadCommission);
 
-  // The dashboard contains exactly the seven requested metrics.
+  // Exact 6 Dashboard Metric Cards
+  const elCombinedRevenue = document.getElementById('dashTodayCombinedRevenue');
   const elStatSales = document.getElementById('dashStationerySales');
   const elStatUnits = document.getElementById('dashStationeryUnits');
   const elReloadVol = document.getElementById('dashReloadVolume');
   const elReloadComm = document.getElementById('dashReloadCommission');
   const elStatProfit = document.getElementById('dashStationeryProfit');
   const elCatalogCount = document.getElementById('dashCatalogCount');
-  const elLifetimeReloadCommission = document.getElementById('dashReloadCommissionTotal');
-  const elLifetimeStationeryProfit = document.getElementById('dashStationeryProfitTotal');
+  const elCombinedProfit = document.getElementById('dashCombinedTotalProfit');
+
+  if (elCombinedRevenue) elCombinedRevenue.textContent = formatLKR(combinedRevenue);
   if (elStatSales) elStatSales.textContent = formatLKR(statSales);
   if (elStatUnits) elStatUnits.textContent = String(statUnits);
   if (elReloadVol) elReloadVol.textContent = formatLKR(reloadVolume);
-  if (elReloadComm) elReloadComm.textContent = formatSignedLKR(reloadCommission);
-  if (elStatProfit) elStatProfit.textContent = formatSignedLKR(statProfitToday);
+  // Clean LKR amount only â€” Strictly NO "Comm." text
+  if (elReloadComm) elReloadComm.textContent = formatLKR(reloadCommission);
+  if (elStatProfit) elStatProfit.textContent = formatLKR(statProfitToday);
   if (elCatalogCount) elCatalogCount.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
-  if (elLifetimeReloadCommission) elLifetimeReloadCommission.textContent = formatSignedLKR(lifetimeReloadCommission);
-  if (elLifetimeStationeryProfit) elLifetimeStationeryProfit.textContent = formatSignedLKR(lifetimeStationeryProfit);
+  if (elCombinedProfit) elCombinedProfit.textContent = formatLKR(combinedTotalProfit);
 
   // Also update paired cards in Master Logs
   updateMasterLogsPairedCards();
@@ -1141,8 +903,6 @@ function initMasterLogs() {
         APP_STATE.logDateScope = 'specific';
         APP_STATE.logDateFrom = val;
         APP_STATE.logDateTo = val;
-        if (fromInput) fromInput.value = '';
-        if (toInput) toInput.value = '';
         document.querySelectorAll('[data-log-date]').forEach(b => {
           b.className = 'log-date-btn px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border transition font-rounded text-xs';
         });
@@ -1154,11 +914,16 @@ function initMasterLogs() {
   // Toggle "More Filter Options"
   if (toggleMoreFiltersBtn && moreFiltersDrawer) {
     toggleMoreFiltersBtn.addEventListener('click', () => {
-      const isOpen = !moreFiltersDrawer.classList.contains('is-open');
-      moreFiltersDrawer.classList.toggle('is-open', isOpen);
-      moreFiltersDrawer.setAttribute('aria-hidden', String(!isOpen));
-      toggleMoreFiltersBtn.setAttribute('aria-expanded', String(isOpen));
-      if (moreFiltersChevron) moreFiltersChevron.classList.toggle('rotate-180', isOpen);
+      const isHidden = moreFiltersDrawer.classList.contains('hidden');
+      if (isHidden) {
+        moreFiltersDrawer.classList.remove('hidden');
+        toggleMoreFiltersBtn.setAttribute('aria-expanded', 'true');
+        if (moreFiltersChevron) moreFiltersChevron.classList.add('rotate-180');
+      } else {
+        moreFiltersDrawer.classList.add('hidden');
+        toggleMoreFiltersBtn.setAttribute('aria-expanded', 'false');
+        if (moreFiltersChevron) moreFiltersChevron.classList.remove('rotate-180');
+      }
     });
   }
 
@@ -1172,8 +937,6 @@ function initMasterLogs() {
 
       const scope = btn.getAttribute('data-log-date');
       APP_STATE.logDateScope = scope;
-      if (fromInput) fromInput.value = '';
-      if (toInput) toInput.value = '';
 
       if (scope === 'today') {
         APP_STATE.logDateFrom = getTodayDateString();
@@ -1201,14 +964,9 @@ function initMasterLogs() {
   if (applyCustomDateBtn) {
     applyCustomDateBtn.addEventListener('click', () => {
       if (fromInput && fromInput.value) {
-        const rangeEnd = (toInput && toInput.value) ? toInput.value : fromInput.value;
-        if (rangeEnd < fromInput.value) {
-          showToast('The end date must be on or after the start date.', 'error');
-          return;
-        }
         APP_STATE.logDateScope = 'custom';
         APP_STATE.logDateFrom = fromInput.value;
-        APP_STATE.logDateTo = rangeEnd;
+        APP_STATE.logDateTo = (toInput && toInput.value) ? toInput.value : fromInput.value;
         if (specificDateInput) specificDateInput.value = '';
         document.querySelectorAll('[data-log-date]').forEach(b => {
           b.className = 'log-date-btn px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border transition font-rounded text-xs';
@@ -1339,14 +1097,16 @@ export function applyMasterLogFilters() {
   });
 
   const filteredTotalProfit = roundCurrency(filteredStatProfit + filteredReloadComm);
+  const filteredCombinedRevenue = roundCurrency(filteredStatSales + filteredReloadVol);
+
   // Card 1: Filtered Reloads Card
   const elLogReloadVol = document.getElementById('logPairedReloadVol');
   const elLogReloadComm = document.getElementById('logPairedReloadComm');
   const elLogReloadStats = document.getElementById('logPairedReloadStats');
 
   if (elLogReloadVol) elLogReloadVol.textContent = formatLKR(filteredReloadVol);
-  // Display the full currency amount without a shortened commission label.
-  if (elLogReloadComm) elLogReloadComm.textContent = formatSignedLKR(filteredReloadComm);
+  // Clean LKR amount only - strictly NO "Comm." text
+  if (elLogReloadComm) elLogReloadComm.textContent = `+${formatLKR(filteredReloadComm)}`;
   if (elLogReloadStats) elLogReloadStats.textContent = `${filteredReloadCount} reload transactions`;
 
   // Card 2: Filtered Stationery & Bills Card
@@ -1355,34 +1115,29 @@ export function applyMasterLogFilters() {
   const elLogStatStats = document.getElementById('logPairedStatStats');
 
   if (elLogStatSales) elLogStatSales.textContent = formatLKR(filteredStatSales);
-  if (elLogStatProfit) elLogStatProfit.textContent = formatSignedLKR(filteredStatProfit);
-  if (elLogStatStats) elLogStatStats.textContent = `${filteredStatUnits} units sold | ${filteredStatCount} txs`;
+  if (elLogStatProfit) elLogStatProfit.textContent = `+${formatLKR(filteredStatProfit)}`;
+  if (elLogStatStats) elLogStatStats.textContent = `${filteredStatUnits} units sold • ${filteredStatCount} txs`;
 
   // Card 3: Dedicated Standalone Combined Total Profit Card
   const elLogCombinedTotalProfit = document.getElementById('logCombinedTotalProfit');
+  const elLogCombinedRevenue = document.getElementById('logCombinedRevenue');
   const elLogCombinedProfitStats = document.getElementById('logCombinedProfitStats');
 
-  if (elLogCombinedTotalProfit) elLogCombinedTotalProfit.textContent = formatSignedLKR(filteredTotalProfit);
-  if (elLogCombinedProfitStats) elLogCombinedProfitStats.textContent = `Reloads (${formatSignedLKR(filteredReloadComm)}) + Stationery (${formatSignedLKR(filteredStatProfit)})`;
+  if (elLogCombinedTotalProfit) elLogCombinedTotalProfit.textContent = formatLKR(filteredTotalProfit);
+  if (elLogCombinedRevenue) elLogCombinedRevenue.textContent = formatLKR(filteredCombinedRevenue);
+  if (elLogCombinedProfitStats) elLogCombinedProfitStats.textContent = `Reloads (${formatLKR(filteredReloadComm)}) + Stationery (${formatLKR(filteredStatProfit)})`;
 
   // Filter Scope Label
   const scopeLabel = document.getElementById('masterLogsDateScopeLabel');
   if (scopeLabel) {
     if (isAllTime) {
-      scopeLabel.textContent = 'Showing: All Time';
+      scopeLabel.textContent = 'All Time Records';
     } else if (fromDate === toDate) {
-      scopeLabel.textContent = fromDate === getTodayDateString() ? `Showing: Today (${fromDate})` : `Showing: ${fromDate}`;
+      scopeLabel.textContent = fromDate === getTodayDateString() ? `Today (${fromDate})` : fromDate;
     } else {
-      scopeLabel.textContent = `Showing: ${fromDate} → ${toDate}`;
+      scopeLabel.textContent = `${fromDate} to ${toDate}`;
     }
   }
-  const specificDateWrap = document.getElementById('logSpecificDateWrap');
-  specificDateWrap?.classList.toggle('filter-active', APP_STATE.logDateScope === 'specific');
-  const rangeDrawer = document.getElementById('moreFiltersDrawer');
-  rangeDrawer?.classList.toggle('range-active', APP_STATE.logDateScope === 'custom');
-  document.querySelectorAll('[data-log-date]').forEach(button => {
-    button.classList.toggle('active', button.getAttribute('data-log-date') === APP_STATE.logDateScope);
-  });
 
   // Update Category Badge Counts
   const countAll = document.getElementById('countLogAll');
@@ -1462,27 +1217,27 @@ function renderMasterLogsTable(rows) {
     }
 
     tr.innerHTML = `
-      <td data-label="Time / Date" class="py-2.5 px-3 font-mono text-xs whitespace-nowrap">
+      <td class="py-2.5 px-3 font-mono text-xs whitespace-nowrap">
         <div class="font-bold theme-text-main">${escapeHTML(item.time || '--:--')}</div>
         <div class="text-[10px] theme-text-dim">${escapeHTML(item.date || '')}</div>
       </td>
-      <td data-label="Category / Item" class="py-2.5 px-3">
+      <td class="py-2.5 px-3">
         <div class="flex items-center gap-2">
           ${typeBadge}
-          <span class="font-semibold text-xs theme-text-main">${escapeHTML(item.type === 'RELOAD' ? item.title : toTitleCase(item.title))}</span>
+          <span class="font-semibold text-xs theme-text-main">${escapeHTML(item.title)}</span>
         </div>
       </td>
-      <td data-label="Reference / Number" class="py-2.5 px-3 font-mono text-xs theme-text-dim">
+      <td class="py-2.5 px-3 font-mono text-xs theme-text-dim">
         ${escapeHTML(item.ref)}
       </td>
-      <td data-label="Amount" class="py-2.5 px-3 text-right font-mono font-bold text-xs theme-text-main currency-lkr">
+      <td class="py-2.5 px-3 text-right font-mono font-bold text-xs theme-text-main currency-lkr">
         ${formatLKR(item.amount)}
       </td>
-      <td data-label="Profit" class="py-2.5 px-3 text-right font-mono font-bold text-xs ${item.type === 'RELOAD' ? 'text-emerald-400' : 'text-sky-400'} currency-lkr">
-        ${formatSignedLKR(item.profit)}
+      <td class="py-2.5 px-3 text-right font-mono font-bold text-xs ${item.type === 'RELOAD' ? 'text-emerald-400' : 'text-sky-400'} currency-lkr">
+        +${formatLKR(item.profit)}
       </td>
-      <td data-label="Action" class="py-2.5 px-3 text-center">
-        <button type="button" class="delete-tx-btn min-h-11 min-w-11 p-1 text-red-400 hover:text-red-300 transition" title="Delete record" aria-label="Delete transaction">
+      <td class="py-2.5 px-3 text-center">
+        <button type="button" class="delete-tx-btn p-1 text-red-400 hover:text-red-300 transition" title="Delete record">
           <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </td>
@@ -1493,10 +1248,9 @@ function renderMasterLogsTable(rows) {
       deleteBtn.addEventListener('click', async () => {
         if (!confirm(`Delete transaction for "${item.title}" (${formatLKR(item.amount)})?`)) return;
         try {
-          const restored = await removeTransaction(item.type, item.raw);
-          showToast(restored
-            ? 'Transaction deleted, stock restored'
-            : 'Transaction deleted', 'success');
+          const colName = item.type === 'RELOAD' ? 'reload_transactions' : 'stationery_transactions';
+          await deleteDoc(doc(db, colName, item.raw.id));
+          showToast('Transaction record deleted', 'success');
         } catch (err) {
           showToast(`Delete failed: ${err.message}`, 'error');
         }
@@ -1549,20 +1303,13 @@ export async function generateProfessionalPdfReport() {
   const toDate = APP_STATE.logDateTo || fromDate;
   const isAllTime = fromDate === '1970-01-01' || APP_STATE.logDateScope === 'all-time';
   const dateRangeStr = isAllTime ? 'All Time Transaction Records' : (fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`);
-  const searchQuery = APP_STATE.logSearchQuery || '';
-  const matchesActiveSearch = record => !searchQuery ||
-    (record.itemName || '').toLowerCase().includes(searchQuery) ||
-    (record.itemCode || '').toLowerCase().includes(searchQuery) ||
-    (record.phone || '').toLowerCase().includes(searchQuery) ||
-    (record.operator || '').toLowerCase().includes(searchQuery) ||
-    String(record.totalAmount ?? record.amount ?? '').includes(searchQuery);
 
   const stationeryList = APP_STATE.masterStationeryRecords
-    .filter(s => (isAllTime || (s.date >= fromDate && s.date <= toDate)) && matchesActiveSearch(s))
+    .filter(s => isAllTime || (s.date >= fromDate && s.date <= toDate))
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
 
   const reloadList = APP_STATE.masterReloadRecords
-    .filter(r => (isAllTime || (r.date >= fromDate && r.date <= toDate)) && matchesActiveSearch(r))
+    .filter(r => isAllTime || (r.date >= fromDate && r.date <= toDate))
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
 
   let totalStatSales = 0;
@@ -1623,34 +1370,34 @@ export async function generateProfessionalPdfReport() {
   const boxW = 58;
   const boxH = 20;
 
-  // Box 1: Reload Sales & Profit
+  // Box 1: Stationery Sales & Profit
   pdfDoc.setFillColor(248, 250, 252);
   pdfDoc.setDrawColor(226, 232, 240);
   pdfDoc.roundedRect(14, boxY, boxW, boxH, 2, 2, 'FD');
   pdfDoc.setFont('helvetica', 'bold');
   pdfDoc.setFontSize(7.5);
   pdfDoc.setTextColor(100, 116, 139);
-  pdfDoc.text('FILTERED RELOADS', 17, boxY + 5);
+  pdfDoc.text('STATIONERY & BILLS REVENUE', 17, boxY + 5);
   pdfDoc.setFontSize(12);
   pdfDoc.setTextColor(15, 23, 42);
-  pdfDoc.text(formatLKR(totalReloadVol), 17, boxY + 12);
+  pdfDoc.text(formatLKR(totalStatSales), 17, boxY + 12);
   pdfDoc.setFontSize(7);
   pdfDoc.setTextColor(2, 132, 199);
-  pdfDoc.text(`Profit: ${formatSignedLKR(totalReloadComm)} (${reloadList.length} txs)`, 17, boxY + 17);
+  pdfDoc.text(`Profit: +${formatLKR(totalStatProfit)} (${totalUnitsSold} items)`, 17, boxY + 17);
 
-  // Box 2: Stationery & Bills Sales and Profit
+  // Box 2: Reload Sales & Profit
   pdfDoc.setFillColor(248, 250, 252);
   pdfDoc.roundedRect(76, boxY, boxW, boxH, 2, 2, 'FD');
   pdfDoc.setFont('helvetica', 'bold');
   pdfDoc.setFontSize(7.5);
   pdfDoc.setTextColor(100, 116, 139);
-  pdfDoc.text('FILTERED STATIONERY & BILLS', 79, boxY + 5);
+  pdfDoc.text('MOBILE RELOADS VOLUME', 79, boxY + 5);
   pdfDoc.setFontSize(12);
   pdfDoc.setTextColor(15, 23, 42);
-  pdfDoc.text(formatLKR(totalStatSales), 79, boxY + 12);
+  pdfDoc.text(formatLKR(totalReloadVol), 79, boxY + 12);
   pdfDoc.setFontSize(7);
   pdfDoc.setTextColor(16, 185, 129);
-  pdfDoc.text(`Profit: ${formatSignedLKR(totalStatProfit)} (${totalUnitsSold} units)`, 79, boxY + 17);
+  pdfDoc.text(`Profit: +${formatLKR(totalReloadComm)} (${reloadList.length} txs)`, 79, boxY + 17);
 
   // Box 3: Combined Total Profit
   pdfDoc.setFillColor(240, 253, 244);
@@ -1659,10 +1406,10 @@ export async function generateProfessionalPdfReport() {
   pdfDoc.setFont('helvetica', 'bold');
   pdfDoc.setFontSize(7.5);
   pdfDoc.setTextColor(22, 101, 52);
-  pdfDoc.text('TOTAL PROFIT', 141, boxY + 5);
+  pdfDoc.text('COMBINED TOTAL PROFIT', 141, boxY + 5);
   pdfDoc.setFontSize(12);
   pdfDoc.setTextColor(21, 128, 61);
-  pdfDoc.text(formatSignedLKR(totalNetProfit), 141, boxY + 12);
+  pdfDoc.text(formatLKR(totalNetProfit), 141, boxY + 12);
   pdfDoc.setFontSize(7);
   pdfDoc.setTextColor(71, 85, 105);
   pdfDoc.text(`Total Turnover: ${formatLKR(totalStoreRevenue)}`, 141, boxY + 17);
@@ -1674,11 +1421,11 @@ export async function generateProfessionalPdfReport() {
     tableData.push([
       `${s.date || ''} ${s.time || ''}`,
       s.itemType === 'service' ? 'Service/Bill' : 'Stationery',
-      toTitleCase(s.itemName || '-'),
+      s.itemName || '-',
       s.itemCode || '-',
       String(s.quantity || 1),
       formatLKR(Number(s.totalAmount || s.sellingPrice || 0)),
-      formatSignedLKR(Number(s.profit ?? (Number(s.sellingPrice || 0) - Number(s.costPrice || 0)) * Number(s.quantity || 1)))
+      `+${formatLKR(Number(s.profit || 0))}`
     ]);
   });
 
@@ -1690,7 +1437,7 @@ export async function generateProfessionalPdfReport() {
       r.phone || 'Walk-in',
       '1',
       formatLKR(Number(r.amount || 0)),
-      formatSignedLKR(Number(r.commissionAmount || 0))
+      `+${formatLKR(Number(r.commissionAmount || 0))}`
     ]);
   });
 
@@ -1759,7 +1506,6 @@ function initStockInventory() {
     sortSelect.value = APP_STATE.stockSortOrder;
     sortSelect.addEventListener('change', () => {
       APP_STATE.stockSortOrder = sortSelect.value;
-      localStorage.setItem('al_stock_sort_order', APP_STATE.stockSortOrder);
       renderStockTable();
     });
   }
@@ -1838,15 +1584,15 @@ export function renderStockTable() {
     } else if (item.stockQuantity <= 0) {
       stockCol = `<span class="badge-stock-out px-2.5 py-1 rounded-full text-xs font-bold">Out of Stock (0)</span>`;
     } else if (item.stockQuantity <= (item.lowStockThreshold || 5)) {
-      stockCol = `<span class="badge-stock-low px-2.5 py-1 rounded-full text-xs font-bold">${escapeHTML(item.stockQuantity)} Left (Low)</span>`;
+      stockCol = `<span class="badge-stock-low px-2.5 py-1 rounded-full text-xs font-bold">${item.stockQuantity} Left (Low)</span>`;
     } else {
-      stockCol = `<span class="badge-stock-in px-2.5 py-1 rounded-full text-xs font-bold">${escapeHTML(item.stockQuantity)} in stock</span>`;
+      stockCol = `<span class="badge-stock-in px-2.5 py-1 rounded-full text-xs font-bold">${item.stockQuantity} in stock</span>`;
     }
 
     tr.innerHTML = `
       <td class="py-3 px-3 sm:px-4 font-mono font-bold text-xs theme-text-main">${escapeHTML(item.code)}</td>
       <td class="py-3 px-3 sm:px-4">
-        <div class="font-bold text-xs theme-text-main">${escapeHTML(toTitleCase(item.name))}</div>
+        <div class="font-bold text-xs theme-text-main">${escapeHTML(item.name)}</div>
         <div class="text-[11px] theme-text-dim">${escapeHTML(item.category || 'General')}</div>
       </td>
       <td class="py-3 px-3 sm:px-4">${typeCol}</td>
@@ -1885,10 +1631,9 @@ function selectCatalogItemForPOS(item) {
   const priceInput = document.getElementById('posSellingPrice');
   const priceLabel = document.getElementById('posSellingPriceLabel');
   const qtyInput = document.getElementById('posQuantity');
-  const qtyContainer = document.getElementById('posQtyContainer');
   const submitBtnText = document.getElementById('posSubmitBtnText');
 
-  if (input) input.value = toTitleCase(item.name);
+  if (input) input.value = item.name;
   if (codeBadge) {
     codeBadge.textContent = item.code;
     codeBadge.classList.remove('hidden');
@@ -1930,9 +1675,7 @@ function selectCatalogItemForPOS(item) {
 
   if (qtyInput) {
     qtyInput.value = '1';
-    qtyInput.required = !isService;
   }
-  qtyContainer?.classList.toggle('hidden', isService);
 
   if (submitBtnText) {
     submitBtnText.textContent = isService ? 'Log Bill Payment' : 'Log Stationery Sale';
@@ -1997,11 +1740,11 @@ function initStationeryPOS() {
           div.innerHTML = `
             <div class="flex items-center gap-2">
               <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(item.code)}</span>
-              <span class="font-bold text-xs theme-text-main">${escapeHTML(toTitleCase(item.name))}</span>
+              <span class="font-bold text-xs theme-text-main">${escapeHTML(item.name)}</span>
             </div>
             <div class="text-right">
               <div class="font-bold text-xs theme-text-main font-mono">${formatLKR(item.sellingPrice)}</div>
-              <div class="text-[10px] theme-text-dim">${isService ? 'Service/Bill' : `${escapeHTML(item.stockQuantity)} left`}</div>
+              <div class="text-[10px] theme-text-dim">${isService ? 'Service/Bill' : item.stockQuantity + ' left'}</div>
             </div>
           `;
           div.addEventListener('click', () => {
@@ -2071,8 +1814,9 @@ function initStationeryPOS() {
       let lineProfit = 0;
 
       if (isService) {
+        // Utility bills: No stock count. Profit is service fee or margin if defined, else 0
         costPrice = matchedItem ? roundCurrency(matchedItem.costPrice || 0) : 0;
-        unitProfit = roundCurrency(sellingPrice - costPrice);
+        unitProfit = roundCurrency(costPrice > 0 ? sellingPrice - costPrice : 0);
         lineProfit = roundCurrency(unitProfit * quantity);
       } else {
         costPrice = matchedItem ? roundCurrency(matchedItem.costPrice || 0) : 0;
@@ -2090,18 +1834,17 @@ function initStationeryPOS() {
       }
 
       // Stock Warning for physical products
-      if (!isService && matchedItem && Number(matchedItem.stockQuantity || 0) < quantity) {
-        showToast(`Insufficient stock for "${matchedItem.name}". Available: ${matchedItem.stockQuantity || 0}.`, 'error');
-        return;
+      if (!isService && matchedItem && matchedItem.stockQuantity < quantity) {
+        if (!confirm(`Warning: Only ${matchedItem.stockQuantity} units in stock for "${matchedItem.name}". Proceed with logging sale of ${quantity} units?`)) {
+          return;
+        }
       }
 
       const transactionPayload = {
         date: getTodayDateString(),
         time: getCurrentTimeString(),
-        createdBy: auth.currentUser.uid,
         itemCode,
         itemName,
-        ...(matchedItem?.id && !isService ? { inventoryId: matchedItem.id } : {}),
         category,
         itemType: isService ? 'service' : 'product',
         costPrice,
@@ -2114,33 +1857,21 @@ function initStationeryPOS() {
       };
 
       try {
+        // 1. Add Transaction to Firestore
+        await addDoc(collection(db, 'stationery_transactions'), transactionPayload);
+
+        // 2. Deduct Stock strictly for Physical Products (Requirement 4.2)
         if (!isService && matchedItem && matchedItem.id) {
           const itemDocRef = doc(db, 'inventory', matchedItem.id);
-          const transactionRef = doc(collection(db, 'stationery_transactions'));
-          await runTransaction(db, async firestoreTransaction => {
-            const inventorySnapshot = await firestoreTransaction.get(itemDocRef);
-            if (!inventorySnapshot.exists()) {
-              throw new Error('The selected inventory item no longer exists.');
-            }
-            const availableStock = Number(inventorySnapshot.data().stockQuantity || 0);
-            if (availableStock < quantity) {
-              throw new Error(`Insufficient stock. Only ${availableStock} units are currently available.`);
-            }
-            firestoreTransaction.update(itemDocRef, {
-              stockQuantity: increment(-quantity),
-              updatedAt: serverTimestamp()
-            });
-            firestoreTransaction.set(transactionRef, transactionPayload);
+          await updateDoc(itemDocRef, {
+            stockQuantity: increment(-quantity),
+            updatedAt: serverTimestamp()
           });
           const remainingStock = Math.max(0, matchedItem.stockQuantity - quantity);
-          showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) | Stock left: ${remainingStock}`, 'success');
-        } else {
-          await addDoc(collection(db, 'stationery_transactions'), transactionPayload);
-        }
-
-        if (isService) {
+          showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) â€¢ Stock left: ${remainingStock}`, 'success');
+        } else if (isService) {
           showToast(`Recorded utility bill: ${itemName} (${formatLKR(totalAmount)}) [No stock deduction]`, 'success');
-        } else if (!matchedItem) {
+        } else {
           showToast(`Logged custom sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)})`, 'success');
         }
 
@@ -2157,8 +1888,6 @@ function initStationeryPOS() {
         if (priceLabel) priceLabel.textContent = 'Selling Price / Amount [Rs.]';
         if (submitBtnText) submitBtnText.textContent = 'Log Stationery Sale';
         if (qtyInput) qtyInput.value = '1';
-        if (qtyInput) qtyInput.required = true;
-        document.getElementById('posQtyContainer')?.classList.remove('hidden');
         updatePOSTotalPreview();
         itemInput.focus();
       } catch (err) {
@@ -2199,29 +1928,15 @@ function renderRecentStationeryFeed() {
       <div class="flex items-center gap-2">
         ${badge}
         <div>
-          <span class="font-bold theme-text-main">${escapeHTML(toTitleCase(item.itemName))}</span>
-          <span class="text-[11px] theme-text-dim"> &times; ${escapeHTML(item.quantity || 1)} &bull; ${escapeHTML(item.time || '')}</span>
+          <span class="font-bold theme-text-main">${escapeHTML(item.itemName)}</span>
+          <span class="text-[11px] theme-text-dim"> Ã— ${item.quantity || 1} â€¢ ${escapeHTML(item.time || '')}</span>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <div class="text-right">
-          <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.totalAmount)}</span>
-          <span class="text-[10px] theme-text-dim block">${formatSignedLKR(item.profit ?? ((Number(item.sellingPrice || 0) - Number(item.costPrice || 0)) * Number(item.quantity || 1)))} margin</span>
-        </div>
-        <button type="button" class="recent-delete-btn min-h-11 min-w-11 text-red-400 hover:text-red-300" aria-label="Delete transaction" title="Delete transaction">
-          <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
+      <div class="text-right">
+        <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.totalAmount)}</span>
+        <span class="text-[10px] theme-text-dim block">+${formatLKR(item.profit || 0)} margin</span>
       </div>
     `;
-    div.querySelector('.recent-delete-btn')?.addEventListener('click', async () => {
-      if (!confirm(`Delete transaction for "${item.itemName}"?`)) return;
-      try {
-        const restored = await removeTransaction('STATIONERY', item);
-        showToast(restored ? 'Transaction deleted, stock restored' : 'Transaction deleted', 'success');
-      } catch (err) {
-        showToast(`Delete failed: ${err.message}`, 'error');
-      }
-    });
     feed.appendChild(div);
   });
 }
@@ -2295,7 +2010,7 @@ function updateReloadCommissionPreview() {
   const commission = roundCurrency((amount * rate) / 100);
 
   if (commPreview) {
-    commPreview.textContent = formatSignedLKR(commission);
+    commPreview.textContent = formatLKR(commission);
   }
   if (totalPreview) {
     totalPreview.textContent = formatLKR(amount);
@@ -2377,7 +2092,6 @@ function initMobileReloads() {
       const payload = {
         date: getTodayDateString(),
         time: getCurrentTimeString(),
-        createdBy: auth.currentUser.uid,
         operator,
         phone: phone || 'Walk-in Customer',
         amount,
@@ -2388,7 +2102,7 @@ function initMobileReloads() {
 
       try {
         await addDoc(collection(db, 'reload_transactions'), payload);
-        showToast(`Recorded ${operator} reload of ${formatLKR(amount)} (${formatSignedLKR(commissionAmount)} commission)`, 'success');
+        showToast(`Recorded ${operator} reload of ${formatLKR(amount)} (+${formatLKR(commissionAmount)} comm.)`, 'success');
         form.reset();
         if (detectedBadge) detectedBadge.classList.add('hidden');
         selectOperator(operator);
@@ -2428,25 +2142,11 @@ function renderRecentReloadsFeed() {
           <span class="text-[11px] theme-text-dim block">${escapeHTML(item.time || '')}</span>
         </div>
       </div>
-        <div class="flex items-center gap-2">
-          <div class="text-right">
-            <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.amount)}</span>
-            <span class="text-[10px] theme-text-dim block font-mono">${formatSignedLKR(item.commissionAmount)} commission</span>
-          </div>
-          <button type="button" class="recent-delete-btn min-h-11 min-w-11 text-red-400 hover:text-red-300" aria-label="Delete transaction" title="Delete transaction">
-            <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-          </button>
+      <div class="text-right">
+        <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.amount)}</span>
+        <span class="text-[10px] theme-text-dim block font-mono">+${formatLKR(item.commissionAmount)} comm.</span>
       </div>
     `;
-      div.querySelector('.recent-delete-btn')?.addEventListener('click', async () => {
-        if (!confirm(`Delete ${item.operator} reload for ${item.phone || 'Walk-in'}?`)) return;
-        try {
-          await removeTransaction('RELOAD', item);
-          showToast('Transaction record deleted', 'success');
-        } catch (err) {
-          showToast(`Delete failed: ${err.message}`, 'error');
-        }
-      });
     feed.appendChild(div);
   });
 }
@@ -2484,9 +2184,12 @@ function initSettingsCatalog() {
     if (isService) {
       if (stockQtyContainer) stockQtyContainer.classList.add('hidden');
       if (thresholdContainer) thresholdContainer.classList.add('hidden');
-      if (costPriceContainer) costPriceContainer.classList.remove('hidden');
+      if (costPriceContainer) costPriceContainer.classList.add('hidden');
       if (sellingPriceLabel) sellingPriceLabel.textContent = 'Default Base Fee / Amount [Rs.]';
-      if (costPriceInput) costPriceInput.required = true;
+      if (costPriceInput) {
+        costPriceInput.required = false;
+        costPriceInput.value = '0.00';
+      }
       if (stockInput) {
         stockInput.required = false;
         stockInput.value = '0';
@@ -2540,10 +2243,6 @@ function initSettingsCatalog() {
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      if (APP_STATE.currentRole !== 'admin') {
-        showToast('Only an admin can edit the master catalog.', 'error');
-        return;
-      }
       const code = codeInput.value.trim().toUpperCase();
       const rawName = nameInput.value.trim();
       const name = toTitleCase(rawName); // Auto Title Case
@@ -2551,7 +2250,7 @@ function initSettingsCatalog() {
       const isService = form.querySelector('input[name="catalogItemType"]:checked')?.value === 'service';
       const itemType = isService ? 'service' : 'product';
 
-      const costPrice = roundCurrency(costPriceInput.value);
+      const costPrice = isService ? 0 : roundCurrency(costPriceInput.value);
       const sellingPrice = roundCurrency(sellingPriceInput.value);
       const stockQuantity = isService ? 0 : Math.max(0, parseInt(stockInput.value, 10) || 0);
       const lowStockThreshold = isService ? 0 : Math.max(0, parseInt(thresholdInput.value, 10) || 5);
@@ -2603,7 +2302,6 @@ function initSettingsCatalog() {
     sortSelect.value = APP_STATE.catalogSortOrder;
     sortSelect.addEventListener('change', () => {
       APP_STATE.catalogSortOrder = sortSelect.value;
-      localStorage.setItem('al_catalog_sort_order', APP_STATE.catalogSortOrder);
       renderCatalogTable();
     });
   }
@@ -2611,10 +2309,6 @@ function initSettingsCatalog() {
   // Seed Button
   if (seedBtn) {
     seedBtn.addEventListener('click', async () => {
-      if (APP_STATE.currentRole !== 'admin') {
-        showToast('Only an admin can add catalog items.', 'error');
-        return;
-      }
       if (!confirm('Seed standard Sri Lankan retail stationery and utility bills into your catalog? Existing codes will not be overwritten.')) return;
 
       let addedCount = 0;
@@ -2681,20 +2375,14 @@ export function renderCatalogTable() {
       ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service/Bill</span>`
       : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">Product</span>`;
 
-    const costDisplay = `<span class="font-mono font-bold text-amber-400">${formatLKR(item.costPrice)}</span>`;
-    const profitDisplay = `<span class="font-mono font-bold text-sky-400">${formatSignedLKR(item.sellingPrice - item.costPrice)}</span>`;
-    const stockDisplay = isService ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[11px] font-bold">No Qty</span>` : `<span class="font-mono font-bold ${item.stockQuantity <= 5 ? 'text-red-400' : 'theme-text-main'}">${escapeHTML(item.stockQuantity)}</span>`;
-    const actions = APP_STATE.currentRole === 'admin'
-      ? `<div class="flex items-center justify-center gap-1.5">
-          <button type="button" class="edit-cat-btn min-h-11 px-2 py-1 rounded bg-sky-500/15 text-sky-400 hover:bg-sky-500 hover:text-white text-[11px] font-bold transition">Edit</button>
-          <button type="button" class="del-cat-btn min-h-11 px-2 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-[11px] font-bold transition">Delete</button>
-        </div>`
-      : '<span class="text-xs theme-text-dim">Read only</span>';
+    const costDisplay = isService ? '<span class="theme-text-dim font-mono">N/A</span>' : `<span class="font-mono font-bold text-amber-400">${formatLKR(item.costPrice)}</span>`;
+    const profitDisplay = isService ? '<span class="theme-text-dim font-mono">Custom</span>' : `<span class="font-mono font-bold text-sky-400">+${formatLKR(item.sellingPrice - item.costPrice)}</span>`;
+    const stockDisplay = isService ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[11px] font-bold">No Qty</span>` : `<span class="font-mono font-bold ${item.stockQuantity <= 5 ? 'text-red-400' : 'theme-text-main'}">${item.stockQuantity}</span>`;
 
     tr.innerHTML = `
       <td class="py-2.5 px-3 font-mono font-bold text-xs theme-text-main">${escapeHTML(item.code)}</td>
       <td class="py-2.5 px-3">
-        <div class="font-bold text-xs theme-text-main">${escapeHTML(toTitleCase(item.name))}</div>
+        <div class="font-bold text-xs theme-text-main">${escapeHTML(item.name)}</div>
         <div class="text-[10px] theme-text-dim">${escapeHTML(item.category || 'General')}</div>
       </td>
       <td class="py-2.5 px-3">${typeBadge}</td>
@@ -2703,7 +2391,10 @@ export function renderCatalogTable() {
       <td class="py-2.5 px-3 text-right text-xs">${profitDisplay}</td>
       <td class="py-2.5 px-3 text-center text-xs">${stockDisplay}</td>
       <td class="py-2.5 px-3 text-center">
-        ${actions}
+        <div class="flex items-center justify-center gap-1.5">
+          <button type="button" class="edit-cat-btn px-2 py-1 rounded bg-sky-500/15 text-sky-400 hover:bg-sky-500 hover:text-white text-[11px] font-bold transition">Edit</button>
+          <button type="button" class="del-cat-btn px-2 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-[11px] font-bold transition">Delete</button>
+        </div>
       </td>
     `;
 
@@ -2711,10 +2402,9 @@ export function renderCatalogTable() {
     const editBtn = tr.querySelector('.edit-cat-btn');
     if (editBtn) {
       editBtn.addEventListener('click', () => {
-        if (APP_STATE.currentRole !== 'admin') return;
         document.getElementById('catalogDocId').value = item.id;
         document.getElementById('catalogCode').value = item.code;
-        document.getElementById('catalogName').value = toTitleCase(item.name);
+        document.getElementById('catalogName').value = item.name;
         document.getElementById('catalogCategory').value = item.category || '';
         document.getElementById('catalogCostPrice').value = item.costPrice || 0;
         document.getElementById('catalogSellingPrice').value = item.sellingPrice || 0;
@@ -2739,10 +2429,6 @@ export function renderCatalogTable() {
     const delBtn = tr.querySelector('.del-cat-btn');
     if (delBtn) {
       delBtn.addEventListener('click', async () => {
-        if (APP_STATE.currentRole !== 'admin') {
-          showToast('Only an admin can delete catalog items.', 'error');
-          return;
-        }
         if (!confirm(`Delete "${item.name}" (${item.code}) from master inventory catalog?`)) return;
         try {
           await deleteDoc(doc(db, 'inventory', item.id));
@@ -2770,7 +2456,7 @@ function updateBackupStatusDisplay() {
   if (statCatalog) statCatalog.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
   if (statPresets) statPresets.textContent = `${APP_STATE.reloadPresets.length} Presets`;
 
-  const savedRaw = localStorage.getItem(backupSnapshotKey());
+  const savedRaw = localStorage.getItem('al_settings_backup_snapshot');
   if (savedRaw) {
     try {
       const snap = JSON.parse(savedRaw);
@@ -2791,19 +2477,15 @@ function updateBackupStatusDisplay() {
   }
 }
 
-function backupSnapshotKey() {
-  return `al_settings_backup_snapshot_${auth.currentUser?.uid || 'signed-out'}`;
-}
-
 function createConfigurationSnapshot() {
   return {
-    version: '5.1',
+    version: '5.0',
     appName: 'AL Communication',
     timestamp: new Date().toISOString(),
     formattedDate: new Date().toLocaleString(),
     catalog: APP_STATE.inventoryCatalog.map(item => ({
       code: item.code,
-      name: toTitleCase(item.name),
+      name: item.name,
       category: item.category || 'General',
       itemType: item.itemType || 'product',
       costPrice: Number(item.costPrice) || 0,
@@ -2813,38 +2495,25 @@ function createConfigurationSnapshot() {
     })),
     commissionRates: { ...APP_STATE.commissionRates },
     reloadPresets: [...APP_STATE.reloadPresets],
-    activeTheme: APP_STATE.activeTheme,
-    preferences: {
-      activeTheme: APP_STATE.activeTheme,
-      gradientBlurEnabled: APP_STATE.gradientBlurEnabled,
-      dashboardOrder: APP_STATE.dashboardOrder,
-      hiddenDashboardCards: [...APP_STATE.hiddenDashboardCards],
-      stockSortOrder: APP_STATE.stockSortOrder,
-      catalogSortOrder: APP_STATE.catalogSortOrder
-    }
+    activeTheme: APP_STATE.activeTheme
   };
 }
 
 export async function applyConfigurationBackup(snapshot) {
-  if (!APP_STATE.currentUser) {
-    showToast('Sign in before restoring a backup.', 'error');
-    return false;
-  }
   if (!snapshot || typeof snapshot !== 'object') {
     showToast('Invalid backup file or snapshot structure', 'error');
     return false;
   }
 
-  let preferencesSynced = true;
   try {
     // 1. Restore Commission Rates
-    if (snapshot.commissionRates && APP_STATE.currentRole === 'admin') {
+    if (snapshot.commissionRates) {
       APP_STATE.commissionRates = { ...snapshot.commissionRates };
       await setDoc(doc(db, 'settings', 'rates'), APP_STATE.commissionRates, { merge: true });
     }
 
     // 2. Restore Reload Presets
-    if (Array.isArray(snapshot.reloadPresets) && APP_STATE.currentRole === 'admin') {
+    if (Array.isArray(snapshot.reloadPresets)) {
       APP_STATE.reloadPresets = [...snapshot.reloadPresets];
       await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
       renderPresetPills();
@@ -2854,42 +2523,9 @@ export async function applyConfigurationBackup(snapshot) {
     if (snapshot.activeTheme) {
       applyTheme(snapshot.activeTheme);
     }
-    if (snapshot.preferences) {
-      const preferences = snapshot.preferences;
-      if (preferences.activeTheme) applyTheme(preferences.activeTheme);
-      if (typeof preferences.gradientBlurEnabled === 'boolean') {
-        setGradientBlurEnabled(preferences.gradientBlurEnabled);
-      }
-      if (preferences.dashboardOrder?.metrics && preferences.dashboardOrder?.actions) {
-        APP_STATE.dashboardOrder = preferences.dashboardOrder;
-        applyDashboardOrder(document.getElementById('dashboardGrid'), preferences.dashboardOrder.metrics);
-        applyDashboardOrder(document.getElementById('dashboardActionsGrid'), preferences.dashboardOrder.actions);
-      }
-      if (Array.isArray(preferences.hiddenDashboardCards)) {
-        applyHiddenDashboardCards(preferences.hiddenDashboardCards);
-      }
-      if (['name-asc', 'name-desc', 'selling-desc', 'selling-asc', 'cost-desc', 'cost-asc', 'stock-desc', 'stock-asc', 'newest', 'oldest'].includes(preferences.stockSortOrder)) {
-        APP_STATE.stockSortOrder = preferences.stockSortOrder;
-        localStorage.setItem('al_stock_sort_order', preferences.stockSortOrder);
-        const stockSortSelect = document.getElementById('stockSortSelect');
-        if (stockSortSelect) stockSortSelect.value = preferences.stockSortOrder;
-      }
-      if (['name-asc', 'name-desc', 'selling-desc', 'selling-asc', 'cost-desc', 'cost-asc', 'stock-desc', 'stock-asc', 'newest', 'oldest'].includes(preferences.catalogSortOrder)) {
-        APP_STATE.catalogSortOrder = preferences.catalogSortOrder;
-        localStorage.setItem('al_catalog_sort_order', preferences.catalogSortOrder);
-        const catalogSortSelect = document.getElementById('catalogSortSelect');
-        if (catalogSortSelect) catalogSortSelect.value = preferences.catalogSortOrder;
-      }
-      preferencesSynced = await saveUserPreferences({
-        activeTheme: APP_STATE.activeTheme,
-        gradientBlurEnabled: APP_STATE.gradientBlurEnabled,
-        dashboardOrder: APP_STATE.dashboardOrder,
-        hiddenDashboardCards: [...APP_STATE.hiddenDashboardCards]
-      });
-    }
 
     // 4. Restore / Sync Catalog Items in Firestore
-    if (Array.isArray(snapshot.catalog) && APP_STATE.currentRole === 'admin') {
+    if (Array.isArray(snapshot.catalog)) {
       let restoredCount = 0;
       for (const item of snapshot.catalog) {
         if (!item.code || !item.name) continue;
@@ -2914,19 +2550,13 @@ export async function applyConfigurationBackup(snapshot) {
         }
         restoredCount++;
       }
+      showToast(`Restored configuration: ${restoredCount} catalog items, rates & presets`, 'success');
     }
 
     updateBackupStatusDisplay();
     renderCatalogTable();
     renderStockTable();
     updateDashboardMetrics();
-    if (!preferencesSynced) {
-      showToast('Backup applied locally, but personal preferences could not sync to Firestore.', 'error');
-      return false;
-    }
-    showToast(APP_STATE.currentRole === 'admin'
-      ? 'Backup settings restored successfully.'
-      : 'Personal preferences restored. Shared catalog, presets, and rates require an admin.', 'success');
     return true;
   } catch (err) {
     logDebug(`Restore error: ${err.message}`, 'ERROR');
@@ -2940,60 +2570,12 @@ function initBackupRestoreSystem() {
   const downloadJsonBtn = document.getElementById('backupDownloadJsonBtn');
   const restoreSnapshotBtn = document.getElementById('backupRestoreSnapshotBtn');
   const uploadInput = document.getElementById('backupUploadInput');
-  const restoreDefaultsBtn = document.getElementById('restoreDefaultsBtn');
-
-  restoreDefaultsBtn?.addEventListener('click', async () => {
-    const globalSettingsIncluded = APP_STATE.currentRole === 'admin';
-    const confirmation = globalSettingsIncluded
-      ? 'Restore the default theme, header blur, dashboard layout, sort order, reload presets, and commission rates?'
-      : 'Restore your default theme, header blur, dashboard layout, and sort order?';
-    if (!confirm(confirmation)) return;
-    try {
-      applyTheme('modern-slate');
-      setGradientBlurEnabled(true);
-      APP_STATE.stockSortOrder = 'name-asc';
-      APP_STATE.catalogSortOrder = 'name-asc';
-      localStorage.setItem('al_stock_sort_order', 'name-asc');
-      localStorage.setItem('al_catalog_sort_order', 'name-asc');
-      const stockSortSelect = document.getElementById('stockSortSelect');
-      const catalogSortSelect = document.getElementById('catalogSortSelect');
-      if (stockSortSelect) stockSortSelect.value = 'name-asc';
-      if (catalogSortSelect) catalogSortSelect.value = 'name-asc';
-      resetDashboardLayout();
-      if (globalSettingsIncluded) {
-        const defaultRates = { AIRTEL: 6.80, DIALOG: 3.80, MOBITEL: 6.80, HUTCH: 5.00 };
-        const defaultPresets = [50, 100, 200, 500, 1000];
-        APP_STATE.commissionRates = defaultRates;
-        APP_STATE.reloadPresets = defaultPresets;
-        await Promise.all([
-          setDoc(doc(db, 'settings', 'rates'), defaultRates, { merge: true }),
-          setDoc(doc(db, 'settings', 'presets'), { list: defaultPresets }, { merge: true })
-        ]);
-        renderPresetPills();
-      }
-      const preferencesSynced = await saveUserPreferences({
-        activeTheme: 'modern-slate',
-        gradientBlurEnabled: true,
-        dashboardOrder: APP_STATE.dashboardOrder,
-        hiddenDashboardCards: []
-      });
-      if (!preferencesSynced) {
-        showToast('Defaults applied locally, but preferences could not sync to Firestore.', 'error');
-        return;
-      }
-      renderStockTable();
-      renderCatalogTable();
-      showToast('Default settings restored.', 'success');
-    } catch (error) {
-      showToast(`Could not restore defaults: ${error.message}`, 'error');
-    }
-  });
 
   // Save Snapshot to localStorage
   if (saveSnapshotBtn) {
     saveSnapshotBtn.addEventListener('click', () => {
       const snap = createConfigurationSnapshot();
-      localStorage.setItem(backupSnapshotKey(), JSON.stringify(snap));
+      localStorage.setItem('al_settings_backup_snapshot', JSON.stringify(snap));
       updateBackupStatusDisplay();
       showToast(`Snapshot saved to local storage (${snap.catalog.length} items)`, 'success');
     });
@@ -3020,7 +2602,7 @@ function initBackupRestoreSystem() {
   // Restore from localStorage Snapshot
   if (restoreSnapshotBtn) {
     restoreSnapshotBtn.addEventListener('click', async () => {
-      const savedRaw = localStorage.getItem(backupSnapshotKey());
+      const savedRaw = localStorage.getItem('al_settings_backup_snapshot');
       if (!savedRaw) {
         showToast('No saved snapshot found in local storage. Save one first or upload a JSON backup file.', 'error');
         return;
@@ -3048,11 +2630,11 @@ function initBackupRestoreSystem() {
       reader.onload = async (evt) => {
         try {
           const snap = JSON.parse(evt.target.result);
-          if (!snap.catalog && !snap.commissionRates && !snap.preferences && !snap.reloadPresets) {
-            throw new Error('Unrecognized backup format. No supported settings were found.');
+          if (!snap.catalog && !snap.commissionRates) {
+            throw new Error('Unrecognized backup format. Missing catalog or rates.');
           }
 
-          if (confirm(`Restore configuration from "${file.name}" (${snap.catalog?.length || 0} catalog items)?`)) {
+          if (confirm(`Restore configuration from "${file.name}" (${snap.catalog?.length || 0} items)?`)) {
             await applyConfigurationBackup(snap);
           }
         } catch (err) {
@@ -3084,14 +2666,10 @@ function initSettingsPanels() {
       const span = document.createElement('span');
       span.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border theme-border theme-bg-surface text-xs font-bold font-mono';
       span.innerHTML = `
-        <span>Rs. ${escapeHTML(val)}</span>
-        <button type="button" class="del-preset-btn min-h-11 min-w-11 text-red-400 hover:text-red-300 ml-1 text-sm font-bold" aria-label="Remove preset Rs. ${escapeHTML(val)}">&times;</button>
+        <span>Rs. ${val}</span>
+        <button type="button" class="del-preset-btn text-red-400 hover:text-red-300 ml-1 text-sm font-bold">âœ•</button>
       `;
       span.querySelector('.del-preset-btn')?.addEventListener('click', async () => {
-        if (APP_STATE.currentRole !== 'admin') {
-          showToast('Only an admin can change reload presets.', 'error');
-          return;
-        }
         APP_STATE.reloadPresets = APP_STATE.reloadPresets.filter(p => p !== val);
         await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
         renderSettingsPresetsTags();
@@ -3107,10 +2685,6 @@ function initSettingsPanels() {
   if (addPresetForm) {
     addPresetForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      if (APP_STATE.currentRole !== 'admin') {
-        showToast('Only an admin can change reload presets.', 'error');
-        return;
-      }
       const input = document.getElementById('newPresetAmountInput');
       const val = parseInt(input?.value, 10);
       if (!val || val < 10) return;
@@ -3128,7 +2702,6 @@ function initSettingsPanels() {
 
   if (resetPresetsBtn) {
     resetPresetsBtn.addEventListener('click', async () => {
-      if (APP_STATE.currentRole !== 'admin') return;
       APP_STATE.reloadPresets = [50, 100, 200, 500, 1000];
       await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
       renderSettingsPresetsTags();
@@ -3142,10 +2715,6 @@ function initSettingsPanels() {
   if (commForm) {
     commForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      if (APP_STATE.currentRole !== 'admin') {
-        showToast('Only an admin can change commission rates.', 'error');
-        return;
-      }
       const airtel = parseFloat(document.getElementById('rateAirtelInput')?.value) || 6.80;
       const dialog = parseFloat(document.getElementById('rateDialogInput')?.value) || 3.80;
       const mobitel = parseFloat(document.getElementById('rateMobitelInput')?.value) || 6.80;
@@ -3177,29 +2746,12 @@ function initSettingsPanels() {
     updateEmailForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const newEmail = document.getElementById('newEmailInput')?.value.trim();
-      if (!newEmail || !auth.currentUser) {
-        showToast('Sign in before updating account details.', 'error');
-        return;
-      }
+      if (!newEmail || !auth.currentUser) return;
       try {
         await updateEmail(auth.currentUser, newEmail);
-        let profileSynced = true;
-        try {
-          await setDoc(doc(db, 'users', auth.currentUser.uid), {
-            email: newEmail,
-            updatedAt: serverTimestamp()
-          }, { merge: true });
-        } catch (syncError) {
-          profileSynced = false;
-          logDebug(`Updated email profile sync failed: ${syncError.message}`, 'ERROR');
-        }
-        showToast(profileSynced
-          ? `Email updated to ${newEmail}`
-          : 'Email changed, but the account profile could not be synced.', profileSynced ? 'success' : 'error');
+        showToast(`Email updated to ${newEmail}`, 'success');
         const badge = document.getElementById('userEmailBadge');
         if (badge) badge.textContent = newEmail;
-        APP_STATE.currentUser = auth.currentUser;
-        updateProfileDisplay(auth.currentUser);
         updateEmailForm.reset();
       } catch (err) {
         showToast(`Email update failed: ${err.message}`, 'error');
@@ -3213,14 +2765,6 @@ function initSettingsPanels() {
       e.preventDefault();
       const pass = document.getElementById('newPasswordInput')?.value;
       const confirmPass = document.getElementById('confirmPasswordInput')?.value;
-      if (!auth.currentUser) {
-        showToast('Sign in before updating your password.', 'error');
-        return;
-      }
-      if (!pass || pass.length < 8) {
-        showToast('Password must be at least 8 characters.', 'error');
-        return;
-      }
       if (pass !== confirmPass) {
         showToast('Passwords do not match', 'error');
         return;
@@ -3280,254 +2824,9 @@ function initSettingsPanels() {
   }
 }
 
-function updateProfileDisplay(user = APP_STATE.currentUser) {
-  const email = document.getElementById('profileAccountEmail');
-  const roleBadge = document.getElementById('profileAccountRole');
-  const createAccountPanel = document.getElementById('createStaffAccountPanel');
-  const usersPanel = document.getElementById('adminUsersPanel');
-  const lastLogin = document.getElementById('profileLastLogin');
-  const isAdmin = APP_STATE.currentRole === 'admin';
-  if (email) email.textContent = user?.email || '';
-  if (roleBadge) {
-    roleBadge.textContent = isAdmin ? 'Admin' : 'Staff / User';
-    roleBadge.className = `inline-flex mt-3 px-2.5 py-1 rounded-full text-xs font-bold border ${
-      isAdmin
-        ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
-        : 'text-sky-400 border-sky-500/30 bg-sky-500/10'
-    }`;
-  }
-  if (createAccountPanel) createAccountPanel.classList.toggle('hidden', !isAdmin);
-  if (usersPanel) usersPanel.classList.toggle('hidden', !isAdmin);
-  const loginTime = APP_STATE.userProfiles.find(profile => profile.id === user?.uid)?.lastLogin;
-  if (lastLogin) lastLogin.textContent = loginTime?.toDate ? loginTime.toDate().toLocaleString() : 'Current session';
-  renderAdminUsers();
-}
-
-function renderAdminUsers() {
-  const list = document.getElementById('adminUsersList');
-  if (!list || APP_STATE.currentRole !== 'admin') return;
-  list.replaceChildren();
-  if (!APP_STATE.userProfiles.length) {
-    const empty = document.createElement('p');
-    empty.className = 'text-xs theme-text-dim';
-    empty.textContent = 'No account profiles have synced yet.';
-    list.appendChild(empty);
-    return;
-  }
-
-  APP_STATE.userProfiles
-    .slice()
-    .sort((a, b) => String(a.email || '').localeCompare(String(b.email || '')))
-    .forEach(profile => {
-      const row = document.createElement('div');
-      row.className = 'flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border theme-border theme-bg-surface';
-      const identity = document.createElement('div');
-      identity.className = 'min-w-0';
-      const userEmail = document.createElement('div');
-      userEmail.className = 'break-all text-sm font-semibold theme-text-main';
-      userEmail.textContent = profile.email || 'Email unavailable';
-      const role = document.createElement('div');
-      role.className = 'mt-1 text-xs theme-text-dim';
-      role.textContent = profile.role === 'admin' ? 'Admin' : 'Staff / User';
-      identity.append(userEmail, role);
-      row.appendChild(identity);
-
-      if (profile.id !== auth.currentUser?.uid && profile.email?.toLowerCase() !== ADMIN_EMAIL) {
-        const roleButton = document.createElement('button');
-        roleButton.type = 'button';
-        roleButton.className = 'min-h-11 px-3 py-2 rounded-lg text-xs font-bold border theme-border hover:theme-bg-elevated';
-        roleButton.textContent = profile.role === 'admin' ? 'Demote to User' : 'Promote to Admin';
-        roleButton.addEventListener('click', async () => {
-          if (!auth.currentUser || APP_STATE.currentRole !== 'admin') return;
-          const nextRole = profile.role === 'admin' ? 'user' : 'admin';
-          if (!confirm(`Set ${profile.email} role to ${nextRole === 'admin' ? 'Admin' : 'Staff / User'}?`)) return;
-          try {
-            await updateDoc(doc(db, 'users', profile.id), {
-              role: nextRole,
-              updatedAt: serverTimestamp()
-            });
-            showToast(`Updated role for ${profile.email}`, 'success');
-          } catch (error) {
-            showToast(`Role update failed: ${error.message}`, 'error');
-          }
-        });
-        row.appendChild(roleButton);
-      }
-      list.appendChild(row);
-    });
-}
-
-function applyRolePermissions() {
-  const isAdmin = APP_STATE.currentRole === 'admin';
-  document.getElementById('catalogItemForm')?.classList.toggle('hidden', !isAdmin);
-  document.getElementById('seedCatalogBtn')?.classList.toggle('hidden', !isAdmin);
-  document.getElementById('commissionsForm')?.classList.toggle('hidden', !isAdmin);
-  document.getElementById('addPresetForm')?.classList.toggle('hidden', !isAdmin);
-  document.getElementById('resetPresetsDefaultBtn')?.classList.toggle('hidden', !isAdmin);
-  document.querySelectorAll('.del-preset-btn').forEach(button => button.classList.toggle('hidden', !isAdmin));
-  renderCatalogTable();
-  renderAdminUsers();
-}
-
-function initProfileControls() {
-  const openButton = document.getElementById('openProfileBtn');
-  const backButton = document.getElementById('profileBackBtn');
-  const resetButton = document.getElementById('profileResetPasswordBtn');
-  const securityButton = document.getElementById('profileSecurityBtn');
-  const layoutButton = document.getElementById('profileResetLayoutBtn');
-  const blurButton = document.getElementById('profileBlurToggleBtn');
-  const themeButton = document.getElementById('profileThemeToggleBtn');
-  const signOutButton = document.getElementById('profileSignOutBtn');
-  const createAccountForm = document.getElementById('createStaffAccountForm');
-
-  openButton?.addEventListener('click', () => {
-    if (!auth.currentUser || !APP_STATE.currentUser) {
-      showToast('Sign in to view account details.', 'error');
-      return;
-    }
-    updateProfileDisplay();
-    switchView('profile');
-  });
-  backButton?.addEventListener('click', () => {
-    switchView(APP_STATE.previousView || 'dashboard');
-  });
-
-  resetButton?.addEventListener('click', async () => {
-    const email = auth.currentUser?.email;
-    if (!email) {
-      showToast('Sign in before requesting a password reset.', 'error');
-      return;
-    }
-    try {
-      await sendPasswordResetEmail(auth, email);
-      showToast(`Password reset link sent to ${email}`, 'success');
-    } catch (error) {
-      showToast(`Password reset failed: ${error.message}`, 'error');
-    }
-  });
-
-  securityButton?.addEventListener('click', () => {
-    openSettingsModal();
-    switchSettingsTab('security');
-  });
-  layoutButton?.addEventListener('click', resetDashboardLayout);
-  blurButton?.addEventListener('click', () => setGradientBlurEnabled(!APP_STATE.gradientBlurEnabled, true));
-  themeButton?.addEventListener('click', () => {
-    const nextTheme = APP_STATE.activeTheme === 'emerald-store' ? 'modern-slate' : 'emerald-store';
-    applyTheme(nextTheme);
-    saveUserPreferences({ activeTheme: nextTheme });
-  });
-
-  signOutButton?.addEventListener('click', async () => {
-    try {
-      await signOut(auth);
-      clearSignedInState();
-      showToast('Signed out of session', 'info');
-    } catch (error) {
-      showToast(`Sign out failed: ${error.message}`, 'error');
-    }
-  });
-
-  createAccountForm?.addEventListener('submit', async event => {
-    event.preventDefault();
-    if (!auth.currentUser || APP_STATE.currentRole !== 'admin') {
-      showToast('Only an authenticated admin can create staff accounts.', 'error');
-      return;
-    }
-    const email = document.getElementById('staffAccountEmail')?.value.trim();
-    const password = document.getElementById('staffAccountPassword')?.value;
-    const confirmPassword = document.getElementById('staffAccountPasswordConfirm')?.value;
-    if (!email || !password || password.length < 8 || password !== confirmPassword) {
-      showToast(password !== confirmPassword ? 'Passwords do not match.' : 'Enter an email and a password of at least 8 characters.', 'error');
-      return;
-    }
-    if (!email.includes('@')) {
-      showToast('Enter an email and a password of at least 8 characters.', 'error');
-      return;
-    }
-
-    let createdUser = null;
-    try {
-      const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-      createdUser = credential.user;
-      await setDoc(doc(db, 'users', createdUser.uid), {
-        email,
-        role: 'user',
-        createdAt: serverTimestamp(),
-        lastLogin: serverTimestamp()
-      });
-      createAccountForm.reset();
-      showToast(`Standard user account created for ${email}`, 'success');
-    } catch (error) {
-      showToast(`Account creation failed: ${error.message}`, 'error');
-    } finally {
-      if (createdUser) {
-        try {
-          await signOut(secondaryAuth);
-        } catch (error) {
-          logDebug(`Secondary account sign-out failed: ${error.message}`, 'WARN');
-        }
-      }
-    }
-  });
-}
-
 // =============================================================================
 // 18. AUTHENTICATION & SESSION PERSISTENCE (Requirement 7)
 // =============================================================================
-
-let loginFailureCount = 0;
-let loginLockedUntil = 0;
-
-function friendlyAuthError(error) {
-  const messages = {
-    'auth/email-already-in-use': 'An account already uses this email address.',
-    'auth/invalid-email': 'Enter a valid email address.',
-    'auth/weak-password': 'Choose a stronger password with at least 8 characters.',
-    'auth/invalid-credential': 'The email or password is incorrect.',
-    'auth/wrong-password': 'The email or password is incorrect.',
-    'auth/user-not-found': 'The email or password is incorrect.',
-    'auth/user-disabled': 'This account has been disabled. Contact the administrator.',
-    'auth/network-request-failed': 'Network error. Check your connection and try again.',
-    'auth/too-many-requests': 'Too many attempts. Wait a little before trying again.'
-  };
-  return messages[error?.code] || error?.message || 'Authentication could not be completed.';
-}
-
-const profileInitializationPromises = new Map();
-
-function initializeUserProfile(user) {
-  if (!auth.currentUser || auth.currentUser.uid !== user.uid) return Promise.resolve();
-  if (profileInitializationPromises.has(user.uid)) return profileInitializationPromises.get(user.uid);
-
-  const initialization = (async () => {
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      const profileSnapshot = await getDoc(userRef);
-      const profileData = profileSnapshot.data();
-      const isOwner = user.email?.toLowerCase() === ADMIN_EMAIL;
-      const role = isOwner ? 'admin' : (profileData?.role === 'admin' ? 'admin' : 'user');
-
-      await setDoc(userRef, {
-        email: user.email || auth.currentUser?.email || '',
-        role,
-        ...(!profileSnapshot.exists() ? { createdAt: serverTimestamp() } : {}),
-        lastLogin: serverTimestamp()
-      }, { merge: true });
-
-      if (role !== APP_STATE.currentRole) {
-        APP_STATE.currentRole = role;
-        applyRolePermissions();
-      }
-      return true;
-    } catch (error) {
-      logDebug(`Account profile sync skipped: ${error.message}`, 'WARN');
-      return false;
-    }
-  })();
-  profileInitializationPromises.set(user.uid, initialization);
-  return initialization.finally(() => profileInitializationPromises.delete(user.uid));
-}
 
 function initAuthentication() {
   const gateScreen = document.getElementById('authGateScreen');
@@ -3542,73 +2841,6 @@ function initAuthentication() {
   const closeResetBtn = document.getElementById('closeResetModalBtn');
   const cancelResetBtn = document.getElementById('cancelResetBtn');
   const resetForm = document.getElementById('passwordResetForm');
-  const signupModal = document.getElementById('signupModal');
-  const signupForm = document.getElementById('signupForm');
-  const signupAlert = document.getElementById('signupAlert');
-  const showSignupBtn = document.getElementById('showSignupBtn');
-  const closeSignupBtn = document.getElementById('closeSignupBtn');
-
-  showSignupBtn?.addEventListener('click', () => {
-    signupAlert?.classList.add('hidden');
-    signupModal?.classList.remove('hidden');
-  });
-  closeSignupBtn?.addEventListener('click', () => signupModal?.classList.add('hidden'));
-  signupModal?.addEventListener('click', event => {
-    if (event.target === signupModal) signupModal.classList.add('hidden');
-  });
-
-  signupForm?.addEventListener('submit', async event => {
-    event.preventDefault();
-    const email = document.getElementById('signupEmail')?.value.trim();
-    const password = document.getElementById('signupPassword')?.value || '';
-    const confirmPassword = document.getElementById('signupPasswordConfirm')?.value || '';
-    if (!email || password.length < 8) {
-      if (signupAlert) {
-        signupAlert.textContent = 'Enter a valid email and a password of at least 8 characters.';
-        signupAlert.className = 'p-3 rounded-xl text-sm bg-red-500/15 border border-red-500/30 text-red-400';
-      }
-      return;
-    }
-    if (password !== confirmPassword) {
-      if (signupAlert) {
-        signupAlert.textContent = 'The passwords do not match.';
-        signupAlert.className = 'p-3 rounded-xl text-sm bg-red-500/15 border border-red-500/30 text-red-400';
-      }
-      return;
-    }
-    if (email.toLowerCase() === ADMIN_EMAIL) {
-      if (signupAlert) {
-        signupAlert.textContent = 'The owner account must be provisioned by the administrator.';
-        signupAlert.className = 'p-3 rounded-xl text-sm bg-red-500/15 border border-red-500/30 text-red-400';
-      }
-      return;
-    }
-
-    let createdUser = null;
-    try {
-      await authPersistenceReady;
-      const credential = await createUserWithEmailAndPassword(auth, email, password);
-      createdUser = credential.user;
-      await initializeUserProfile(createdUser);
-      signupForm.reset();
-      signupModal?.classList.add('hidden');
-      showToast('Account created. You are now signed in.', 'success');
-      switchView('dashboard');
-    } catch (error) {
-      if (createdUser && auth.currentUser?.uid === createdUser.uid) {
-        try {
-          await signOut(auth);
-        } catch (signOutError) {
-          logDebug(`Sign-up cleanup sign-out failed: ${signOutError.message}`, 'ERROR');
-        }
-      }
-      if (signupAlert) {
-        signupAlert.textContent = friendlyAuthError(error);
-        signupAlert.className = 'p-3 rounded-xl text-sm bg-red-500/15 border border-red-500/30 text-red-400';
-      }
-      showToast(`Sign-up failed: ${friendlyAuthError(error)}`, 'error');
-    }
-  });
 
   if (togglePassBtn && passInput) {
     togglePassBtn.addEventListener('click', () => {
@@ -3642,55 +2874,25 @@ function initAuthentication() {
   }
 
   // Firebase Auth State Listener (Persistent)
-  authPersistenceReady.then(() => onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, (user) => {
     if (gateScreen) gateScreen.classList.add('hidden');
 
     if (user) {
       APP_STATE.currentUser = user;
-      APP_STATE.currentRole = user.email?.toLowerCase() === ADMIN_EMAIL ? 'admin' : 'user';
       if (loginScreen) loginScreen.classList.add('hidden');
       if (appShell) appShell.classList.remove('hidden');
 
       const userBadge = document.getElementById('userEmailBadge');
-      if (userBadge) userBadge.textContent = user.email || 'Account';
-      updateProfileDisplay(user);
-      applyRolePermissions();
+      if (userBadge) userBadge.textContent = user.email || 'Store Owner';
 
-      logDebug('Persistent session confirmed.');
-      if (cloudSyncUserId !== user.uid) {
-        stopCloudSyncListeners();
-        cloudSyncUserId = user.uid;
-        roleSyncUnsubscribe = onSnapshot(doc(db, 'users', user.uid), snapshot => {
-          if (auth.currentUser?.uid !== user.uid) return;
-          const role = user.email?.toLowerCase() === ADMIN_EMAIL
-            ? 'admin'
-            : snapshot.data()?.role === 'admin' ? 'admin' : 'user';
-          const roleChanged = APP_STATE.currentRole !== role;
-          APP_STATE.currentRole = role;
-          updateProfileDisplay(user);
-          applyRolePermissions();
-          if (roleChanged) initCloudSyncListeners();
-        }, error => {
-          logDebug(`Account role sync failed: ${error.message}`, 'ERROR');
-        });
-        initCloudSyncListeners();
-        void initializeUserProfile(user);
-      }
+      logDebug(`Persistent session confirmed: ${user.email}`);
+      initCloudSyncListeners();
     } else {
-      clearSignedInState();
-      stopCloudSyncListeners();
+      APP_STATE.currentUser = null;
       if (appShell) appShell.classList.add('hidden');
       if (loginScreen) loginScreen.classList.remove('hidden');
       logDebug('Awaiting owner authentication...');
     }
-  }, error => {
-    if (gateScreen) gateScreen.classList.add('hidden');
-    if (loginScreen) loginScreen.classList.remove('hidden');
-    logDebug(`Authentication state listener failed: ${error.message}`, 'ERROR');
-  })).catch(error => {
-    if (gateScreen) gateScreen.classList.add('hidden');
-    if (loginScreen) loginScreen.classList.remove('hidden');
-    logDebug(`Authentication initialization failed: ${error.message}`, 'ERROR');
   });
 
   // Login Submit
@@ -3701,49 +2903,25 @@ function initAuthentication() {
       const password = document.getElementById('loginPassword')?.value;
       const btnText = document.getElementById('loginBtnText');
       const spinner = document.getElementById('loginBtnSpinner');
-      const submitButton = loginForm.querySelector('button[type="submit"]');
 
       if (!email || !password) return;
-      const remainingLock = loginLockedUntil - Date.now();
-      if (remainingLock > 0) {
-        const seconds = Math.ceil(remainingLock / 1000);
-        const message = `Too many failed sign-in attempts. Try again in ${seconds} seconds.`;
-        if (loginAlert) {
-          loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-red-500/15 border border-red-500/30 text-red-400 block';
-          loginAlert.textContent = message;
-        }
-        return;
-      }
 
       if (loginAlert) loginAlert.classList.add('hidden');
       if (btnText) btnText.textContent = 'Verifying Credentials...';
       if (spinner) spinner.classList.remove('hidden');
-      if (submitButton) submitButton.disabled = true;
 
       try {
-        await authPersistenceReady;
         await signInWithEmailAndPassword(auth, email, password);
-        loginFailureCount = 0;
-        loginLockedUntil = 0;
         showToast('Login successful. Session established.', 'success');
       } catch (err) {
-        loginFailureCount += 1;
-        const errorMessage = friendlyAuthError(err);
-        if (loginFailureCount >= 5) {
-          loginLockedUntil = Date.now() + 30000;
-          loginFailureCount = 0;
-        }
         if (loginAlert) {
           loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-red-500/15 border border-red-500/30 text-red-400 block';
-          loginAlert.textContent = loginLockedUntil
-            ? 'Too many failed sign-in attempts. Sign-in is paused for 30 seconds.'
-            : errorMessage;
+          loginAlert.textContent = `Authentication Failed: ${err.message}`;
         }
-        showToast(`Login failed: ${errorMessage}`, 'error');
+        showToast(`Login failed: ${err.message}`, 'error');
       } finally {
         if (btnText) btnText.textContent = 'Sign In to Counter Ledger';
         if (spinner) spinner.classList.add('hidden');
-        if (submitButton) submitButton.disabled = false;
       }
     });
   }
@@ -3753,286 +2931,11 @@ function initAuthentication() {
 // 19. REAL-TIME FIRESTORE CLOUD LISTENERS
 // =============================================================================
 
-let cloudSyncUnsubscribers = [];
-let cloudSyncUserId = null;
-let roleSyncUnsubscribe = null;
-let dragSaveTimer = null;
-let activeDashboardDrag = null;
-let dashboardPressTimer = null;
-let suppressDashboardClickUntil = 0;
-let dashboardCardNodes = new Map();
-let dashboardCardContainers = new Map();
-let dashboardDeleteMode = false;
-
-function dashboardPreferenceKey(uid = auth.currentUser?.uid) {
-  return uid ? `al_preferences_${uid}` : null;
-}
-
-function saveUserPreferences(patch) {
-  if (!patch || typeof patch !== 'object') return Promise.resolve(false);
-  const uid = auth.currentUser?.uid;
-  const key = dashboardPreferenceKey(uid);
-  if (key) {
-    let cached = {};
-    try {
-      cached = JSON.parse(localStorage.getItem(key) || '{}');
-    } catch (error) {
-      logDebug(`Stored preferences could not be read: ${error.message}`, 'WARN');
-    }
-    const updated = { ...cached, ...patch };
-    localStorage.setItem(key, JSON.stringify(updated));
-  }
-  if (!uid) return Promise.resolve(false);
-
-  return setDoc(doc(db, 'user_settings', uid), {
-    ...patch,
-    updatedAt: serverTimestamp()
-  }, { merge: true }).then(() => true).catch(error => {
-    logDebug(`Preference sync failed: ${error.message}`, 'ERROR');
-    showToast(`Preference could not be synced: ${error.message}`, 'error');
-    return false;
-  });
-}
-
-function applyDashboardOrder(container, order) {
-  if (!container || !Array.isArray(order)) return;
-  const cards = new Map(
-    [...container.querySelectorAll(':scope > [data-card-id]')]
-      .map(card => [card.dataset.cardId, card])
-  );
-  order.forEach(id => {
-    const card = cards.get(id);
-    if (card) {
-      container.appendChild(card);
-      cards.delete(id);
-    }
-  });
-  cards.forEach(card => container.appendChild(card));
-}
-
-function persistDashboardOrder(immediate = false) {
-  if (dragSaveTimer) clearTimeout(dragSaveTimer);
-  const save = () => {
-    dragSaveTimer = null;
-    const metrics = [...document.querySelectorAll('#dashboardGrid > [data-card-id]')]
-      .map(card => card.dataset.cardId);
-    const actions = [...document.querySelectorAll('#dashboardActionsGrid > [data-card-id]')]
-      .map(card => card.dataset.cardId);
-    APP_STATE.dashboardOrder = { metrics, actions };
-    saveUserPreferences({
-      dashboardOrder: APP_STATE.dashboardOrder,
-      hiddenDashboardCards: [...APP_STATE.hiddenDashboardCards]
-    });
-  };
-  if (immediate) save();
-  else dragSaveTimer = setTimeout(save, 150);
-}
-
-function applyHiddenDashboardCards(cardIds) {
-  if (!Array.isArray(cardIds)) return;
-  const allowedIds = new Set(dashboardCardNodes.keys());
-  const hidden = [...new Set(cardIds.filter(id => typeof id === 'string' && allowedIds.has(id)))];
-  const hiddenSet = new Set(hidden);
-
-  dashboardCardNodes.forEach((card, id) => {
-    if (hiddenSet.has(id)) {
-      card.remove();
-    } else {
-      const container = dashboardCardContainers.get(id);
-      if (container && card.parentElement !== container) container.appendChild(card);
-    }
-  });
-
-  APP_STATE.hiddenDashboardCards = hidden;
-  document.getElementById('dashboardGrid')?.classList.toggle('dashboard-delete-mode', dashboardDeleteMode);
-  document.getElementById('dashboardActionsGrid')?.classList.toggle('dashboard-delete-mode', dashboardDeleteMode);
-}
-
-async function removeDashboardCard(card) {
-  const cardId = card.dataset.cardId;
-  if (!cardId || !dashboardCardNodes.has(cardId) || card.classList.contains('card-removing')) return;
-  const label = card.querySelector('.font-semibold, .font-bold')?.textContent.trim() || cardId;
-  if (!confirm(`Remove "${label}" from the dashboard? Reset Dashboard Layout restores removed cards.`)) return;
-
-  card.classList.add('card-removing');
-  await new Promise(resolve => setTimeout(resolve, 160));
-  card.remove();
-  APP_STATE.hiddenDashboardCards = [...new Set([...APP_STATE.hiddenDashboardCards, cardId])];
-  persistDashboardOrder(true);
-  showToast('Dashboard card removed. Reset the layout to restore it.', 'success');
-}
-
-function resetDashboardLayout() {
-  applyHiddenDashboardCards([]);
-  APP_STATE.dashboardOrder = {
-    metrics: [...DEFAULT_DASHBOARD_ORDER.metrics],
-    actions: [...DEFAULT_DASHBOARD_ORDER.actions]
-  };
-  applyDashboardOrder(document.getElementById('dashboardGrid'), APP_STATE.dashboardOrder.metrics);
-  applyDashboardOrder(document.getElementById('dashboardActionsGrid'), APP_STATE.dashboardOrder.actions);
-  persistDashboardOrder(true);
-  showToast('Dashboard layout restored.', 'success');
-}
-
-function initDashboardReordering() {
-  const containers = [
-    document.getElementById('dashboardGrid'),
-    document.getElementById('dashboardActionsGrid')
-  ].filter(Boolean);
-  dashboardCardNodes = new Map();
-  dashboardCardContainers = new Map();
-  containers.forEach(container => {
-    container.querySelectorAll(':scope > [data-card-id]').forEach(card => {
-      dashboardCardNodes.set(card.dataset.cardId, card);
-      dashboardCardContainers.set(card.dataset.cardId, container);
-    });
-  });
-
-  const deleteModeButton = document.getElementById('dashboardEditCardsBtn');
-  deleteModeButton?.addEventListener('click', () => {
-    dashboardDeleteMode = !dashboardDeleteMode;
-    deleteModeButton.setAttribute('aria-pressed', String(dashboardDeleteMode));
-    deleteModeButton.textContent = dashboardDeleteMode ? 'Done' : 'Edit Cards';
-    deleteModeButton.title = dashboardDeleteMode
-      ? 'Click a card to remove it, or press Done to exit'
-      : 'Enable dashboard card removal';
-    containers.forEach(container => container.classList.toggle('dashboard-delete-mode', dashboardDeleteMode));
-  });
-
-  const beginDrag = (card, event) => {
-    activeDashboardDrag = { card, container: card.parentElement, pointerId: event.pointerId, moved: false };
-    card.classList.add('is-dragging');
-    card.setPointerCapture?.(event.pointerId);
-  };
-  const finishDrag = () => {
-    if (!activeDashboardDrag) return;
-    activeDashboardDrag.card.classList.remove('is-dragging');
-    const moved = activeDashboardDrag.moved;
-    activeDashboardDrag = null;
-    if (moved) {
-      persistDashboardOrder();
-      suppressDashboardClickUntil = Date.now() + 250;
-    }
-  };
-
-  containers.forEach(container => {
-    container.addEventListener('click', event => {
-      const card = event.target.closest('[data-card-id]');
-      if (!dashboardDeleteMode || !card || card.parentElement !== container) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      void removeDashboardCard(card);
-    }, true);
-    container.addEventListener('contextmenu', event => {
-      const card = event.target.closest('[data-card-id]');
-      if (!card || card.parentElement !== container) return;
-      event.preventDefault();
-      void removeDashboardCard(card);
-    });
-    container.addEventListener('pointerdown', event => {
-      if (dashboardDeleteMode) return;
-      const card = event.target.closest('[data-card-id]');
-      const control = event.target.closest('button,a,input,select,textarea');
-      if (!card || card.parentElement !== container || (control && control !== card)) return;
-      const touchInput = event.pointerType === 'touch';
-      if (touchInput) {
-        dashboardPressTimer = setTimeout(() => beginDrag(card, event), 350);
-      } else if (event.button === 0) {
-        beginDrag(card, event);
-      }
-    });
-    container.addEventListener('pointermove', event => {
-      if (!activeDashboardDrag || activeDashboardDrag.container !== container) return;
-      event.preventDefault();
-      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-card-id]');
-      if (!target || target === activeDashboardDrag.card || target.parentElement !== container) return;
-      const rect = target.getBoundingClientRect();
-      const sourceRect = activeDashboardDrag.card.getBoundingClientRect();
-      const sameRow = Math.abs(rect.top - sourceRect.top) < Math.min(rect.height, sourceRect.height) / 2;
-      const placeAfter = sameRow
-        ? event.clientX > rect.left + rect.width / 2
-        : event.clientY > rect.top + rect.height / 2;
-      container.insertBefore(activeDashboardDrag.card, placeAfter ? target.nextSibling : target);
-      activeDashboardDrag.moved = true;
-    }, { passive: false });
-    container.addEventListener('pointerup', () => {
-      if (dashboardPressTimer) clearTimeout(dashboardPressTimer);
-      dashboardPressTimer = null;
-      finishDrag();
-    });
-    container.addEventListener('pointercancel', () => {
-      if (dashboardPressTimer) clearTimeout(dashboardPressTimer);
-      dashboardPressTimer = null;
-      finishDrag();
-    });
-    container.addEventListener('pointerleave', () => {
-      if (dashboardPressTimer && !activeDashboardDrag) {
-        clearTimeout(dashboardPressTimer);
-        dashboardPressTimer = null;
-      }
-    });
-    container.addEventListener('click', event => {
-      if (Date.now() < suppressDashboardClickUntil) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    }, true);
-  });
-}
-
-function clearSignedInState() {
-  APP_STATE.currentUser = null;
-  APP_STATE.currentRole = 'user';
-  APP_STATE.userProfiles = [];
-  APP_STATE.todayStationeryTransactions = [];
-  APP_STATE.todayReloadTransactions = [];
-  APP_STATE.masterStationeryRecords = [];
-  APP_STATE.masterReloadRecords = [];
-  APP_STATE.inventoryCatalog = [];
-  APP_STATE.activeView = 'dashboard';
-  document.getElementById('viewProfile')?.classList.add('hidden');
-  document.getElementById('viewDashboard')?.classList.remove('hidden');
-  document.getElementById('signupModal')?.classList.add('hidden');
-  document.getElementById('userEmailBadge')?.replaceChildren();
-  document.getElementById('profileAccountEmail')?.replaceChildren();
-  document.getElementById('profileAccountRole')?.replaceChildren();
-  document.getElementById('adminUsersList')?.replaceChildren();
-  applyRolePermissions();
-}
-
-function stopCloudSyncListeners() {
-  cloudSyncUnsubscribers.forEach(unsubscribe => unsubscribe());
-  cloudSyncUnsubscribers = [];
-  roleSyncUnsubscribe?.();
-  roleSyncUnsubscribe = null;
-  cloudSyncUserId = null;
-}
-
 function initCloudSyncListeners() {
-  cloudSyncUnsubscribers.forEach(unsubscribe => unsubscribe());
-  cloudSyncUnsubscribers = [];
-  const watch = (...args) => cloudSyncUnsubscribers.push(onSnapshot(...args));
-  const user = auth.currentUser;
-  if (!user) return;
-
-  const prefKey = dashboardPreferenceKey(user.uid);
-  if (prefKey) {
-    try {
-      const cached = JSON.parse(localStorage.getItem(prefKey) || '{}');
-      if (cached.activeTheme) applyTheme(cached.activeTheme);
-      if (typeof cached.gradientBlurEnabled === 'boolean') setGradientBlurEnabled(cached.gradientBlurEnabled);
-      if (cached.dashboardOrder) APP_STATE.dashboardOrder = cached.dashboardOrder;
-      applyHiddenDashboardCards(Array.isArray(cached.hiddenDashboardCards) ? cached.hiddenDashboardCards : []);
-      applyDashboardOrder(document.getElementById('dashboardGrid'), APP_STATE.dashboardOrder.metrics);
-      applyDashboardOrder(document.getElementById('dashboardActionsGrid'), APP_STATE.dashboardOrder.actions);
-    } catch (error) {
-      logDebug(`Stored preferences could not be applied: ${error.message}`, 'WARN');
-    }
-  }
+  const todayStr = getTodayDateString();
 
   // 1. Inventory Catalog Listener
-  watch(collection(db, 'inventory'), (snapshot) => {
+  onSnapshot(collection(db, 'inventory'), (snapshot) => {
     const items = [];
     snapshot.forEach(docSnap => {
       items.push({ id: docSnap.id, ...docSnap.data() });
@@ -4047,42 +2950,59 @@ function initCloudSyncListeners() {
     logDebug(`Catalog sync notice: ${err.message}`, 'WARN');
   });
 
-  // 2. Real-time stationery history, scoped to the signed-in user for standard accounts.
-  const stationeryQuery = APP_STATE.currentRole === 'admin'
-    ? collection(db, 'stationery_transactions')
-    : query(collection(db, 'stationery_transactions'), where('createdBy', '==', user.uid));
-  watch(stationeryQuery, snapshot => {
-    const records = [];
-    snapshot.forEach(docSnap => records.push({ id: docSnap.id, ...docSnap.data() }));
-    APP_STATE.masterStationeryRecords = records;
-    APP_STATE.todayStationeryTransactions = records.filter(record => record.date === getTodayDateString());
-    APP_STATE.todayStationeryTransactions.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+  // 2. Today's Stationery & Bills Listener
+  const statQuery = query(
+    collection(db, 'stationery_transactions'),
+    where('date', '==', todayStr)
+  );
+  onSnapshot(statQuery, (snapshot) => {
+    const txs = [];
+    snapshot.forEach(docSnap => {
+      txs.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    txs.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+    APP_STATE.todayStationeryTransactions = txs;
     renderRecentStationeryFeed();
-    applyMasterLogFilters();
     updateDashboardMetrics();
   }, (err) => {
     logDebug(`Stationery sync notice: ${err.message}`, 'WARN');
   });
 
-  // 3. Real-time reload history, scoped to the signed-in user for standard accounts.
-  const reloadQuery = APP_STATE.currentRole === 'admin'
-    ? collection(db, 'reload_transactions')
-    : query(collection(db, 'reload_transactions'), where('createdBy', '==', user.uid));
-  watch(reloadQuery, snapshot => {
-    const records = [];
-    snapshot.forEach(docSnap => records.push({ id: docSnap.id, ...docSnap.data() }));
-    APP_STATE.masterReloadRecords = records;
-    APP_STATE.todayReloadTransactions = records.filter(record => record.date === getTodayDateString());
-    APP_STATE.todayReloadTransactions.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+  // 3. Today's Reloads Listener
+  const reloadQuery = query(
+    collection(db, 'reload_transactions'),
+    where('date', '==', todayStr)
+  );
+  onSnapshot(reloadQuery, (snapshot) => {
+    const reloads = [];
+    snapshot.forEach(docSnap => {
+      reloads.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    reloads.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+    APP_STATE.todayReloadTransactions = reloads;
     renderRecentReloadsFeed();
-    applyMasterLogFilters();
     updateDashboardMetrics();
   }, (err) => {
     logDebug(`Reloads sync notice: ${err.message}`, 'WARN');
   });
 
-  // 4. System settings and per-user profile/preferences.
-  watch(doc(db, 'settings', 'rates'), (docSnap) => {
+  // 4. Master All-Time Records (For Ledger & PDF)
+  onSnapshot(collection(db, 'stationery_transactions'), (snapshot) => {
+    const list = [];
+    snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
+    APP_STATE.masterStationeryRecords = list;
+    applyMasterLogFilters();
+  });
+
+  onSnapshot(collection(db, 'reload_transactions'), (snapshot) => {
+    const list = [];
+    snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
+    APP_STATE.masterReloadRecords = list;
+    applyMasterLogFilters();
+  });
+
+  // 5. System Settings Listener (Rates & Presets)
+  onSnapshot(doc(db, 'settings', 'rates'), (docSnap) => {
     if (docSnap.exists()) {
       APP_STATE.commissionRates = { ...APP_STATE.commissionRates, ...docSnap.data() };
       const bA = document.getElementById('rateBadgeAirtel');
@@ -4097,38 +3017,12 @@ function initCloudSyncListeners() {
     }
   });
 
-  watch(doc(db, 'settings', 'presets'), (docSnap) => {
+  onSnapshot(doc(db, 'settings', 'presets'), (docSnap) => {
     if (docSnap.exists() && Array.isArray(docSnap.data()?.list)) {
       APP_STATE.reloadPresets = docSnap.data().list;
       renderPresetPills();
     }
   });
-
-  watch(doc(db, 'user_settings', user.uid), snapshot => {
-    if (!snapshot.exists()) return;
-    const preferences = snapshot.data();
-    const localKey = dashboardPreferenceKey(user.uid);
-    if (localKey) localStorage.setItem(localKey, JSON.stringify(preferences));
-    if (preferences.activeTheme) applyTheme(preferences.activeTheme);
-    if (typeof preferences.gradientBlurEnabled === 'boolean') setGradientBlurEnabled(preferences.gradientBlurEnabled);
-    if (preferences.dashboardOrder?.metrics && preferences.dashboardOrder?.actions) {
-      APP_STATE.dashboardOrder = preferences.dashboardOrder;
-      applyDashboardOrder(document.getElementById('dashboardGrid'), preferences.dashboardOrder.metrics);
-      applyDashboardOrder(document.getElementById('dashboardActionsGrid'), preferences.dashboardOrder.actions);
-    }
-    if (Array.isArray(preferences.hiddenDashboardCards)) {
-      applyHiddenDashboardCards(preferences.hiddenDashboardCards);
-    }
-  }, error => logDebug(`User preferences sync failed: ${error.message}`, 'ERROR'));
-
-  if (APP_STATE.currentRole === 'admin') {
-    watch(collection(db, 'users'), snapshot => {
-      APP_STATE.userProfiles = snapshot.docs.map(userDoc => ({ id: userDoc.id, ...userDoc.data() }));
-      updateProfileDisplay();
-    }, error => logDebug(`Account list sync failed: ${error.message}`, 'ERROR'));
-  } else {
-    APP_STATE.userProfiles = [];
-  }
 }
 
 // =============================================================================
@@ -4141,7 +3035,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initThemeSystem();
   startLiveClock();
   initNavigation();
-  initDashboardReordering();
   initGlobalSearch();
   initStationeryPOS();
   initMobileReloads();
@@ -4150,7 +3043,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initSettingsCatalog();
   initSettingsPanels();
   initBackupRestoreSystem();
-  initProfileControls();
   initAuthentication();
 
   logDebug('AL Communication System v5.0 Ready.', 'SUCCESS');

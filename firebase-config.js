@@ -8,7 +8,6 @@ import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebase
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
   signOut, 
   onAuthStateChanged, 
   updateEmail, 
@@ -40,23 +39,23 @@ import {
   runTransaction
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
+// Retrieve custom API key if stored, or fallback to configured key
+const storedApiKey = localStorage.getItem('al_firebase_api_key');
+
 export const firebaseConfig = {
-  apiKey: "AIzaSyCPl4RNDqJy8GFPR1Ixcs_maAhPKK_iIm0",
+  apiKey: storedApiKey || window.__FIREBASE_API_KEY__ || "AIzaSyB_REPLACE_WITH_FIREBASE_CONSOLE_API_KEY",
   authDomain: "al-p1-fb432.firebaseapp.com",
   projectId: "al-p1-fb432",
   storageBucket: "al-p1-fb432.firebasestorage.app",
-  messagingSenderId: "627092911084",
-  appId: "1:627092911084:web:80de6c0a270957842086c9"
+  messagingSenderId: "109876543210",
+  appId: "1:109876543210:web:al-p1-fb432-frontend"
 };
-
-// Deployment note: enable Firebase App Check in the Firebase Console for additional abuse protection.
 
 let app;
 let auth;
 let db;
 let isFirebaseInitialized = false;
 let initError = null;
-export let authPersistenceReady = Promise.resolve(false);
 
 try {
   if (!getApps().length) {
@@ -66,15 +65,13 @@ try {
   }
   auth = getAuth(app);
   
-  // Explicitly enforce persistent auth across mobile and desktop.
-  authPersistenceReady = setPersistence(auth, browserLocalPersistence)
+  // Explicitly enforce IndexedDB/localStorage persistent auth across mobile and desktop
+  setPersistence(auth, browserLocalPersistence)
     .then(() => {
       console.log("[Firebase Auth] Local persistence successfully active.");
-      return true;
     })
     .catch((persErr) => {
       console.warn("[Firebase Auth] Persistence setup notice:", persErr.message);
-      return false;
     });
 
   db = getFirestore(app);
@@ -84,14 +81,15 @@ try {
   initError = error;
 }
 
-export const secondaryApp = getApps().find(existingApp => existingApp.name === 'Secondary')
-  || initializeApp(firebaseConfig, 'Secondary');
-export const secondaryAuth = getAuth(secondaryApp);
+// Function to update API key dynamically and reload
+export function updateFirebaseApiKey(newApiKey) {
+  if (!newApiKey) return false;
+  localStorage.setItem('al_firebase_api_key', newApiKey.trim());
+  window.location.reload();
+  return true;
+}
 
 export {
-  initializeApp,
-  getAuth,
-  getFirestore,
   app,
   auth,
   db,
@@ -99,7 +97,6 @@ export {
   initError,
   // Auth Exports
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   updateEmail,
