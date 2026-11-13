@@ -8,6 +8,7 @@ import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebase
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
   signOut, 
   onAuthStateChanged, 
   updateEmail, 
@@ -39,16 +40,13 @@ import {
   runTransaction
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
-// Retrieve custom API key if stored, or fallback to configured key
-const storedApiKey = localStorage.getItem('al_firebase_api_key');
-
 export const firebaseConfig = {
-  apiKey: storedApiKey || window.__FIREBASE_API_KEY__ || "AIzaSyB_REPLACE_WITH_FIREBASE_CONSOLE_API_KEY",
+  apiKey: "AIzaSyCPl4RNDqJy8GFPR1Ixcs_maAhPKK_iIm0",
   authDomain: "al-p1-fb432.firebaseapp.com",
   projectId: "al-p1-fb432",
   storageBucket: "al-p1-fb432.firebasestorage.app",
-  messagingSenderId: "109876543210",
-  appId: "1:109876543210:web:al-p1-fb432-frontend"
+  messagingSenderId: "627092911084",
+  appId: "1:627092911084:web:80de6c0a270957842086c9"
 };
 
 let app;
@@ -81,13 +79,9 @@ try {
   initError = error;
 }
 
-// Function to update API key dynamically and reload
-export function updateFirebaseApiKey(newApiKey) {
-  if (!newApiKey) return false;
-  localStorage.setItem('al_firebase_api_key', newApiKey.trim());
-  window.location.reload();
-  return true;
-}
+export const secondaryApp = getApps().find(existingApp => existingApp.name === 'Secondary')
+  || initializeApp(firebaseConfig, 'Secondary');
+export const secondaryAuth = getAuth(secondaryApp);
 
 export {
   app,
@@ -97,6 +91,7 @@ export {
   initError,
   // Auth Exports
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   updateEmail,

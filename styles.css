@@ -127,6 +127,8 @@ html {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   scroll-behavior: smooth;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -137,6 +139,19 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   font-family: var(--font-base);
+  width: 100%;
+  overflow-x: hidden;
+}
+
+#appShell,
+main,
+.header-inner {
+  min-width: 0;
+  max-width: 100%;
+}
+
+button {
+  min-height: 44px;
 }
 
 /* --------------------------------------------------------------------------
@@ -183,7 +198,26 @@ button,
 .theme-shadow { box-shadow: var(--card-shadow); }
 .theme-header {
   background-color: var(--header-bg);
-  /* Pure Solid Header without any backdrop blur */
+  position: relative;
+  isolation: isolate;
+}
+
+[data-gradient-blur="on"] .theme-header {
+  background-color: color-mix(in srgb, var(--header-bg) 82%, transparent);
+  -webkit-backdrop-filter: saturate(145%) blur(14px);
+  backdrop-filter: saturate(145%) blur(14px);
+  transform: translateZ(0);
+}
+
+[data-gradient-blur="on"] .theme-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(14, 165, 233, 0.22), transparent 45%),
+    radial-gradient(ellipse at 92% 10%, rgba(16, 185, 129, 0.16), transparent 40%);
 }
 
 /* --------------------------------------------------------------------------
@@ -559,6 +593,74 @@ header.search-active .search-expand-box {
   box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.6);
 }
 
+[data-gradient-blur="on"] .modal-backdrop {
+  background:
+    radial-gradient(ellipse at 15% 15%, rgba(14, 165, 233, 0.2), transparent 48%),
+    radial-gradient(ellipse at 85% 85%, rgba(16, 185, 129, 0.16), transparent 45%),
+    rgba(2, 6, 23, 0.68);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+[data-gradient-blur="on"] .modal-content,
+[data-gradient-blur="on"] .profile-panel {
+  background-color: color-mix(in srgb, var(--bg-surface) 90%, transparent);
+  -webkit-backdrop-filter: saturate(135%) blur(12px);
+  backdrop-filter: saturate(135%) blur(12px);
+  transform: translateZ(0);
+}
+
+.gradient-surface {
+  background:
+    radial-gradient(ellipse at 8% 0%, rgba(14, 165, 233, 0.2), transparent 48%),
+    radial-gradient(ellipse at 100% 100%, rgba(16, 185, 129, 0.14), transparent 48%),
+    var(--bg-surface);
+  transform: translateZ(0);
+}
+
+[data-gradient-blur="off"] .theme-header,
+[data-gradient-blur="off"] .modal-backdrop {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+[data-gradient-blur="off"] .gradient-surface {
+  background: var(--bg-surface);
+  transform: none;
+}
+
+.gradient-toggle-track {
+  width: 2.75rem;
+  height: 1.5rem;
+  padding: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background: var(--border-color);
+  transition: background-color 0.2s ease;
+}
+
+.gradient-toggle-track > span {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+}
+
+.gradient-toggle input:checked + .gradient-toggle-track {
+  background: var(--accent);
+}
+
+.gradient-toggle input:checked + .gradient-toggle-track > span {
+  transform: translateX(1.25rem);
+}
+
+.gradient-toggle input:focus-visible + .gradient-toggle-track {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
 /* Compact Single-Row Settings Tabs */
 .settings-tabs-wrapper {
   scrollbar-width: thin;
@@ -854,6 +956,81 @@ header.search-active .search-expand-box {
 }
 
 /* Print Optimization */
+@media (max-width: 359px) {
+  #appShell > nav {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+
+  .brand-logo-img {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .brand-group {
+    min-width: 0;
+  }
+
+  .brand-group > button > div {
+    max-width: 6rem;
+  }
+
+  .brand-group .font-bold.text-base {
+    font-size: 0.75rem;
+  }
+
+  .actions-group {
+    gap: 0.125rem;
+  }
+
+  .actions-group > button,
+  .search-wrapper > button {
+    width: 30px !important;
+    flex: 0 0 30px;
+  }
+
+  .mobile-nav-btn span {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 420px) {
+  #mobileSettingsBtn {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  body.theme-bg-app {
+    padding-bottom: 5rem;
+  }
+
+  .clock-group {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  main {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  body {
+    padding-bottom: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
 @media print {
   header, nav, .no-print, button, .modal-backdrop {
     display: none !important;

@@ -1,95 +1,127 @@
-// =============================================================================
-// AL COMMUNICATION — CLOUD FIRESTORE SECURITY RULES (VERSION 5.0)
-// Single-Owner Production Authorization & Strict Data Validations
-// =============================================================================
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper: Check if user is authenticated with Firebase Auth
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Helper: Verify authorized store owner email
-    function isAuthorizedUser() {
+    function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.email == 'lasasdias11@gmail.com' ||
-        request.auth.token.email != null
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
 
-    // Helper: Validation functions for numeric precision
-    function isValidPrice(val) {
-      return val is number && val >= 0;
+    function validNonNegativeNumber(value) {
+      return value is number && value >= 0;
     }
 
-    function isValidQuantity(val) {
-      return val is number && val >= 0;
+    function validCommissionRates(data) {
+      return data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH']) &&
+        validNonNegativeNumber(data.AIRTEL) &&
+        validNonNegativeNumber(data.DIALOG) &&
+        validNonNegativeNumber(data.MOBITEL) &&
+        validNonNegativeNumber(data.HUTCH);
     }
 
-    // 1. Master Inventory Catalog Collection (Physical Products & Services/Bills)
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create, update: if isAdmin() &&
+        request.resource.data.keys().hasOnly(['email', 'role', 'createdAt', 'updatedAt']) &&
+        request.resource.data.email is string &&
+        request.resource.data.role in ['admin', 'staff'];
+      allow delete: if isAdmin();
+    }
+
     match /inventory/{itemId} {
-      allow read: if isAuthorizedUser();
-      allow create, update: if isAuthorizedUser() &&
-        request.resource.data.itemCode is string &&
-        request.resource.data.itemCode.size() > 0 &&
-        request.resource.data.itemName is string &&
-        request.resource.data.itemName.size() > 0 &&
-        isValidPrice(request.resource.data.sellingPrice) &&
-        isValidPrice(request.resource.data.costPrice);
-      allow delete: if isAuthorizedUser();
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() &&
+        request.resource.data.code is string &&
+        request.resource.data.code.size() > 0 &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.category is string &&
+        request.resource.data.itemType in ['product', 'service'] &&
+        validNonNegativeNumber(request.resource.data.sellingPrice) &&
+        validNonNegativeNumber(request.resource.data.costPrice) &&
+        validNonNegativeNumber(request.resource.data.stockQuantity) &&
+        validNonNegativeNumber(request.resource.data.lowStockThreshold);
+      allow delete: if isAdmin();
     }
 
-    // 2. Stationery Daily Sales, Bills & Profit Logs
     match /stationery_transactions/{transactionId} {
-      allow read: if isAuthorizedUser();
-      allow create: if isAuthorizedUser() &&
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
         request.resource.data.itemCode is string &&
         request.resource.data.itemName is string &&
-        isValidPrice(request.resource.data.sellingPrice) &&
-        isValidPrice(request.resource.data.costPrice) &&
+        request.resource.data.category is string &&
+        request.resource.data.itemType in ['product', 'service'] &&
+        validNonNegativeNumber(request.resource.data.sellingPrice) &&
+        validNonNegativeNumber(request.resource.data.costPrice) &&
+        request.resource.data.unitProfit is number &&
         request.resource.data.profit is number &&
         request.resource.data.quantity is number &&
         request.resource.data.quantity > 0 &&
-        isValidPrice(request.resource.data.totalAmount) &&
+        validNonNegativeNumber(request.resource.data.totalAmount) &&
         request.resource.data.date is string;
-      allow update: if isAuthorizedUser() &&
-        isValidPrice(request.resource.data.sellingPrice) &&
-        isValidPrice(request.resource.data.costPrice) &&
+      allow update: if isAuthenticated() &&
+        request.resource.data.itemCode is string &&
+        request.resource.data.itemName is string &&
+        request.resource.data.itemType in ['product', 'service'] &&
+        validNonNegativeNumber(request.resource.data.sellingPrice) &&
+        validNonNegativeNumber(request.resource.data.costPrice) &&
+        request.resource.data.unitProfit is number &&
         request.resource.data.profit is number &&
-        request.resource.data.quantity is number;
-      allow delete: if isAuthorizedUser();
-    }
-
-    // 3. Mobile Reloads & Commission Logs
-    match /reload_transactions/{reloadId} {
-      allow read: if isAuthorizedUser();
-      allow create: if isAuthorizedUser() &&
-        request.resource.data.operator in ['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH'] &&
-        isValidPrice(request.resource.data.amount) &&
-        request.resource.data.amount > 0 &&
-        request.resource.data.commissionRate is number &&
-        isValidPrice(request.resource.data.commissionAmount) &&
+        request.resource.data.quantity is number &&
+        request.resource.data.quantity > 0 &&
+        validNonNegativeNumber(request.resource.data.totalAmount) &&
         request.resource.data.date is string;
-      allow update, delete: if isAuthorizedUser();
+      allow delete: if isAuthenticated();
     }
 
-    // 4. System Settings, Snapshots, Backups & Preferences
+    match /reload_transactions/{reloadId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.operator in ['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH'] &&
+        validNonNegativeNumber(request.resource.data.amount) &&
+        request.resource.data.amount > 0 &&
+        validNonNegativeNumber(request.resource.data.commissionRate) &&
+        validNonNegativeNumber(request.resource.data.commissionAmount) &&
+        request.resource.data.date is string;
+      allow update: if isAuthenticated() &&
+        request.resource.data.operator in ['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH'] &&
+        validNonNegativeNumber(request.resource.data.amount) &&
+        request.resource.data.amount > 0 &&
+        validNonNegativeNumber(request.resource.data.commissionRate) &&
+        validNonNegativeNumber(request.resource.data.commissionAmount) &&
+        request.resource.data.date is string;
+      allow delete: if isAuthenticated();
+    }
+
     match /settings/{settingDoc} {
-      allow read, write: if isAuthorizedUser();
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && (
+        (settingDoc == 'rates' && validCommissionRates(request.resource.data)) ||
+        (settingDoc == 'presets' &&
+          request.resource.data.keys().hasOnly(['list']) &&
+          request.resource.data.list is list)
+      );
+      allow delete: if isAdmin();
     }
 
-    // 5. Diagnostics & System Health Testing
     match /diagnostics/{diagId} {
-      allow read, write: if isAuthorizedUser();
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.test is string &&
+        request.resource.data.timestamp is timestamp;
     }
 
     match /system_health/{healthDoc} {
-      allow read, write: if isAuthorizedUser();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
-    // Default deny all other requests
     match /{document=**} {
       allow read, write: if false;
     }

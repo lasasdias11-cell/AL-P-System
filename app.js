@@ -10,7 +10,9 @@
 import {
   auth,
   db,
+  secondaryAuth,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   updateEmail,
@@ -29,7 +31,8 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
-  increment
+  increment,
+  runTransaction
 } from './firebase-config.js';
 
 // =============================================================================
@@ -38,8 +41,10 @@ import {
 
 export const APP_STATE = {
   currentUser: null,
+  currentRole: 'staff',
   activeView: 'dashboard',
   activeTheme: localStorage.getItem('al_theme_preference') || 'modern-slate',
+  gradientBlurEnabled: localStorage.getItem('al_gradient_blur') !== 'false',
   inventoryCatalog: [],
   todayStationeryTransactions: [],
   todayReloadTransactions: [],
@@ -155,6 +160,43 @@ function escapeHTML(str) {
     .replace(/'/g, '&#039;');
 }
 
+async function removeTransaction(type, transactionRecord) {
+  if (!auth.currentUser) throw new Error('Sign in before deleting transactions.');
+
+  const collectionName = type === 'RELOAD' ? 'reload_transactions' : 'stationery_transactions';
+  const transactionRef = doc(db, collectionName, transactionRecord.id);
+  await runTransaction(db, async firestoreTransaction => {
+    const transactionSnapshot = await firestoreTransaction.get(transactionRef);
+    if (!transactionSnapshot.exists()) throw new Error('This transaction no longer exists.');
+
+    const data = transactionSnapshot.data();
+    const isPhysicalSale = type !== 'RELOAD' && data.itemType !== 'service';
+    if (isPhysicalSale) {
+      const catalogItem = data.inventoryId
+        ? { id: data.inventoryId }
+        : APP_STATE.inventoryCatalog.find(item => item.code === data.itemCode);
+
+      if (catalogItem?.id) {
+        const inventoryRef = doc(db, 'inventory', catalogItem.id);
+        const inventorySnapshot = await firestoreTransaction.get(inventoryRef);
+        if (!inventorySnapshot.exists()) {
+          throw new Error('The original inventory item is missing; the transaction was not deleted.');
+        }
+        const quantity = Number(data.quantity || 1);
+        if (!Number.isFinite(quantity) || quantity <= 0) {
+          throw new Error('The transaction has an invalid quantity; the transaction was not deleted.');
+        }
+        firestoreTransaction.update(inventoryRef, {
+          stockQuantity: increment(quantity),
+          updatedAt: serverTimestamp()
+        });
+      }
+    }
+
+    firestoreTransaction.delete(transactionRef);
+  });
+}
+
 // =============================================================================
 // 3. LOGGING & TOAST ENGINE
 // =============================================================================
@@ -248,6 +290,7 @@ export function applyTheme(themeName) {
 
 function initThemeSystem() {
   applyTheme(APP_STATE.activeTheme);
+  setGradientBlurEnabled(APP_STATE.gradientBlurEnabled);
 
   // Quick Header Light/Dark Toggle
   const quickToggle = document.getElementById('themeQuickToggleBtn');
@@ -267,6 +310,24 @@ function initThemeSystem() {
       showToast(`Theme applied: ${chosen}`, 'success');
     });
   });
+
+  const blurToggle = document.getElementById('gradientBlurToggle');
+  if (blurToggle) {
+    blurToggle.checked = APP_STATE.gradientBlurEnabled;
+    blurToggle.addEventListener('change', () => {
+      setGradientBlurEnabled(blurToggle.checked);
+    });
+  }
+}
+
+function setGradientBlurEnabled(enabled) {
+  APP_STATE.gradientBlurEnabled = Boolean(enabled);
+  document.documentElement.dataset.gradientBlur = enabled ? 'on' : 'off';
+  localStorage.setItem('al_gradient_blur', String(Boolean(enabled)));
+  const toggle = document.getElementById('gradientBlurToggle');
+  const stateLabel = document.getElementById('gradientBlurState');
+  if (toggle) toggle.checked = Boolean(enabled);
+  if (stateLabel) stateLabel.textContent = enabled ? 'On' : 'Off';
 }
 
 // =============================================================================
@@ -655,8 +716,8 @@ function initGlobalSearch() {
         const stockBadge = isService
           ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service/Bill</span>`
           : item.stockQuantity <= 5
-          ? `<span class="badge-stock-low px-2 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} Left</span>`
-          : `<span class="badge-stock-in px-2 py-0.5 rounded text-[10px] font-bold">${item.stockQuantity} in stock</span>`;
+          ? `<span class="badge-stock-low px-2 py-0.5 rounded text-[10px] font-bold">${escapeHTML(item.stockQuantity)} Left</span>`
+          : `<span class="badge-stock-in px-2 py-0.5 rounded text-[10px] font-bold">${escapeHTML(item.stockQuantity)} in stock</span>`;
 
         row.innerHTML = `
           <div class="flex items-center gap-2.5 min-w-0">
@@ -750,7 +811,7 @@ function initGlobalSearch() {
             <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(s.itemCode || 'ST')}</span>
             <div class="truncate">
               <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(s.itemName)}</div>
-              <div class="text-[10px] theme-text-dim">${escapeHTML(s.date || '')} &bull; Qty: ${s.quantity || 1}</div>
+              <div class="text-[10px] theme-text-dim">${escapeHTML(s.date || '')} &bull; Qty: ${escapeHTML(s.quantity || 1)}</div>
             </div>
           </div>
           <div class="text-right flex-shrink-0">
@@ -1228,7 +1289,7 @@ function renderMasterLogsTable(rows) {
         +${formatLKR(item.profit)}
       </td>
       <td class="py-2.5 px-3 text-center">
-        <button type="button" class="delete-tx-btn p-1 text-red-400 hover:text-red-300 transition" title="Delete record">
+        <button type="button" class="delete-tx-btn p-1 text-red-400 hover:text-red-300 transition" title="Delete record" aria-label="Delete transaction">
           <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </td>
@@ -1239,9 +1300,10 @@ function renderMasterLogsTable(rows) {
       deleteBtn.addEventListener('click', async () => {
         if (!confirm(`Delete transaction for "${item.title}" (${formatLKR(item.amount)})?`)) return;
         try {
-          const colName = item.type === 'RELOAD' ? 'reload_transactions' : 'stationery_transactions';
-          await deleteDoc(doc(db, colName, item.raw.id));
-          showToast('Transaction record deleted', 'success');
+          await removeTransaction(item.type, item.raw);
+          showToast(item.type === 'STATIONERY' && item.raw.itemType !== 'service'
+            ? 'Transaction deleted and stock restored'
+            : 'Transaction record deleted', 'success');
         } catch (err) {
           showToast(`Delete failed: ${err.message}`, 'error');
         }
@@ -1575,9 +1637,9 @@ export function renderStockTable() {
     } else if (item.stockQuantity <= 0) {
       stockCol = `<span class="badge-stock-out px-2.5 py-1 rounded-full text-xs font-bold">Out of Stock (0)</span>`;
     } else if (item.stockQuantity <= (item.lowStockThreshold || 5)) {
-      stockCol = `<span class="badge-stock-low px-2.5 py-1 rounded-full text-xs font-bold">${item.stockQuantity} Left (Low)</span>`;
+      stockCol = `<span class="badge-stock-low px-2.5 py-1 rounded-full text-xs font-bold">${escapeHTML(item.stockQuantity)} Left (Low)</span>`;
     } else {
-      stockCol = `<span class="badge-stock-in px-2.5 py-1 rounded-full text-xs font-bold">${item.stockQuantity} in stock</span>`;
+      stockCol = `<span class="badge-stock-in px-2.5 py-1 rounded-full text-xs font-bold">${escapeHTML(item.stockQuantity)} in stock</span>`;
     }
 
     tr.innerHTML = `
@@ -1735,7 +1797,7 @@ function initStationeryPOS() {
             </div>
             <div class="text-right">
               <div class="font-bold text-xs theme-text-main font-mono">${formatLKR(item.sellingPrice)}</div>
-              <div class="text-[10px] theme-text-dim">${isService ? 'Service/Bill' : item.stockQuantity + ' left'}</div>
+              <div class="text-[10px] theme-text-dim">${isService ? 'Service/Bill' : `${escapeHTML(item.stockQuantity)} left`}</div>
             </div>
           `;
           div.addEventListener('click', () => {
@@ -1825,10 +1887,9 @@ function initStationeryPOS() {
       }
 
       // Stock Warning for physical products
-      if (!isService && matchedItem && matchedItem.stockQuantity < quantity) {
-        if (!confirm(`Warning: Only ${matchedItem.stockQuantity} units in stock for "${matchedItem.name}". Proceed with logging sale of ${quantity} units?`)) {
-          return;
-        }
+      if (!isService && matchedItem && Number(matchedItem.stockQuantity || 0) < quantity) {
+        showToast(`Insufficient stock for "${matchedItem.name}". Available: ${matchedItem.stockQuantity || 0}.`, 'error');
+        return;
       }
 
       const transactionPayload = {
@@ -1836,6 +1897,7 @@ function initStationeryPOS() {
         time: getCurrentTimeString(),
         itemCode,
         itemName,
+        ...(matchedItem?.id && !isService ? { inventoryId: matchedItem.id } : {}),
         category,
         itemType: isService ? 'service' : 'product',
         costPrice,
@@ -1848,21 +1910,33 @@ function initStationeryPOS() {
       };
 
       try {
-        // 1. Add Transaction to Firestore
-        await addDoc(collection(db, 'stationery_transactions'), transactionPayload);
-
-        // 2. Deduct Stock strictly for Physical Products (Requirement 4.2)
         if (!isService && matchedItem && matchedItem.id) {
           const itemDocRef = doc(db, 'inventory', matchedItem.id);
-          await updateDoc(itemDocRef, {
-            stockQuantity: increment(-quantity),
-            updatedAt: serverTimestamp()
+          const transactionRef = doc(collection(db, 'stationery_transactions'));
+          await runTransaction(db, async firestoreTransaction => {
+            const inventorySnapshot = await firestoreTransaction.get(itemDocRef);
+            if (!inventorySnapshot.exists()) {
+              throw new Error('The selected inventory item no longer exists.');
+            }
+            const availableStock = Number(inventorySnapshot.data().stockQuantity || 0);
+            if (availableStock < quantity) {
+              throw new Error(`Insufficient stock. Only ${availableStock} units are currently available.`);
+            }
+            firestoreTransaction.update(itemDocRef, {
+              stockQuantity: increment(-quantity),
+              updatedAt: serverTimestamp()
+            });
+            firestoreTransaction.set(transactionRef, transactionPayload);
           });
           const remainingStock = Math.max(0, matchedItem.stockQuantity - quantity);
           showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) | Stock left: ${remainingStock}`, 'success');
-        } else if (isService) {
-          showToast(`Recorded utility bill: ${itemName} (${formatLKR(totalAmount)}) [No stock deduction]`, 'success');
         } else {
+          await addDoc(collection(db, 'stationery_transactions'), transactionPayload);
+        }
+
+        if (isService) {
+          showToast(`Recorded utility bill: ${itemName} (${formatLKR(totalAmount)}) [No stock deduction]`, 'success');
+        } else if (!matchedItem) {
           showToast(`Logged custom sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)})`, 'success');
         }
 
@@ -1920,14 +1994,28 @@ function renderRecentStationeryFeed() {
         ${badge}
         <div>
           <span class="font-bold theme-text-main">${escapeHTML(item.itemName)}</span>
-          <span class="text-[11px] theme-text-dim"> &times; ${item.quantity || 1} &bull; ${escapeHTML(item.time || '')}</span>
+          <span class="text-[11px] theme-text-dim"> &times; ${escapeHTML(item.quantity || 1)} &bull; ${escapeHTML(item.time || '')}</span>
         </div>
       </div>
-      <div class="text-right">
-        <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.totalAmount)}</span>
-        <span class="text-[10px] theme-text-dim block">+${formatLKR(item.profit || 0)} margin</span>
+      <div class="flex items-center gap-2">
+        <div class="text-right">
+          <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.totalAmount)}</span>
+          <span class="text-[10px] theme-text-dim block">+${formatLKR(item.profit || 0)} margin</span>
+        </div>
+        <button type="button" class="recent-delete-btn text-red-400 hover:text-red-300" aria-label="Delete transaction" title="Delete transaction">
+          <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
       </div>
     `;
+    div.querySelector('.recent-delete-btn')?.addEventListener('click', async () => {
+      if (!confirm(`Delete transaction for "${item.itemName}"?`)) return;
+      try {
+        await removeTransaction('STATIONERY', item);
+        showToast(item.itemType === 'service' ? 'Transaction record deleted' : 'Transaction deleted and stock restored', 'success');
+      } catch (err) {
+        showToast(`Delete failed: ${err.message}`, 'error');
+      }
+    });
     feed.appendChild(div);
   });
 }
@@ -2133,11 +2221,25 @@ function renderRecentReloadsFeed() {
           <span class="text-[11px] theme-text-dim block">${escapeHTML(item.time || '')}</span>
         </div>
       </div>
-      <div class="text-right">
-        <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.amount)}</span>
-        <span class="text-[10px] theme-text-dim block font-mono">+${formatLKR(item.commissionAmount)} comm.</span>
+        <div class="flex items-center gap-2">
+          <div class="text-right">
+            <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.amount)}</span>
+            <span class="text-[10px] theme-text-dim block font-mono">+${formatLKR(item.commissionAmount)} comm.</span>
+          </div>
+          <button type="button" class="recent-delete-btn text-red-400 hover:text-red-300" aria-label="Delete transaction" title="Delete transaction">
+            <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
       </div>
     `;
+      div.querySelector('.recent-delete-btn')?.addEventListener('click', async () => {
+        if (!confirm(`Delete ${item.operator} reload for ${item.phone || 'Walk-in'}?`)) return;
+        try {
+          await removeTransaction('RELOAD', item);
+          showToast('Transaction record deleted', 'success');
+        } catch (err) {
+          showToast(`Delete failed: ${err.message}`, 'error');
+        }
+      });
     feed.appendChild(div);
   });
 }
@@ -2368,7 +2470,7 @@ export function renderCatalogTable() {
 
     const costDisplay = isService ? '<span class="theme-text-dim font-mono">N/A</span>' : `<span class="font-mono font-bold text-amber-400">${formatLKR(item.costPrice)}</span>`;
     const profitDisplay = isService ? '<span class="theme-text-dim font-mono">Custom</span>' : `<span class="font-mono font-bold text-sky-400">+${formatLKR(item.sellingPrice - item.costPrice)}</span>`;
-    const stockDisplay = isService ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[11px] font-bold">No Qty</span>` : `<span class="font-mono font-bold ${item.stockQuantity <= 5 ? 'text-red-400' : 'theme-text-main'}">${item.stockQuantity}</span>`;
+    const stockDisplay = isService ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[11px] font-bold">No Qty</span>` : `<span class="font-mono font-bold ${item.stockQuantity <= 5 ? 'text-red-400' : 'theme-text-main'}">${escapeHTML(item.stockQuantity)}</span>`;
 
     tr.innerHTML = `
       <td class="py-2.5 px-3 font-mono font-bold text-xs theme-text-main">${escapeHTML(item.code)}</td>
@@ -2657,7 +2759,7 @@ function initSettingsPanels() {
       const span = document.createElement('span');
       span.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border theme-border theme-bg-surface text-xs font-bold font-mono';
       span.innerHTML = `
-        <span>Rs. ${val}</span>
+        <span>Rs. ${escapeHTML(val)}</span>
         <button type="button" class="del-preset-btn text-red-400 hover:text-red-300 ml-1 text-sm font-bold">&times;</button>
       `;
       span.querySelector('.del-preset-btn')?.addEventListener('click', async () => {
@@ -2737,12 +2839,17 @@ function initSettingsPanels() {
     updateEmailForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const newEmail = document.getElementById('newEmailInput')?.value.trim();
-      if (!newEmail || !auth.currentUser) return;
+      if (!newEmail || !auth.currentUser) {
+        showToast('Sign in before updating account details.', 'error');
+        return;
+      }
       try {
         await updateEmail(auth.currentUser, newEmail);
         showToast(`Email updated to ${newEmail}`, 'success');
         const badge = document.getElementById('userEmailBadge');
         if (badge) badge.textContent = newEmail;
+        APP_STATE.currentUser = auth.currentUser;
+        updateProfileDisplay(auth.currentUser);
         updateEmailForm.reset();
       } catch (err) {
         showToast(`Email update failed: ${err.message}`, 'error');
@@ -2756,6 +2863,14 @@ function initSettingsPanels() {
       e.preventDefault();
       const pass = document.getElementById('newPasswordInput')?.value;
       const confirmPass = document.getElementById('confirmPasswordInput')?.value;
+      if (!auth.currentUser) {
+        showToast('Sign in before updating your password.', 'error');
+        return;
+      }
+      if (!pass || pass.length < 8) {
+        showToast('Password must be at least 8 characters.', 'error');
+        return;
+      }
       if (pass !== confirmPass) {
         showToast('Passwords do not match', 'error');
         return;
@@ -2815,6 +2930,106 @@ function initSettingsPanels() {
   }
 }
 
+function updateProfileDisplay(user = APP_STATE.currentUser) {
+  const email = document.getElementById('profileAccountEmail');
+  const roleBadge = document.getElementById('profileAccountRole');
+  const createAccountPanel = document.getElementById('createStaffAccountPanel');
+  const isAdmin = APP_STATE.currentRole === 'admin';
+  if (email) email.textContent = user?.email || '';
+  if (roleBadge) {
+    roleBadge.textContent = isAdmin ? 'Admin' : 'Staff / User';
+    roleBadge.className = `inline-flex mt-3 px-2.5 py-1 rounded-full text-xs font-bold border ${
+      isAdmin
+        ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+        : 'text-sky-400 border-sky-500/30 bg-sky-500/10'
+    }`;
+  }
+  if (createAccountPanel) createAccountPanel.classList.toggle('hidden', !isAdmin);
+}
+
+function initProfileControls() {
+  const modal = document.getElementById('profileModal');
+  const openButton = document.getElementById('openProfileBtn');
+  const closeButton = document.getElementById('closeProfileBtn');
+  const resetButton = document.getElementById('profileResetPasswordBtn');
+  const signOutButton = document.getElementById('profileSignOutBtn');
+  const createAccountForm = document.getElementById('createStaffAccountForm');
+
+  openButton?.addEventListener('click', () => {
+    if (!auth.currentUser || !APP_STATE.currentUser) {
+      showToast('Sign in to view account details.', 'error');
+      return;
+    }
+    updateProfileDisplay();
+    modal?.classList.remove('hidden');
+  });
+  closeButton?.addEventListener('click', () => modal?.classList.add('hidden'));
+  modal?.addEventListener('click', event => {
+    if (event.target === modal) modal.classList.add('hidden');
+  });
+
+  resetButton?.addEventListener('click', async () => {
+    const email = auth.currentUser?.email;
+    if (!email) {
+      showToast('Sign in before requesting a password reset.', 'error');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      showToast(`Password reset link sent to ${email}`, 'success');
+    } catch (error) {
+      showToast(`Password reset failed: ${error.message}`, 'error');
+    }
+  });
+
+  signOutButton?.addEventListener('click', async () => {
+    try {
+      await signOut(auth);
+      modal?.classList.add('hidden');
+      showToast('Signed out of session', 'info');
+    } catch (error) {
+      showToast(`Sign out failed: ${error.message}`, 'error');
+    }
+  });
+
+  createAccountForm?.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!auth.currentUser || APP_STATE.currentRole !== 'admin') {
+      showToast('Only an authenticated admin can create staff accounts.', 'error');
+      return;
+    }
+    const email = document.getElementById('staffAccountEmail')?.value.trim();
+    const password = document.getElementById('staffAccountPassword')?.value;
+    if (!email || !password || password.length < 8) {
+      showToast('Enter an email and a password of at least 8 characters.', 'error');
+      return;
+    }
+
+    let createdUser = null;
+    try {
+      const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      createdUser = credential.user;
+      await setDoc(doc(db, 'users', createdUser.uid), {
+        email,
+        role: 'staff',
+        createdAt: serverTimestamp()
+      });
+      createAccountForm.reset();
+      showToast(`Staff account created for ${email}`, 'success');
+    } catch (error) {
+      showToast(`Account creation failed: ${error.message}`, 'error');
+    } finally {
+      if (createdUser) {
+        try {
+          await signOut(secondaryAuth);
+        } catch (error) {
+          logDebug(`Secondary account sign-out failed: ${error.message}`, 'WARN');
+        }
+      }
+    }
+  });
+}
+
 // =============================================================================
 // 18. AUTHENTICATION & SESSION PERSISTENCE (Requirement 7)
 // =============================================================================
@@ -2870,16 +3085,44 @@ function initAuthentication() {
 
     if (user) {
       APP_STATE.currentUser = user;
+      APP_STATE.currentRole = user.email?.toLowerCase() === 'lasasdias11@gmail.com' ? 'admin' : 'staff';
       if (loginScreen) loginScreen.classList.add('hidden');
       if (appShell) appShell.classList.remove('hidden');
 
       const userBadge = document.getElementById('userEmailBadge');
       if (userBadge) userBadge.textContent = user.email || 'Store Owner';
+      updateProfileDisplay(user);
 
       logDebug(`Persistent session confirmed: ${user.email}`);
-      initCloudSyncListeners();
+      if (cloudSyncUserId !== user.uid) {
+        stopCloudSyncListeners();
+        cloudSyncUserId = user.uid;
+        if (APP_STATE.currentRole === 'admin') {
+          setDoc(doc(db, 'users', user.uid), {
+            email: user.email || '',
+            role: 'admin',
+            updatedAt: serverTimestamp()
+          }, { merge: true }).catch(error => {
+            logDebug(`Admin profile initialization failed: ${error.message}`, 'ERROR');
+          });
+        }
+        cloudSyncUnsubscribers.push(onSnapshot(doc(db, 'users', user.uid), snapshot => {
+          if (auth.currentUser?.uid !== user.uid) return;
+          const role = user.email?.toLowerCase() === 'lasasdias11@gmail.com'
+            ? 'admin'
+            : snapshot.data()?.role === 'admin' ? 'admin' : 'staff';
+          APP_STATE.currentRole = role;
+          updateProfileDisplay(user);
+        }, error => {
+          logDebug(`Account role sync failed: ${error.message}`, 'ERROR');
+        }));
+        initCloudSyncListeners();
+      }
     } else {
       APP_STATE.currentUser = null;
+      APP_STATE.currentRole = 'staff';
+      stopCloudSyncListeners();
+      document.getElementById('profileModal')?.classList.add('hidden');
       if (appShell) appShell.classList.add('hidden');
       if (loginScreen) loginScreen.classList.remove('hidden');
       logDebug('Awaiting owner authentication...');
@@ -2922,11 +3165,21 @@ function initAuthentication() {
 // 19. REAL-TIME FIRESTORE CLOUD LISTENERS
 // =============================================================================
 
+let cloudSyncUnsubscribers = [];
+let cloudSyncUserId = null;
+
+function stopCloudSyncListeners() {
+  cloudSyncUnsubscribers.forEach(unsubscribe => unsubscribe());
+  cloudSyncUnsubscribers = [];
+  cloudSyncUserId = null;
+}
+
 function initCloudSyncListeners() {
   const todayStr = getTodayDateString();
+  const watch = (...args) => cloudSyncUnsubscribers.push(onSnapshot(...args));
 
   // 1. Inventory Catalog Listener
-  onSnapshot(collection(db, 'inventory'), (snapshot) => {
+  watch(collection(db, 'inventory'), (snapshot) => {
     const items = [];
     snapshot.forEach(docSnap => {
       items.push({ id: docSnap.id, ...docSnap.data() });
@@ -2946,7 +3199,7 @@ function initCloudSyncListeners() {
     collection(db, 'stationery_transactions'),
     where('date', '==', todayStr)
   );
-  onSnapshot(statQuery, (snapshot) => {
+  watch(statQuery, (snapshot) => {
     const txs = [];
     snapshot.forEach(docSnap => {
       txs.push({ id: docSnap.id, ...docSnap.data() });
@@ -2964,7 +3217,7 @@ function initCloudSyncListeners() {
     collection(db, 'reload_transactions'),
     where('date', '==', todayStr)
   );
-  onSnapshot(reloadQuery, (snapshot) => {
+  watch(reloadQuery, (snapshot) => {
     const reloads = [];
     snapshot.forEach(docSnap => {
       reloads.push({ id: docSnap.id, ...docSnap.data() });
@@ -2978,14 +3231,14 @@ function initCloudSyncListeners() {
   });
 
   // 4. Master All-Time Records (For Ledger & PDF)
-  onSnapshot(collection(db, 'stationery_transactions'), (snapshot) => {
+  watch(collection(db, 'stationery_transactions'), (snapshot) => {
     const list = [];
     snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
     APP_STATE.masterStationeryRecords = list;
     applyMasterLogFilters();
   });
 
-  onSnapshot(collection(db, 'reload_transactions'), (snapshot) => {
+  watch(collection(db, 'reload_transactions'), (snapshot) => {
     const list = [];
     snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
     APP_STATE.masterReloadRecords = list;
@@ -2993,7 +3246,7 @@ function initCloudSyncListeners() {
   });
 
   // 5. System Settings Listener (Rates & Presets)
-  onSnapshot(doc(db, 'settings', 'rates'), (docSnap) => {
+  watch(doc(db, 'settings', 'rates'), (docSnap) => {
     if (docSnap.exists()) {
       APP_STATE.commissionRates = { ...APP_STATE.commissionRates, ...docSnap.data() };
       const bA = document.getElementById('rateBadgeAirtel');
@@ -3008,7 +3261,7 @@ function initCloudSyncListeners() {
     }
   });
 
-  onSnapshot(doc(db, 'settings', 'presets'), (docSnap) => {
+  watch(doc(db, 'settings', 'presets'), (docSnap) => {
     if (docSnap.exists() && Array.isArray(docSnap.data()?.list)) {
       APP_STATE.reloadPresets = docSnap.data().list;
       renderPresetPills();
@@ -3034,6 +3287,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSettingsCatalog();
   initSettingsPanels();
   initBackupRestoreSystem();
+  initProfileControls();
   initAuthentication();
 
   logDebug('AL Communication System v5.0 Ready.', 'SUCCESS');
