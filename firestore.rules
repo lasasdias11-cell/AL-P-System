@@ -86,20 +86,23 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
       allow create: if (isAdmin() &&
           validUserProfile(request.resource.data)) ||
-        (signedIn() &&
+        (request.auth != null &&
           request.auth.uid == userId &&
           validUserProfile(request.resource.data) &&
           request.resource.data.email == request.auth.token.email &&
           request.resource.data.role == (isOwnerAccount() ? 'admin' : 'user'));
       allow update: if isAdmin() && validUserProfile(request.resource.data) ||
-        (signedIn() && request.auth.uid == userId &&
+        (request.auth != null && request.auth.uid == userId &&
           validUserProfile(request.resource.data) &&
-          request.resource.data.role == resource.data.role &&
+          (('role' in resource.data &&
+            request.resource.data.role == resource.data.role) ||
+           (!('role' in resource.data) &&
+            request.resource.data.role == (isOwnerAccount() ? 'admin' : 'user'))) &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['email', 'lastLogin', 'updatedAt']));
+            .hasOnly(['email', 'role', 'lastLogin', 'updatedAt']));
       allow delete: if isAdmin() && userId != request.auth.uid;
     }
 
@@ -157,7 +160,8 @@ service cloud.firestore {
       allow create, update: if signedIn() &&
         request.auth.uid == userId &&
         request.resource.data.keys().hasOnly([
-          'activeTheme', 'gradientBlurEnabled', 'dashboardOrder', 'updatedAt'
+          'activeTheme', 'gradientBlurEnabled', 'dashboardOrder',
+          'hiddenDashboardCards', 'updatedAt'
         ]) &&
         (!('activeTheme' in request.resource.data) ||
           request.resource.data.activeTheme in ['modern-slate', 'emerald-store', 'sapphire-blue', 'warm-amber']) &&
@@ -168,6 +172,8 @@ service cloud.firestore {
            request.resource.data.dashboardOrder.keys().hasOnly(['metrics', 'actions']) &&
            request.resource.data.dashboardOrder.metrics is list &&
            request.resource.data.dashboardOrder.actions is list)) &&
+        (!('hiddenDashboardCards' in request.resource.data) ||
+          request.resource.data.hiddenDashboardCards is list) &&
         (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
       allow delete: if signedIn() && request.auth.uid == userId;
     }

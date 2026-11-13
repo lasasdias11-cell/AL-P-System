@@ -62,6 +62,7 @@ export const APP_STATE = {
   activeTheme: localStorage.getItem('al_theme_preference') || 'modern-slate',
   gradientBlurEnabled: localStorage.getItem('al_gradient_blur') !== 'false',
   dashboardOrder: DEFAULT_DASHBOARD_ORDER,
+  hiddenDashboardCards: [],
   userProfiles: [],
   inventoryCatalog: [],
   todayStationeryTransactions: [],
@@ -2817,6 +2818,7 @@ function createConfigurationSnapshot() {
       activeTheme: APP_STATE.activeTheme,
       gradientBlurEnabled: APP_STATE.gradientBlurEnabled,
       dashboardOrder: APP_STATE.dashboardOrder,
+      hiddenDashboardCards: [...APP_STATE.hiddenDashboardCards],
       stockSortOrder: APP_STATE.stockSortOrder,
       catalogSortOrder: APP_STATE.catalogSortOrder
     }
@@ -2863,6 +2865,9 @@ export async function applyConfigurationBackup(snapshot) {
         applyDashboardOrder(document.getElementById('dashboardGrid'), preferences.dashboardOrder.metrics);
         applyDashboardOrder(document.getElementById('dashboardActionsGrid'), preferences.dashboardOrder.actions);
       }
+      if (Array.isArray(preferences.hiddenDashboardCards)) {
+        applyHiddenDashboardCards(preferences.hiddenDashboardCards);
+      }
       if (['name-asc', 'name-desc', 'selling-desc', 'selling-asc', 'cost-desc', 'cost-asc', 'stock-desc', 'stock-asc', 'newest', 'oldest'].includes(preferences.stockSortOrder)) {
         APP_STATE.stockSortOrder = preferences.stockSortOrder;
         localStorage.setItem('al_stock_sort_order', preferences.stockSortOrder);
@@ -2878,7 +2883,8 @@ export async function applyConfigurationBackup(snapshot) {
       preferencesSynced = await saveUserPreferences({
         activeTheme: APP_STATE.activeTheme,
         gradientBlurEnabled: APP_STATE.gradientBlurEnabled,
-        dashboardOrder: APP_STATE.dashboardOrder
+        dashboardOrder: APP_STATE.dashboardOrder,
+        hiddenDashboardCards: [...APP_STATE.hiddenDashboardCards]
       });
     }
 
@@ -2968,7 +2974,8 @@ function initBackupRestoreSystem() {
       const preferencesSynced = await saveUserPreferences({
         activeTheme: 'modern-slate',
         gradientBlurEnabled: true,
-        dashboardOrder: APP_STATE.dashboardOrder
+        dashboardOrder: APP_STATE.dashboardOrder,
+        hiddenDashboardCards: []
       });
       if (!preferencesSynced) {
         showToast('Defaults applied locally, but preferences could not sync to Firestore.', 'error');
@@ -3494,34 +3501,28 @@ function initializeUserProfile(user) {
   if (profileInitializationPromises.has(user.uid)) return profileInitializationPromises.get(user.uid);
 
   const initialization = (async () => {
-    const userRef = doc(db, 'users', user.uid);
-    const profileSnapshot = await getDoc(userRef);
-    const isOwner = user.email?.toLowerCase() === ADMIN_EMAIL;
-    const profileData = profileSnapshot.data();
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const profileSnapshot = await getDoc(userRef);
+      const profileData = profileSnapshot.data();
+      const isOwner = user.email?.toLowerCase() === ADMIN_EMAIL;
+      const role = isOwner ? 'admin' : (profileData?.role === 'admin' ? 'admin' : 'user');
 
-    if (isOwner) {
       await setDoc(userRef, {
-        email: user.email || '',
-        role: 'admin',
-        ...(profileSnapshot.exists() ? {} : { createdAt: serverTimestamp() }),
+        email: user.email || auth.currentUser?.email || '',
+        role,
+        ...(!profileSnapshot.exists() ? { createdAt: serverTimestamp() } : {}),
         lastLogin: serverTimestamp()
       }, { merge: true });
-    } else if (profileSnapshot.exists()) {
-      await setDoc(userRef, {
-        email: user.email || '',
-        lastLogin: serverTimestamp()
-      }, { merge: true });
-    } else {
-      await setDoc(userRef, {
-        email: user.email || '',
-        role: 'user',
-        createdAt: serverTimestamp(),
-        lastLogin: serverTimestamp()
-      });
-    }
-    if (profileData?.role && profileData.role !== APP_STATE.currentRole && !isOwner) {
-      APP_STATE.currentRole = profileData.role;
-      applyRolePermissions();
+
+      if (role !== APP_STATE.currentRole) {
+        APP_STATE.currentRole = role;
+        applyRolePermissions();
+      }
+      return true;
+    } catch (error) {
+      logDebug(`Account profile sync skipped: ${error.message}`, 'WARN');
+      return false;
     }
   })();
   profileInitializationPromises.set(user.uid, initialization);
@@ -3673,10 +3674,7 @@ function initAuthentication() {
           logDebug(`Account role sync failed: ${error.message}`, 'ERROR');
         });
         initCloudSyncListeners();
-        initializeUserProfile(user).catch(error => {
-          logDebug(`Account profile initialization failed: ${error.message}`, 'ERROR');
-          showToast(`Account profile could not be synced: ${error.message}`, 'error');
-        });
+        void initializeUserProfile(user);
       }
     } else {
       clearSignedInState();
@@ -3762,6 +3760,9 @@ let dragSaveTimer = null;
 let activeDashboardDrag = null;
 let dashboardPressTimer = null;
 let suppressDashboardClickUntil = 0;
+let dashboardCardNodes = new Map();
+let dashboardCardContainers = new Map();
+let dashboardDeleteMode = false;
 
 function dashboardPreferenceKey(uid = auth.currentUser?.uid) {
   return uid ? `al_preferences_${uid}` : null;
@@ -3809,26 +3810,67 @@ function applyDashboardOrder(container, order) {
   cards.forEach(card => container.appendChild(card));
 }
 
-function persistDashboardOrder() {
+function persistDashboardOrder(immediate = false) {
   if (dragSaveTimer) clearTimeout(dragSaveTimer);
-  dragSaveTimer = setTimeout(() => {
+  const save = () => {
+    dragSaveTimer = null;
     const metrics = [...document.querySelectorAll('#dashboardGrid > [data-card-id]')]
       .map(card => card.dataset.cardId);
     const actions = [...document.querySelectorAll('#dashboardActionsGrid > [data-card-id]')]
       .map(card => card.dataset.cardId);
     APP_STATE.dashboardOrder = { metrics, actions };
-    saveUserPreferences({ dashboardOrder: APP_STATE.dashboardOrder });
-  }, 150);
+    saveUserPreferences({
+      dashboardOrder: APP_STATE.dashboardOrder,
+      hiddenDashboardCards: [...APP_STATE.hiddenDashboardCards]
+    });
+  };
+  if (immediate) save();
+  else dragSaveTimer = setTimeout(save, 150);
+}
+
+function applyHiddenDashboardCards(cardIds) {
+  if (!Array.isArray(cardIds)) return;
+  const allowedIds = new Set(dashboardCardNodes.keys());
+  const hidden = [...new Set(cardIds.filter(id => typeof id === 'string' && allowedIds.has(id)))];
+  const hiddenSet = new Set(hidden);
+
+  dashboardCardNodes.forEach((card, id) => {
+    if (hiddenSet.has(id)) {
+      card.remove();
+    } else {
+      const container = dashboardCardContainers.get(id);
+      if (container && card.parentElement !== container) container.appendChild(card);
+    }
+  });
+
+  APP_STATE.hiddenDashboardCards = hidden;
+  document.getElementById('dashboardGrid')?.classList.toggle('dashboard-delete-mode', dashboardDeleteMode);
+  document.getElementById('dashboardActionsGrid')?.classList.toggle('dashboard-delete-mode', dashboardDeleteMode);
+}
+
+async function removeDashboardCard(card) {
+  const cardId = card.dataset.cardId;
+  if (!cardId || !dashboardCardNodes.has(cardId) || card.classList.contains('card-removing')) return;
+  const label = card.querySelector('.font-semibold, .font-bold')?.textContent.trim() || cardId;
+  if (!confirm(`Remove "${label}" from the dashboard? Reset Dashboard Layout restores removed cards.`)) return;
+
+  card.classList.add('card-removing');
+  await new Promise(resolve => setTimeout(resolve, 160));
+  card.remove();
+  APP_STATE.hiddenDashboardCards = [...new Set([...APP_STATE.hiddenDashboardCards, cardId])];
+  persistDashboardOrder(true);
+  showToast('Dashboard card removed. Reset the layout to restore it.', 'success');
 }
 
 function resetDashboardLayout() {
+  applyHiddenDashboardCards([]);
   APP_STATE.dashboardOrder = {
     metrics: [...DEFAULT_DASHBOARD_ORDER.metrics],
     actions: [...DEFAULT_DASHBOARD_ORDER.actions]
   };
   applyDashboardOrder(document.getElementById('dashboardGrid'), APP_STATE.dashboardOrder.metrics);
   applyDashboardOrder(document.getElementById('dashboardActionsGrid'), APP_STATE.dashboardOrder.actions);
-  persistDashboardOrder();
+  persistDashboardOrder(true);
   showToast('Dashboard layout restored.', 'success');
 }
 
@@ -3837,6 +3879,25 @@ function initDashboardReordering() {
     document.getElementById('dashboardGrid'),
     document.getElementById('dashboardActionsGrid')
   ].filter(Boolean);
+  dashboardCardNodes = new Map();
+  dashboardCardContainers = new Map();
+  containers.forEach(container => {
+    container.querySelectorAll(':scope > [data-card-id]').forEach(card => {
+      dashboardCardNodes.set(card.dataset.cardId, card);
+      dashboardCardContainers.set(card.dataset.cardId, container);
+    });
+  });
+
+  const deleteModeButton = document.getElementById('dashboardEditCardsBtn');
+  deleteModeButton?.addEventListener('click', () => {
+    dashboardDeleteMode = !dashboardDeleteMode;
+    deleteModeButton.setAttribute('aria-pressed', String(dashboardDeleteMode));
+    deleteModeButton.textContent = dashboardDeleteMode ? 'Done' : 'Edit Cards';
+    deleteModeButton.title = dashboardDeleteMode
+      ? 'Click a card to remove it, or press Done to exit'
+      : 'Enable dashboard card removal';
+    containers.forEach(container => container.classList.toggle('dashboard-delete-mode', dashboardDeleteMode));
+  });
 
   const beginDrag = (card, event) => {
     activeDashboardDrag = { card, container: card.parentElement, pointerId: event.pointerId, moved: false };
@@ -3855,7 +3916,22 @@ function initDashboardReordering() {
   };
 
   containers.forEach(container => {
+    container.addEventListener('click', event => {
+      const card = event.target.closest('[data-card-id]');
+      if (!dashboardDeleteMode || !card || card.parentElement !== container) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      void removeDashboardCard(card);
+    }, true);
+    container.addEventListener('contextmenu', event => {
+      const card = event.target.closest('[data-card-id]');
+      if (!card || card.parentElement !== container) return;
+      event.preventDefault();
+      void removeDashboardCard(card);
+    });
     container.addEventListener('pointerdown', event => {
+      if (dashboardDeleteMode) return;
       const card = event.target.closest('[data-card-id]');
       const control = event.target.closest('button,a,input,select,textarea');
       if (!card || card.parentElement !== container || (control && control !== card)) return;
@@ -3947,6 +4023,7 @@ function initCloudSyncListeners() {
       if (cached.activeTheme) applyTheme(cached.activeTheme);
       if (typeof cached.gradientBlurEnabled === 'boolean') setGradientBlurEnabled(cached.gradientBlurEnabled);
       if (cached.dashboardOrder) APP_STATE.dashboardOrder = cached.dashboardOrder;
+      applyHiddenDashboardCards(Array.isArray(cached.hiddenDashboardCards) ? cached.hiddenDashboardCards : []);
       applyDashboardOrder(document.getElementById('dashboardGrid'), APP_STATE.dashboardOrder.metrics);
       applyDashboardOrder(document.getElementById('dashboardActionsGrid'), APP_STATE.dashboardOrder.actions);
     } catch (error) {
@@ -4038,6 +4115,9 @@ function initCloudSyncListeners() {
       APP_STATE.dashboardOrder = preferences.dashboardOrder;
       applyDashboardOrder(document.getElementById('dashboardGrid'), preferences.dashboardOrder.metrics);
       applyDashboardOrder(document.getElementById('dashboardActionsGrid'), preferences.dashboardOrder.actions);
+    }
+    if (Array.isArray(preferences.hiddenDashboardCards)) {
+      applyHiddenDashboardCards(preferences.hiddenDashboardCards);
     }
   }, error => logDebug(`User preferences sync failed: ${error.message}`, 'ERROR'));
 

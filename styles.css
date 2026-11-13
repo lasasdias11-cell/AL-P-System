@@ -470,8 +470,12 @@ header.search-active .search-expand-box {
 
 @media (max-width: 640px) {
   .global-search-results {
-    width: calc(100vw - 20px);
-    right: -48px;
+    position: fixed;
+    top: 4.5rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    max-width: none;
     min-width: 0;
   }
 }
@@ -553,6 +557,7 @@ header.search-active .search-expand-box {
 
 .dash-card {
   position: relative;
+  min-width: 0;
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 1.125rem;
@@ -588,6 +593,7 @@ header.search-active .search-expand-box {
 
 .quick-action-btn {
   width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -599,6 +605,15 @@ header.search-active .search-expand-box {
   text-align: left;
   cursor: pointer;
   transition: all 0.18s ease-in-out;
+}
+
+.quick-action-btn > div,
+.quick-action-btn > div > div {
+  min-width: 0;
+}
+
+.quick-action-btn > div > div > div {
+  overflow-wrap: anywhere;
 }
 
 .quick-action-btn:hover {
@@ -618,6 +633,45 @@ header.search-active .search-expand-box {
   opacity: 0.82;
   transform: translateZ(0) scale(1.025);
   box-shadow: 0 16px 36px rgba(2, 8, 23, 0.28);
+}
+
+.dashboard-delete-mode > [data-card-id] {
+  outline: 1px dashed var(--danger);
+  outline-offset: 2px;
+  padding-top: 2.5rem;
+}
+
+.dashboard-delete-mode > [data-card-id]::after {
+  content: "×";
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 0.625rem;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 1.25rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.dashboard-delete-mode > [data-card-id] {
+  position: relative;
+}
+
+.card-removing {
+  opacity: 0;
+  transform: scale(0.97);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.profile-panel {
+  min-width: 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -818,10 +872,17 @@ header.search-active .search-expand-box {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 0.75rem;
     padding: 0.65rem 0.75rem;
     text-align: right;
     border-bottom: 1px solid var(--border-color);
+  }
+
+  .master-logs-table tbody td > * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
   }
 
   .master-logs-table tbody td::before {
@@ -1243,6 +1304,29 @@ header.search-active .search-expand-box {
 @media (min-width: 768px) and (max-width: 1279px) {
   body.theme-bg-app {
     padding-bottom: 5rem;
+  }
+
+  @media (min-width: 1280px) and (max-width: 1535px) {
+    .header-inner {
+      gap: 0.5rem;
+    }
+
+    .nav-group nav {
+      gap: 0;
+    }
+
+    .nav-group .nav-tab-btn,
+    .nav-group .nav-settings-btn {
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+      font-size: 0.75rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card-removing {
+      transition-duration: 0.01ms;
+    }
   }
 
   .clock-group {
