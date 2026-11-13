@@ -1,6 +1,6 @@
 /* ==========================================================================
-   AL COMMUNICATION — VERSION 5.1 EXPANDABLE SEARCH, WIDE SETTINGS & ROUNDED UI
-   Plus Jakarta Sans & Outfit Rounded Typography, Tabular LKR Numerics,
+   AL COMMUNICATION — DEFAULT UI REFINEMENT
+   Inter & Outfit Typography, Tabular LKR Numerics,
    Motion Graphics Sticky Header, Generous Global Search Dropdown, Compact Tabs
    High-Contrast Architecture with Optional, Theme-Matched Gradient Blur
    ========================================================================== */
@@ -20,9 +20,9 @@
 
 :root {
   --font-base: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-rounded: 'Plus Jakarta Sans', 'Outfit', var(--font-base);
-  --font-display: 'Outfit', 'Plus Jakarta Sans', var(--font-base);
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-rounded: var(--font-base);
+  --font-display: 'Outfit', var(--font-base);
+  --font-mono: var(--font-base);
 
   /* Theme 1: Modern Slate (Default Dark Mode) */
   --bg-app: #0b1120;
@@ -223,7 +223,7 @@ button,
   transition: background-color 300ms ease, color 300ms ease;
 }
 
-[data-gradient-blur="on"] .theme-header {
+[data-gradient-blur="on"] #mainHeader.theme-header {
   background-color: color-mix(in srgb, var(--header-bg) 82%, transparent);
   -webkit-backdrop-filter: saturate(145%) blur(14px);
   backdrop-filter: saturate(145%) blur(14px);
@@ -231,7 +231,7 @@ button,
   transition: background-color 300ms ease;
 }
 
-[data-gradient-blur="on"] .theme-header::before {
+[data-gradient-blur="on"] #mainHeader.theme-header::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -244,7 +244,7 @@ button,
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  [data-gradient-blur="on"] .theme-header {
+  [data-gradient-blur="on"] #mainHeader.theme-header {
     background: linear-gradient(115deg, var(--header-bg), color-mix(in srgb, var(--accent) 12%, var(--header-bg)));
   }
 }
@@ -286,6 +286,47 @@ header.sticky {
   background-color: var(--accent);
   color: #ffffff !important;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.nav-tab-btn.active,
+.nav-settings-btn.active {
+  color: var(--text-main);
+  background-color: var(--bg-surface-elevated);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+}
+
+.mobile-menu-toggle {
+  display: inline-flex;
+}
+
+.mobile-menu-drawer {
+  position: fixed;
+  top: 4.25rem;
+  right: max(0.75rem, env(safe-area-inset-right));
+  z-index: 60;
+  width: min(19rem, calc(100vw - 1.5rem));
+}
+
+.mobile-menu-panel {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border-radius: 1rem;
+}
+
+.mobile-menu-nav-btn {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.65rem;
+  text-align: left;
+  color: var(--text-muted);
+}
+
+.mobile-menu-nav-btn:hover,
+.mobile-menu-nav-btn:focus-visible {
+  color: var(--text-main);
+  background-color: var(--bg-surface-elevated);
 }
 
 /* Mobile Nav Bar */
@@ -331,6 +372,15 @@ header.search-active .search-expand-box {
   margin-right: 0.5rem;
 }
 
+@media (min-width: 1536px) {
+  .search-expand-box {
+    width: 190px;
+    opacity: 1;
+    pointer-events: auto;
+    margin-right: 0.5rem;
+  }
+}
+
 /* Surrounding items smoothly shrink/slide with cubic-bezier */
 .brand-group,
 .nav-group,
@@ -351,6 +401,11 @@ header.search-active .search-expand-box {
 
 /* Mobile search overlay when active: expands cleanly across header */
 @media (max-width: 767px) {
+  #themeQuickToggleBtn,
+  #openSettingsBtn {
+    display: none !important;
+  }
+
   header.search-active .brand-group {
     display: none;
   }
@@ -366,6 +421,13 @@ header.search-active .search-expand-box {
   header.search-active .search-wrapper {
     flex: 1;
     width: 100%;
+  }
+}
+
+@media (min-width: 1280px) {
+  .mobile-menu-toggle,
+  .mobile-menu-drawer {
+    display: none !important;
   }
 }
 
@@ -477,12 +539,6 @@ header.search-active .search-expand-box {
   user-select: none;
 }
 
-[data-ui-style="glass"] .dash-card,
-[data-ui-style="glass"] .profile-panel {
-  border-color: color-mix(in srgb, var(--accent) 24%, var(--border-color));
-  box-shadow: 0 12px 30px rgba(2, 8, 23, 0.18), 0 0 24px color-mix(in srgb, var(--accent) 10%, transparent);
-}
-
 @media (min-width: 640px) {
   .dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -526,7 +582,7 @@ header.search-active .search-expand-box {
 
 @media (min-width: 1024px) {
   .quick-action-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -617,6 +673,20 @@ header.search-active .search-expand-box {
   transition-delay: 0s;
 }
 
+.log-date-btn.active,
+#logSpecificDateWrap.filter-active {
+  color: var(--text-main);
+  border-color: var(--accent);
+  background-color: var(--accent-light);
+  border-radius: 0.6rem;
+  outline: 1px solid var(--accent);
+  padding: 0.2rem 0.35rem;
+}
+
+#moreFiltersDrawer.range-active > div {
+  border-color: var(--accent);
+}
+
 .log-paired-card {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
@@ -652,16 +722,6 @@ header.search-active .search-expand-box {
   box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.6);
 }
 
-[data-gradient-blur="on"] .modal-backdrop {
-  background:
-    radial-gradient(ellipse at 15% 15%, var(--gradient-cyan), transparent 48%),
-    radial-gradient(ellipse at 85% 85%, var(--gradient-emerald), transparent 45%),
-    rgba(2, 6, 23, 0.68);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-}
-
-[data-gradient-blur="on"] .modal-content,
 [data-gradient-blur="on"] .profile-panel {
   background-color: color-mix(in srgb, var(--bg-surface) 90%, transparent);
   -webkit-backdrop-filter: saturate(135%) blur(12px);
@@ -677,52 +737,30 @@ header.search-active .search-expand-box {
   transform: translateZ(0);
 }
 
-.theme-header::before,
-.gradient-surface,
-[data-gradient-blur="on"] .modal-backdrop {
+#mainHeader.theme-header::before,
+.gradient-surface {
   transition: background 300ms ease;
 }
 
-[data-theme="emerald-store"][data-gradient-blur="on"] .theme-header::before,
+[data-theme="emerald-store"][data-gradient-blur="on"] #mainHeader.theme-header::before,
 [data-theme="emerald-store"] .gradient-surface {
   background:
     radial-gradient(ellipse at 12% 0%, rgba(56, 189, 248, 0.18), transparent 45%),
     radial-gradient(ellipse at 92% 10%, rgba(16, 185, 129, 0.12), transparent 40%);
 }
 
-[data-theme="emerald-store"][data-gradient-blur="on"] .modal-backdrop {
-  background:
-    radial-gradient(ellipse at 15% 15%, rgba(56, 189, 248, 0.18), transparent 48%),
-    radial-gradient(ellipse at 85% 85%, rgba(16, 185, 129, 0.12), transparent 45%),
-    rgba(2, 6, 23, 0.62);
-}
-
-[data-theme="sapphire-blue"][data-gradient-blur="on"] .theme-header::before,
+[data-theme="sapphire-blue"][data-gradient-blur="on"] #mainHeader.theme-header::before,
 [data-theme="sapphire-blue"] .gradient-surface {
   background:
     radial-gradient(ellipse at 12% 0%, rgba(59, 130, 246, 0.24), transparent 45%),
     radial-gradient(ellipse at 92% 10%, rgba(14, 165, 233, 0.15), transparent 40%);
 }
 
-[data-theme="sapphire-blue"][data-gradient-blur="on"] .modal-backdrop {
-  background:
-    radial-gradient(ellipse at 15% 15%, rgba(59, 130, 246, 0.24), transparent 48%),
-    radial-gradient(ellipse at 85% 85%, rgba(14, 165, 233, 0.15), transparent 45%),
-    rgba(2, 6, 23, 0.68);
-}
-
-[data-theme="warm-amber"][data-gradient-blur="on"] .theme-header::before,
+[data-theme="warm-amber"][data-gradient-blur="on"] #mainHeader.theme-header::before,
 [data-theme="warm-amber"] .gradient-surface {
   background:
     radial-gradient(ellipse at 12% 0%, rgba(245, 158, 11, 0.2), transparent 45%),
     radial-gradient(ellipse at 92% 10%, rgba(16, 185, 129, 0.13), transparent 40%);
-}
-
-[data-theme="warm-amber"][data-gradient-blur="on"] .modal-backdrop {
-  background:
-    radial-gradient(ellipse at 15% 15%, rgba(245, 158, 11, 0.2), transparent 48%),
-    radial-gradient(ellipse at 85% 85%, rgba(16, 185, 129, 0.13), transparent 45%),
-    rgba(2, 6, 23, 0.68);
 }
 
 [data-theme="emerald-store"] .gradient-surface,
@@ -750,10 +788,71 @@ header.search-active .search-expand-box {
     min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     border-radius: 0;
   }
+
+  .master-logs-table-wrap {
+    overflow: visible;
+    border: 0;
+  }
+
+  .master-logs-table thead {
+    display: none;
+  }
+
+  .master-logs-table,
+  .master-logs-table tbody,
+  .master-logs-table tbody tr,
+  .master-logs-table tbody td {
+    display: block;
+    width: 100%;
+  }
+
+  .master-logs-table tbody tr {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.875rem;
+    overflow: hidden;
+    background: var(--bg-surface);
+  }
+
+  .master-logs-table tbody td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 0.75rem;
+    text-align: right;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .master-logs-table tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 38%;
+    text-align: left;
+    color: var(--text-dim);
+    font-weight: 600;
+    font-family: var(--font-rounded);
+  }
+
+  .master-logs-table tbody td[colspan] {
+    display: block;
+    text-align: center;
+  }
+
+  .master-logs-table tbody td[colspan]::before {
+    content: none;
+  }
+
+  .master-logs-table tbody td:last-child {
+    justify-content: flex-end;
+    border-bottom: 0;
+  }
+
+  .master-logs-table tbody td:last-child::before {
+    margin-right: auto;
+  }
 }
 
-[data-gradient-blur="off"] .theme-header,
-[data-gradient-blur="off"] .modal-backdrop {
+[data-gradient-blur="off"] #mainHeader.theme-header {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -1125,9 +1224,7 @@ header.search-active .search-expand-box {
     flex: 0 0 44px;
   }
 
-  #headerSearchToggleBtn,
   #themeQuickToggleBtn,
-  .search-wrapper,
   .clock-group {
     display: none !important;
   }
@@ -1173,8 +1270,7 @@ header.search-active .search-expand-box {
     animation-duration: 0.01ms !important;
   }
 
-  [data-gradient-blur="on"] .theme-header,
-  [data-gradient-blur="on"] .modal-content,
+  [data-gradient-blur="on"] #mainHeader.theme-header,
   [data-gradient-blur="on"] .profile-panel {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;

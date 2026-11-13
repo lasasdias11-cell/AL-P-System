@@ -7,10 +7,10 @@
   <meta name="description" content="Production-ready retail point of sale, mobile reloads ledger, inventory management, utility bills and financial profit tracking for AL Communication.">
   <meta name="theme-color" content="#0b1120">
 
-  <!-- Inter, Plus Jakarta Sans & Outfit Rounded Fonts -->
+  <!-- Inter for body and Outfit for headings -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -21,9 +21,9 @@
         extend: {
           fontFamily: {
             sans: ['Inter', 'sans-serif'],
-            rounded: ['Plus Jakarta Sans', 'Outfit', 'sans-serif'],
-            display: ['Outfit', 'Plus Jakarta Sans', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
+            rounded: ['Inter', 'sans-serif'],
+            display: ['Outfit', 'sans-serif'],
+            mono: ['Inter', 'sans-serif'],
           }
         }
       }
@@ -216,6 +216,9 @@
             <button type="button" data-view="logs" class="nav-tab-btn px-3.5 py-1.5 rounded-lg transition font-rounded">
               Master Logs
             </button>
+            <button type="button" id="desktopSettingsNavBtn" class="nav-settings-btn px-3.5 py-1.5 rounded-lg transition font-rounded">
+              Settings
+            </button>
           </nav>
         </div>
 
@@ -316,10 +319,25 @@
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
           </button>
+          <button type="button" id="mobileMenuToggleBtn" class="mobile-menu-toggle tap-target w-10 h-10 rounded-xl theme-bg-subtle border theme-border flex items-center justify-center theme-text-main" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobileMenuDrawer">
+            <svg class="icon-svg" viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>
+          </button>
         </div>
 
       </div>
     </header>
+
+    <div id="mobileMenuDrawer" class="mobile-menu-drawer hidden" aria-hidden="true">
+      <nav class="mobile-menu-panel theme-bg-surface border theme-border theme-shadow" aria-label="Main navigation">
+        <button type="button" data-view="dashboard" class="mobile-menu-nav-btn">Dashboard</button>
+        <button type="button" data-view="stationery" class="mobile-menu-nav-btn">Stationery Entry</button>
+        <button type="button" data-view="reloads" class="mobile-menu-nav-btn">Mobile Reloads</button>
+        <button type="button" data-view="stock" class="mobile-menu-nav-btn">Stock Inventory</button>
+        <button type="button" data-view="logs" class="mobile-menu-nav-btn">Master Logs</button>
+        <button type="button" id="mobileMenuProfileBtn" class="mobile-menu-nav-btn">Account Profile</button>
+        <button type="button" id="mobileMenuSettingsBtn" class="mobile-menu-nav-btn">Settings</button>
+      </nav>
+    </div>
 
     <!-- MAIN VIEW CONTAINER -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-6">
@@ -340,19 +358,9 @@
               <span class="text-xs theme-text-dim">Real-time store ledger & instant profit tracking</span>
             </div>
           </div>
-          <div class="flex items-center gap-3">
-            <div class="px-4 py-2.5 rounded-xl theme-bg-subtle border theme-border flex items-center gap-3">
-              <div class="text-xs">
-                <div class="theme-text-dim uppercase tracking-wider font-semibold font-rounded">Today's Combined Revenue</div>
-                <div id="dashTodayCombinedRevenue" class="text-xl sm:text-2xl font-extrabold text-emerald-400 currency-lkr">
-                  Rs. 0.00
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <!-- STRICTLY THE 6 CLEAN METRIC CARDS -->
+        <!-- Exactly seven dashboard metrics -->
         <div id="dashboardGrid" class="dashboard-grid">
           
           <!-- Card 1: Today's Stationery Sales -->
@@ -383,7 +391,7 @@
               <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">Today's Reload Commissions</span>
               <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
             </div>
-            <div id="dashReloadCommission" class="text-xl sm:text-2xl font-extrabold text-emerald-400 currency-lkr">Rs. 0.00</div>
+            <div id="dashReloadCommission" class="text-xl sm:text-2xl font-extrabold text-emerald-400 currency-lkr">+ Rs. 0.00</div>
             <div class="text-[11px] theme-text-dim font-mono mt-1">Earned operator commission</div>
           </div>
 
@@ -393,7 +401,7 @@
               <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">Today's Stationery Profit</span>
               <span class="w-2 h-2 rounded-full bg-amber-400"></span>
             </div>
-            <div id="dashStationeryProfit" class="text-xl sm:text-2xl font-extrabold text-amber-400 currency-lkr">Rs. 0.00</div>
+            <div id="dashStationeryProfit" class="text-xl sm:text-2xl font-extrabold text-amber-400 currency-lkr">+ Rs. 0.00</div>
             <div class="text-[11px] theme-text-dim font-mono mt-1">Calculated stationery net margin</div>
           </div>
 
@@ -407,39 +415,24 @@
             <div class="text-[11px] theme-text-dim font-mono mt-1">Products & services in system</div>
           </div>
 
-          <!-- Card 6: Combined Total Profit -->
-          <div class="dash-card" data-card-id="card-dash-combined-profit">
+          <!-- Card 6: Lifetime Reload Commissions -->
+          <div class="dash-card" data-card-id="card-dash-reload-profit-total">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400 font-bold font-rounded">Combined Total Profit</span>
+              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">All Reload Commissions (Total)</span>
               <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
             </div>
-            <div id="dashCombinedTotalProfit" class="text-xl sm:text-2xl font-extrabold text-emerald-400 currency-lkr">Rs. 0.00</div>
-            <div class="text-[11px] theme-text-dim font-mono mt-1">Reload commissions + Stationery profit</div>
+            <div id="dashReloadCommissionTotal" class="text-xl sm:text-2xl font-extrabold text-emerald-400 currency-lkr">+ Rs. 0.00</div>
+            <div class="text-[11px] theme-text-dim font-mono mt-1">Lifetime reload commission earned</div>
           </div>
 
-          <div class="dash-card" data-card-id="profit-today">
+          <!-- Card 7: Lifetime Stationery Profit -->
+          <div class="dash-card" data-card-id="card-dash-stationery-profit-total">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">Profit Today</span>
-              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">Stationery Profit (Total)</span>
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span>
             </div>
-            <div id="dashProfitToday" class="text-xl sm:text-2xl font-extrabold text-emerald-400 currency-lkr">Rs. 0.00</div>
-            <div class="text-[11px] theme-text-dim font-mono mt-1">Stationery margin + reload earnings</div>
-          </div>
-          <div class="dash-card" data-card-id="profit-month">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">Profit This Month</span>
-              <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
-            </div>
-            <div id="dashProfitMonth" class="text-xl sm:text-2xl font-extrabold text-cyan-400 currency-lkr">Rs. 0.00</div>
-            <div class="text-[11px] theme-text-dim font-mono mt-1">Month-to-date net profit</div>
-          </div>
-          <div class="dash-card" data-card-id="profit-year">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wider theme-text-muted font-rounded">Profit This Year</span>
-              <span class="w-2 h-2 rounded-full bg-sky-400"></span>
-            </div>
-            <div id="dashProfitYear" class="text-xl sm:text-2xl font-extrabold text-sky-400 currency-lkr">Rs. 0.00</div>
-            <div class="text-[11px] theme-text-dim font-mono mt-1">Year-to-date net profit</div>
+            <div id="dashStationeryProfitTotal" class="text-xl sm:text-2xl font-extrabold text-amber-400 currency-lkr">+ Rs. 0.00</div>
+            <div class="text-[11px] theme-text-dim font-mono mt-1">Lifetime stationery margin</div>
           </div>
 
         </div>
@@ -503,6 +496,32 @@
                 <div>
                   <div class="font-bold text-base theme-text-main font-rounded">Master Logs</div>
                   <div class="text-xs theme-text-dim">Ledger & stamped PDF export</div>
+                </div>
+              </div>
+              <span class="theme-text-dim group-hover:theme-text-main group-hover:translate-x-1 transition">→</span>
+            </button>
+
+            <button type="button" id="dashTileSettings" data-card-id="action-settings" class="quick-action-btn group">
+              <div class="flex items-center gap-3.5">
+                <div class="w-12 h-12 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 1 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </div>
+                <div>
+                  <div class="font-bold text-base theme-text-main font-rounded">Settings</div>
+                  <div class="text-xs theme-text-dim">Preferences &amp; store setup</div>
+                </div>
+              </div>
+              <span class="theme-text-dim group-hover:theme-text-main group-hover:translate-x-1 transition">→</span>
+            </button>
+
+            <button type="button" id="dashTileProfile" data-card-id="action-profile" class="quick-action-btn group">
+              <div class="flex items-center gap-3.5">
+                <div class="w-12 h-12 rounded-xl bg-violet-500/15 text-violet-400 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                  <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M5 21a7 7 0 0 1 14 0"></path></svg>
+                </div>
+                <div>
+                  <div class="font-bold text-base theme-text-main font-rounded">Profile</div>
+                  <div class="text-xs theme-text-dim">Account &amp; security</div>
                 </div>
               </div>
               <span class="theme-text-dim group-hover:theme-text-main group-hover:translate-x-1 transition">→</span>
@@ -805,7 +824,7 @@
             <div class="p-3.5 rounded-xl theme-bg-subtle border theme-border flex items-center justify-between">
               <div>
                 <span class="text-xs theme-text-dim block">Earned Commission:</span>
-                <span id="reloadCommissionPreview" class="text-sm font-bold text-emerald-400 currency-lkr">Rs. 0.00</span>
+                <span id="reloadCommissionPreview" class="text-sm font-bold text-emerald-400 currency-lkr">+ Rs. 0.00</span>
               </div>
               <div class="text-right">
                 <span class="text-xs theme-text-dim block">Customer Charge:</span>
@@ -887,13 +906,16 @@
             <div class="flex items-center gap-2">
               <span class="text-xs font-semibold theme-text-muted whitespace-nowrap font-rounded">Sort:</span>
               <select id="stockSortSelect" class="form-select text-xs py-1.5 px-3 max-w-[220px] font-rounded">
-                <option value="code-asc" selected>Item Number: Low to High (Default)</option>
-                <option value="code-desc">Item Number: High to Low</option>
-                <option value="price-asc">Price: Low to High</option>
-                <option value="price-desc">Price: High to Low</option>
-                <option value="stock-asc">Stock: Low to High (Low First)</option>
-                <option value="stock-desc">Stock: High to Low</option>
-                <option value="name-asc">Name: A to Z</option>
+                <option value="name-asc" selected>Name: A → Z (Default)</option>
+                <option value="name-desc">Name: Z → A</option>
+                <option value="selling-desc">Selling Price: High → Low</option>
+                <option value="selling-asc">Selling Price: Low → High</option>
+                <option value="cost-desc">Getting (Cost) Price: High → Low</option>
+                <option value="cost-asc">Getting (Cost) Price: Low → High</option>
+                <option value="stock-desc">Stock Quantity: High → Low</option>
+                <option value="stock-asc">Stock Quantity: Low → High</option>
+                <option value="newest">Newest added</option>
+                <option value="oldest">Oldest added</option>
               </select>
             </div>
 
@@ -971,7 +993,7 @@
         <!-- UNIFIED SUMMARY SECTION WITH 3 DEDICATED HIGH-CONTRAST PROFIT CARDS (V5.3) -->
         <div class="space-y-2">
           <div class="flex items-center justify-between px-1">
-            <span class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded" id="masterLogsSummaryTitle">Filtered Performance & Profit Summary</span>
+            <span class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded" id="masterLogsSummaryTitle">Filtered Profit Summary</span>
             <span class="text-[11px] theme-text-dim font-mono" id="masterLogsDateScopeLabel">All Active Records</span>
           </div>
 
@@ -982,7 +1004,7 @@
               <!-- Top: Total Reload Amount -->
               <div class="log-paired-top">
                 <div class="flex items-center justify-between mb-1">
-                  <span class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded">Filtered Reload Sales</span>
+                  <span class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded">Filtered Reloads</span>
                   <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
                 </div>
                 <div class="text-2xl sm:text-3xl font-extrabold theme-text-main currency-lkr" id="logPairedReloadVol">Rs. 0.00</div>
@@ -993,7 +1015,7 @@
               <div class="log-paired-bottom pt-1">
                 <div>
                   <span class="text-xs font-semibold theme-text-dim block font-rounded">Reload Profit:</span>
-                  <span class="text-lg sm:text-xl font-extrabold text-emerald-400 currency-lkr" id="logPairedReloadComm">+Rs. 0.00</span>
+                  <span class="text-lg sm:text-xl font-extrabold text-emerald-400 currency-lkr" id="logPairedReloadComm">+ Rs. 0.00</span>
                 </div>
                 <div class="text-right">
                   <span class="text-[11px] theme-text-dim block">Operator Margin</span>
@@ -1007,7 +1029,7 @@
               <!-- Top: Total Stationery/Bill Amount -->
               <div class="log-paired-top">
                 <div class="flex items-center justify-between mb-1">
-                  <span class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded">Stationery & Bills Sales</span>
+                  <span class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded">Filtered Stationery &amp; Bills</span>
                   <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
                 </div>
                 <div class="text-2xl sm:text-3xl font-extrabold theme-text-main currency-lkr" id="logPairedStatSales">Rs. 0.00</div>
@@ -1018,7 +1040,7 @@
               <div class="log-paired-bottom pt-1">
                 <div>
                   <span class="text-xs font-semibold theme-text-dim block font-rounded">Stationery Net Profit:</span>
-                  <span class="text-lg sm:text-xl font-extrabold text-sky-400 currency-lkr" id="logPairedStatProfit">+Rs. 0.00</span>
+                  <span class="text-lg sm:text-xl font-extrabold text-sky-400 currency-lkr" id="logPairedStatProfit">+ Rs. 0.00</span>
                 </div>
                 <div class="text-right">
                   <span class="text-[11px] theme-text-dim block">Sales Margin</span>
@@ -1028,17 +1050,25 @@
             </div>
 
             <!-- CARD 3: TOTAL PROFIT SUMMARY (PROMINENT STANDALONE) -->
-            <div class="log-paired-card border theme-border theme-border-accent" style="border-color: rgba(56, 189, 248, 0.4);">
-              <!-- Top: Combined Total Net Profit -->
+            <div class="log-paired-card border theme-border">
               <div class="log-paired-top">
                 <div class="flex items-center justify-between mb-1">
-                  <span class="text-xs font-bold uppercase tracking-wider text-sky-400 font-rounded">Combined Total Profit</span>
+                  <span class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded">Total Profit</span>
                   <span class="w-2.5 h-2.5 rounded-full bg-sky-400 pulse-dot"></span>
                 </div>
-                <div class="text-2xl sm:text-3xl font-extrabold text-sky-400 currency-lkr" id="logCombinedTotalProfit">Rs. 0.00</div>
-                <div class="text-xs theme-text-dim font-mono mt-1" id="logCombinedProfitStats">Reloads + Stationery combined</div>
+                <div class="text-2xl sm:text-3xl font-extrabold theme-text-main currency-lkr" id="logCombinedTotalProfit">+ Rs. 0.00</div>
+                <div class="text-xs theme-text-dim font-mono mt-1">Filtered reload and stationery profit combined</div>
               </div>
-
+              <div class="log-paired-bottom pt-1">
+                <div>
+                  <span class="text-xs font-semibold theme-text-dim block font-rounded">Profit breakdown:</span>
+                  <span class="text-xs theme-text-muted font-mono" id="logCombinedProfitStats">Reloads + Stationery</span>
+                </div>
+                <div class="text-right">
+                  <span class="text-[11px] theme-text-dim block">Filtered results</span>
+                  <span class="text-xs font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-mono">Net Profit</span>
+                </div>
+              </div>
             </div>
 
           </div>
@@ -1066,7 +1096,7 @@
               <div class="h-4 w-px bg-slate-700/40 hidden sm:block"></div>
 
               <!-- Direct Specific Date Input Picker -->
-              <div class="flex items-center gap-1.5">
+              <div id="logSpecificDateWrap" class="flex items-center gap-1.5">
                 <label for="logSpecificDate" class="text-xs font-semibold theme-text-dim whitespace-nowrap font-rounded">Specific Date:</label>
                 <input 
                   type="date" 
@@ -1159,15 +1189,15 @@
           </div>
 
           <!-- Master Transaction Records Table -->
-          <div class="overflow-x-auto rounded-xl border theme-border">
-            <table class="w-full text-left text-xs border-collapse">
+          <div class="master-logs-table-wrap overflow-x-auto rounded-xl border theme-border">
+            <table class="master-logs-table w-full text-left text-xs border-collapse">
               <thead>
                 <tr class="theme-bg-subtle border-b theme-border uppercase theme-text-muted font-rounded">
                   <th class="py-2.5 px-3 font-semibold">Time / Date</th>
                   <th class="py-2.5 px-3 font-semibold">Category / Item</th>
                   <th class="py-2.5 px-3 font-semibold">Reference / Number</th>
                   <th class="py-2.5 px-3 font-semibold text-right">Amount</th>
-                  <th class="py-2.5 px-3 font-semibold text-right">Profit / Comm</th>
+                  <th class="py-2.5 px-3 font-semibold text-right">Profit</th>
                   <th class="py-2.5 px-3 font-semibold text-center">Action</th>
                 </tr>
               </thead>
@@ -1208,8 +1238,8 @@
                   <button type="button" id="profileResetPasswordBtn" class="min-h-11 px-3 py-2 rounded-xl text-sm font-semibold border theme-border hover:theme-bg-elevated">Send Password Reset</button>
                   <button type="button" id="profileSecurityBtn" class="min-h-11 px-3 py-2 rounded-xl text-sm font-semibold border theme-border hover:theme-bg-elevated">Change Password</button>
                   <button type="button" id="profileResetLayoutBtn" class="min-h-11 px-3 py-2 rounded-xl text-sm font-semibold border theme-border hover:theme-bg-elevated">Reset Dashboard Layout</button>
-                  <button type="button" id="profileUIStyleToggleBtn" class="min-h-11 px-3 py-2 rounded-xl text-sm font-semibold border theme-border hover:theme-bg-elevated">UI Style: Default</button>
                   <button type="button" id="profileBlurToggleBtn" class="min-h-11 px-3 py-2 rounded-xl text-sm font-semibold border theme-border hover:theme-bg-elevated">Gradient Blur: On</button>
+                  <button type="button" id="profileThemeToggleBtn" class="min-h-11 px-3 py-2 rounded-xl text-sm font-semibold border theme-border hover:theme-bg-elevated">Toggle Theme</button>
                   <button type="button" id="profileSignOutBtn" class="min-h-11 px-3 py-2 rounded-xl text-sm font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10">Sign Out</button>
                 </div>
               </div>
@@ -1227,6 +1257,10 @@
                 <label class="text-xs font-semibold theme-text-muted">
                   Temporary password (8+ characters)
                   <input type="password" id="staffAccountPassword" required minlength="8" autocomplete="new-password" class="form-input mt-1 text-sm">
+                </label>
+                <label class="text-xs font-semibold theme-text-muted">
+                  Confirm password
+                  <input type="password" id="staffAccountPasswordConfirm" required minlength="8" autocomplete="new-password" class="form-input mt-1 text-sm">
                 </label>
                 <button type="submit" class="sm:col-span-2 min-h-11 px-4 py-2 rounded-xl text-sm font-bold text-white theme-bg-accent hover:opacity-90">Create User Account</button>
               </form>
@@ -1409,13 +1443,16 @@
               <div class="flex items-center gap-2">
                 <!-- Sorting Dropdown in Settings Catalog (Requirement 4.3) -->
                 <select id="catalogSortSelect" class="form-select text-xs py-1 px-2.5 max-w-[210px] font-rounded">
-                  <option value="code-asc" selected>Item Number: Low to High (Default)</option>
-                  <option value="code-desc">Item Number: High to Low</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                  <option value="stock-asc">Stock: Low to High</option>
-                  <option value="stock-desc">Stock: High to Low</option>
-                  <option value="name-asc">Name: A to Z</option>
+                  <option value="name-asc" selected>Name: A → Z (Default)</option>
+                  <option value="name-desc">Name: Z → A</option>
+                  <option value="selling-desc">Selling Price: High → Low</option>
+                  <option value="selling-asc">Selling Price: Low → High</option>
+                  <option value="cost-desc">Getting (Cost) Price: High → Low</option>
+                  <option value="cost-asc">Getting (Cost) Price: Low → High</option>
+                  <option value="stock-desc">Stock Quantity: High → Low</option>
+                  <option value="stock-asc">Stock Quantity: Low → High</option>
+                  <option value="newest">Newest added</option>
+                  <option value="oldest">Oldest added</option>
                 </select>
 
                 <input type="text" id="catalogSearchInput" placeholder="Filter catalog..." class="form-input text-xs py-1 px-2.5 max-w-xs">
@@ -1612,6 +1649,7 @@
                   <span>Upload & Restore from .JSON File</span>
                 </label>
                 <input type="file" id="backupUploadInput" accept=".json" class="hidden">
+                <button type="button" id="restoreDefaultsBtn" class="w-full px-4 py-2.5 rounded-xl text-xs font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 transition">Restore Defaults</button>
               </div>
             </div>
 
@@ -1624,7 +1662,7 @@
           <div class="p-4 rounded-xl theme-bg-subtle border theme-border flex items-center justify-between gap-4">
             <div>
               <div class="font-bold text-sm theme-text-main font-rounded">Header &amp; UI Gradient Blur</div>
-              <div class="text-xs theme-text-dim">Enable the branded frosted gradient treatment.</div>
+              <div class="text-xs theme-text-dim">Enable the branded gradient header and matching profile surface.</div>
             </div>
             <label class="gradient-toggle inline-flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="gradientBlurToggle" class="sr-only" aria-label="Header and UI Gradient Blur">
@@ -1633,15 +1671,6 @@
             </label>
           </div>
           <div class="p-4 rounded-xl theme-bg-subtle border theme-border flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <div class="font-bold text-sm theme-text-main font-rounded">Glass UI Style</div>
-              <div class="text-xs theme-text-dim">Use stronger frosted surfaces and gradient accents.</div>
-            </div>
-            <label class="gradient-toggle inline-flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" id="uiStyleToggle" class="sr-only" aria-label="Glass UI Style">
-              <span class="gradient-toggle-track" aria-hidden="true"><span></span></span>
-              <span class="text-xs font-semibold theme-text-muted">Off / On</span>
-            </label>
             <button type="button" id="resetDashboardLayoutBtn" class="min-h-11 px-4 py-2 rounded-xl text-sm font-semibold border theme-border hover:theme-bg-elevated">Reset Dashboard Layout</button>
           </div>
           

@@ -44,12 +44,10 @@ const DEFAULT_DASHBOARD_ORDER = {
     'card-dash-commission',
     'card-dash-stationery-profit',
     'card-dash-catalog',
-    'card-dash-combined-profit',
-    'profit-today',
-    'profit-month',
-    'profit-year'
+    'card-dash-reload-profit-total',
+    'card-dash-stationery-profit-total'
   ],
-  actions: ['action-stationery', 'action-reloads', 'action-stock', 'action-logs']
+  actions: ['action-stationery', 'action-reloads', 'action-stock', 'action-logs', 'action-settings', 'action-profile']
 };
 
 // =============================================================================
@@ -63,7 +61,6 @@ export const APP_STATE = {
   previousView: 'dashboard',
   activeTheme: localStorage.getItem('al_theme_preference') || 'modern-slate',
   gradientBlurEnabled: localStorage.getItem('al_gradient_blur') !== 'false',
-  uiStyle: localStorage.getItem('al_ui_style') || 'default',
   dashboardOrder: DEFAULT_DASHBOARD_ORDER,
   userProfiles: [],
   inventoryCatalog: [],
@@ -80,8 +77,8 @@ export const APP_STATE = {
   reloadPresets: [50, 100, 200, 500, 1000],
   selectedCatalogItem: null,
   selectedOperator: 'DIALOG',
-  stockSortOrder: 'code-asc',
-  catalogSortOrder: 'code-asc',
+  stockSortOrder: localStorage.getItem('al_stock_sort_order') || 'name-asc',
+  catalogSortOrder: localStorage.getItem('al_catalog_sort_order') || 'name-asc',
   stockFilter: 'ALL',
   logTab: 'all',
   logDateScope: 'today',
@@ -130,6 +127,18 @@ export function formatLKR(amount, prefix = 'Rs. ') {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+  document.addEventListener('click', event => {
+    if (menuDrawer && !menuDrawer.contains(event.target) && !menuToggle?.contains(event.target)) {
+      menuDrawer.classList.add('hidden');
+      menuDrawer.setAttribute('aria-hidden', 'true');
+      menuToggle?.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
+export function formatSignedLKR(amount) {
+  const rounded = roundCurrency(amount);
+  return `${rounded < 0 ? '- ' : '+ '}${formatLKR(Math.abs(rounded))}`;
 }
 
 /**
@@ -138,9 +147,11 @@ export function formatLKR(amount, prefix = 'Rs. ') {
  */
 export function toTitleCase(str) {
   if (!str) return '';
-  return String(str)
-    .toLowerCase()
-    .replace(/(?:^|\s|[-/()&])([a-z0-9])/gi, (match) => match.toUpperCase());
+  const acronyms = new Set(['A4', 'A5', 'LED', 'AA', 'AAA', 'USB']);
+  return String(str).trim().replace(/\s+/g, ' ').toLowerCase().replace(/[a-z0-9]+/gi, word => {
+    const upperWord = word.toUpperCase();
+    return acronyms.has(upperWord) ? upperWord : word.charAt(0).toUpperCase() + word.slice(1);
+  });
 }
 
 export function getTodayDateString() {
@@ -324,7 +335,6 @@ export function applyTheme(themeName) {
 function initThemeSystem() {
   applyTheme(APP_STATE.activeTheme);
   setGradientBlurEnabled(APP_STATE.gradientBlurEnabled);
-  setUIStyle(APP_STATE.uiStyle);
 
   // Quick Header Light/Dark Toggle
   const quickToggle = document.getElementById('themeQuickToggleBtn');
@@ -355,12 +365,6 @@ function initThemeSystem() {
     });
   }
 
-  const uiStyleToggle = document.getElementById('uiStyleToggle');
-  if (uiStyleToggle) {
-    uiStyleToggle.checked = APP_STATE.uiStyle === 'glass';
-    uiStyleToggle.addEventListener('change', () => setUIStyle(uiStyleToggle.checked ? 'glass' : 'default', true));
-  }
-
   document.getElementById('resetDashboardLayoutBtn')?.addEventListener('click', resetDashboardLayout);
 }
 
@@ -375,17 +379,6 @@ function setGradientBlurEnabled(enabled, persist = false) {
   const profileToggle = document.getElementById('profileBlurToggleBtn');
   if (profileToggle) profileToggle.textContent = `Gradient Blur: ${enabled ? 'On' : 'Off'}`;
   if (persist) saveUserPreferences({ gradientBlurEnabled: Boolean(enabled) });
-}
-
-function setUIStyle(style, persist = false) {
-  APP_STATE.uiStyle = style === 'glass' ? 'glass' : 'default';
-  document.documentElement.dataset.uiStyle = APP_STATE.uiStyle;
-  localStorage.setItem('al_ui_style', APP_STATE.uiStyle);
-  const toggle = document.getElementById('uiStyleToggle');
-  if (toggle) toggle.checked = APP_STATE.uiStyle === 'glass';
-  const profileToggle = document.getElementById('profileUIStyleToggleBtn');
-  if (profileToggle) profileToggle.textContent = `UI Style: ${APP_STATE.uiStyle === 'glass' ? 'Glass' : 'Default'}`;
-  if (persist) saveUserPreferences({ uiStyle: APP_STATE.uiStyle });
 }
 
 // =============================================================================
@@ -479,6 +472,9 @@ export function switchView(viewName) {
     }
   });
   document.getElementById('openProfileBtn')?.classList.toggle('active', viewName === 'profile');
+  document.getElementById('mobileMenuDrawer')?.classList.add('hidden');
+  document.getElementById('mobileMenuToggleBtn')?.setAttribute('aria-expanded', 'false');
+  document.getElementById('mobileMenuDrawer')?.setAttribute('aria-hidden', 'true');
 
   // Contextual view refreshes
   if (viewName === 'stock') {
@@ -511,11 +507,35 @@ function initNavigation() {
     }
   });
 
+  document.querySelectorAll('.mobile-menu-nav-btn[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
+  });
+
+  const menuToggle = document.getElementById('mobileMenuToggleBtn');
+  const menuDrawer = document.getElementById('mobileMenuDrawer');
+  menuToggle?.addEventListener('click', () => {
+    const opening = menuDrawer?.classList.contains('hidden');
+    menuDrawer?.classList.toggle('hidden', !opening);
+    menuDrawer?.setAttribute('aria-hidden', String(!opening));
+    menuToggle.setAttribute('aria-expanded', String(Boolean(opening)));
+  });
+  document.getElementById('mobileMenuProfileBtn')?.addEventListener('click', () => switchView('profile'));
+  document.getElementById('desktopSettingsNavBtn')?.addEventListener('click', openSettingsModal);
+  document.getElementById('mobileMenuSettingsBtn')?.addEventListener('click', () => {
+    menuDrawer?.classList.add('hidden');
+    menuToggle?.setAttribute('aria-expanded', 'false');
+    menuDrawer?.setAttribute('aria-hidden', 'true');
+    openSettingsModal();
+  });
+
   // Header Brand Logo link -> Dashboard
   const headerHomeBtn = document.getElementById('headerHomeBtn');
   if (headerHomeBtn) {
     headerHomeBtn.addEventListener('click', () => switchView('dashboard'));
   }
+  document.querySelectorAll('#headerHomeBtn img, #settingsModal img[alt="AL Communication"]').forEach(image => {
+    image.addEventListener('error', () => image.classList.add('hidden'), { once: true });
+  });
 
   // Dashboard 4 Operational Quick Actions (Below Metrics)
   const dashTileStationery = document.getElementById('dashTileStationery');
@@ -537,6 +557,8 @@ function initNavigation() {
   if (dashTileLogs) {
     dashTileLogs.addEventListener('click', () => switchView('logs'));
   }
+  document.getElementById('dashTileSettings')?.addEventListener('click', openSettingsModal);
+  document.getElementById('dashTileProfile')?.addEventListener('click', () => switchView('profile'));
 
   // Stock inventory -> Open Settings Catalog
   // Stock inventory -> Open Settings Catalog
@@ -586,6 +608,7 @@ export function openSettingsModal() {
   const modal = document.getElementById('settingsModal');
   if (modal) {
     modal.classList.remove('hidden');
+    document.getElementById('desktopSettingsNavBtn')?.classList.add('active');
     updateBackupStatusDisplay();
   }
 }
@@ -593,6 +616,7 @@ export function openSettingsModal() {
 export function closeSettingsModal() {
   const modal = document.getElementById('settingsModal');
   if (modal) modal.classList.add('hidden');
+  document.getElementById('desktopSettingsNavBtn')?.classList.remove('active');
 }
 
 export function switchSettingsTab(tabId) {
@@ -692,6 +716,12 @@ function initGlobalSearch() {
 
   // Search field logic
   if (input && results) {
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        results.querySelector('.search-result-item')?.click();
+      }
+    });
     input.addEventListener('input', () => {
       const queryStr = input.value.trim().toLowerCase();
       if (!queryStr) {
@@ -720,6 +750,32 @@ function initGlobalSearch() {
   function performSearch(q, container) {
     container.innerHTML = '';
     container.classList.remove('hidden');
+
+    const navigationTargets = [
+      { label: 'Dashboard', terms: 'home metrics cards', view: 'dashboard' },
+      { label: 'Stationery Entry', terms: 'stationery point of sale bills', view: 'stationery' },
+      { label: 'Mobile Reloads', terms: 'reload top up mobile', view: 'reloads' },
+      { label: 'Stock Inventory', terms: 'stock inventory catalog', view: 'stock' },
+      { label: 'Master Logs', terms: 'logs ledger transactions report', view: 'logs' },
+      { label: 'Account Profile', terms: 'profile account password security', view: 'profile' },
+      { label: 'Settings: Inventory Catalog', terms: 'settings catalog inventory items', tab: 'catalog' },
+      { label: 'Settings: Reload Presets', terms: 'settings reload presets amounts', tab: 'presets' },
+      { label: 'Settings: Commission Rates', terms: 'settings commission rate operator', tab: 'rates' },
+      { label: 'Settings: Backup & Restore', terms: 'settings backup restore export import', tab: 'backup' },
+      { label: 'Settings: Themes & Header Blur', terms: 'settings theme gradient blur ui', tab: 'themes' },
+      { label: 'Settings: Account Security', terms: 'settings password security account', tab: 'security' },
+      { label: 'Settings: Debug Console', terms: 'settings debug developer diagnostics', tab: 'developer' }
+    ];
+    const matchedNavigation = navigationTargets.filter(target =>
+      `${target.label} ${target.terms}`.toLowerCase().includes(q)
+    );
+    const dashboardCards = [...document.querySelectorAll('#dashboardGrid > [data-card-id]')]
+      .map(card => ({
+        label: card.querySelector('span')?.textContent?.trim() || card.textContent.trim().split('\n')[0],
+        card
+      }))
+      .filter(target => target.label && target.label.toLowerCase().includes(q))
+      .slice(0, 5);
 
     // 1. Search Catalog Items & Stock
     const matchedCatalog = APP_STATE.inventoryCatalog.filter(item => {
@@ -756,7 +812,7 @@ function initGlobalSearch() {
       }
     }
 
-    const totalMatches = matchedCatalog.length + uniqueReloads.length + uniqueStats.length;
+    const totalMatches = matchedNavigation.length + dashboardCards.length + matchedCatalog.length + uniqueReloads.length + uniqueStats.length;
 
     if (totalMatches === 0) {
       container.innerHTML = `
@@ -765,6 +821,37 @@ function initGlobalSearch() {
         </div>
       `;
       return;
+    }
+
+    if (matchedNavigation.length || dashboardCards.length) {
+      const header = document.createElement('div');
+      header.className = 'search-section-header flex items-center justify-between';
+      header.innerHTML = `<span>Pages, Settings &amp; Dashboard</span><span>${matchedNavigation.length + dashboardCards.length}</span>`;
+      container.appendChild(header);
+      [...matchedNavigation, ...dashboardCards.map(target => ({ ...target, card: target.card }))].forEach(target => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'search-result-item w-full text-left';
+        row.innerHTML = `<div class="min-w-0"><div class="font-bold text-xs theme-text-main">${escapeHTML(target.label)}</div><div class="text-[11px] theme-text-dim">${target.tab ? 'Open settings section' : target.view ? 'Navigate to page' : 'Open dashboard card'}</div></div><span class="theme-text-dim">→</span>`;
+        row.addEventListener('click', () => {
+          container.classList.add('hidden');
+          if (target.card) {
+            const action = target.card.querySelector('button') || target.card;
+            if (target.card.closest('#dashboardActionsGrid')) {
+              action.click();
+            } else {
+              switchView('dashboard');
+              requestAnimationFrame(() => target.card.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+            }
+          } else if (target.tab) {
+            openSettingsModal();
+            switchSettingsTab(target.tab);
+          } else {
+            switchView(target.view);
+          }
+        });
+        container.appendChild(row);
+      });
     }
 
     // CATEGORY 1: CATALOG & STOCK INVENTORY
@@ -788,7 +875,7 @@ function initGlobalSearch() {
           <div class="flex items-center gap-2.5 min-w-0">
             <span class="px-2 py-0.5 rounded text-[11px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">${escapeHTML(item.code)}</span>
             <div class="truncate">
-              <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(item.name)}</div>
+              <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(toTitleCase(item.name))}</div>
               <div class="text-[11px] theme-text-dim">${escapeHTML(item.category || 'General')}</div>
             </div>
           </div>
@@ -842,7 +929,7 @@ function initGlobalSearch() {
           </div>
           <div class="text-right flex-shrink-0">
             <div class="font-bold text-xs text-emerald-400 font-mono">${formatLKR(r.amount)}</div>
-            <div class="text-[10px] theme-text-dim font-mono">+${formatLKR(r.commissionAmount)}</div>
+            <div class="text-[10px] theme-text-dim font-mono">${formatSignedLKR(r.commissionAmount)}</div>
           </div>
         `;
 
@@ -875,13 +962,13 @@ function initGlobalSearch() {
           <div class="flex items-center gap-2.5 min-w-0">
             <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(s.itemCode || 'ST')}</span>
             <div class="truncate">
-              <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(s.itemName)}</div>
+              <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(toTitleCase(s.itemName))}</div>
               <div class="text-[10px] theme-text-dim">${escapeHTML(s.date || '')} &bull; Qty: ${escapeHTML(s.quantity || 1)}</div>
             </div>
           </div>
           <div class="text-right flex-shrink-0">
             <div class="font-bold text-xs theme-text-main font-mono">${formatLKR(s.totalAmount)}</div>
-            <div class="text-[10px] text-sky-400 font-mono">Profit: +${formatLKR(s.profit || 0)}</div>
+            <div class="text-[10px] text-sky-400 font-mono">Profit: ${formatSignedLKR(s.profit ?? ((Number(s.sellingPrice || 0) - Number(s.costPrice || 0)) * Number(s.quantity || 1)))}</div>
           </div>
         `;
 
@@ -912,31 +999,52 @@ function initGlobalSearch() {
  */
 export function sortCatalogList(items, sortKey) {
   const list = [...items];
+  const compareName = (a, b) => toTitleCase(a.name).localeCompare(toTitleCase(b.name), undefined, { numeric: true, sensitivity: 'base' });
+  const addedAt = item => {
+    const value = item.createdAt;
+    if (value?.toMillis) return value.toMillis();
+    const parsed = value ? new Date(value).getTime() : 0;
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
   switch (sortKey) {
     case 'code-asc':
       return list.sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
     case 'code-desc':
       return list.sort((a, b) => String(b.code || '').localeCompare(String(a.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
+    case 'selling-asc':
     case 'price-asc':
       return list.sort((a, b) => (Number(a.sellingPrice) || 0) - (Number(b.sellingPrice) || 0));
+    case 'selling-desc':
     case 'price-desc':
       return list.sort((a, b) => (Number(b.sellingPrice) || 0) - (Number(a.sellingPrice) || 0));
+    case 'cost-asc':
+      return list.sort((a, b) => (Number(a.costPrice) || 0) - (Number(b.costPrice) || 0));
+    case 'cost-desc':
+      return list.sort((a, b) => (Number(b.costPrice) || 0) - (Number(a.costPrice) || 0));
     case 'stock-asc':
       return list.sort((a, b) => {
-        if (a.itemType === 'service') return 1;
-        if (b.itemType === 'service') return -1;
+        if (a.itemType === 'service' || b.itemType === 'service') {
+          return a.itemType === b.itemType ? 0 : a.itemType === 'service' ? 1 : -1;
+        }
         return (Number(a.stockQuantity) || 0) - (Number(b.stockQuantity) || 0);
       });
     case 'stock-desc':
       return list.sort((a, b) => {
-        if (a.itemType === 'service') return 1;
-        if (b.itemType === 'service') return -1;
+        if (a.itemType === 'service' || b.itemType === 'service') {
+          return a.itemType === b.itemType ? 0 : a.itemType === 'service' ? 1 : -1;
+        }
         return (Number(b.stockQuantity) || 0) - (Number(a.stockQuantity) || 0);
       });
     case 'name-asc':
-      return list.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }));
+      return list.sort(compareName);
+    case 'name-desc':
+      return list.sort((a, b) => compareName(b, a));
+    case 'newest':
+      return list.sort((a, b) => addedAt(b) - addedAt(a));
+    case 'oldest':
+      return list.sort((a, b) => addedAt(a) - addedAt(b));
     default:
-      return list;
+      return list.sort(compareName);
   }
 }
 
@@ -974,54 +1082,32 @@ export function updateDashboardMetrics() {
     reloadCommission += Number(r.commissionAmount || 0);
   });
 
-  const today = getTodayDateString();
-  const periodProfit = (prefixLength) => {
-    const matchesPeriod = record => String(record.date || '').slice(0, prefixLength) === today.slice(0, prefixLength);
-    const stationeryProfit = APP_STATE.masterStationeryRecords
-      .filter(matchesPeriod)
-      .reduce((sum, record) => sum + Number(
-        record.profit !== undefined
-          ? record.profit
-          : (Number(record.sellingPrice || 0) - Number(record.costPrice || 0)) * Number(record.quantity || 1)
-      ), 0);
-    const reloadProfit = APP_STATE.masterReloadRecords
-      .filter(matchesPeriod)
-      .reduce((sum, record) => sum + Number(record.commissionAmount || 0), 0);
-    return roundCurrency(stationeryProfit + reloadProfit);
-  };
-  const todayProfit = roundCurrency(statProfitToday + reloadCommission);
-  const monthProfit = periodProfit(7);
-  const yearProfit = periodProfit(4);
+  const lifetimeReloadCommission = roundCurrency(APP_STATE.masterReloadRecords
+    .reduce((sum, record) => sum + Number(record.commissionAmount || 0), 0));
+  const lifetimeStationeryProfit = roundCurrency(APP_STATE.masterStationeryRecords
+    .reduce((sum, record) => sum + Number(
+      record.profit !== undefined
+        ? record.profit
+        : (Number(record.sellingPrice || 0) - Number(record.costPrice || 0)) * Number(record.quantity || 1)
+    ), 0));
 
-  // Combined Totals
-  const combinedRevenue = roundCurrency(statSales + reloadVolume);
-  const combinedTotalProfit = todayProfit;
-
-  // Exact 6 Dashboard Metric Cards
-  const elCombinedRevenue = document.getElementById('dashTodayCombinedRevenue');
+  // The dashboard contains exactly the seven requested metrics.
   const elStatSales = document.getElementById('dashStationerySales');
   const elStatUnits = document.getElementById('dashStationeryUnits');
   const elReloadVol = document.getElementById('dashReloadVolume');
   const elReloadComm = document.getElementById('dashReloadCommission');
   const elStatProfit = document.getElementById('dashStationeryProfit');
   const elCatalogCount = document.getElementById('dashCatalogCount');
-  const elCombinedProfit = document.getElementById('dashCombinedTotalProfit');
-  const elProfitToday = document.getElementById('dashProfitToday');
-  const elProfitMonth = document.getElementById('dashProfitMonth');
-  const elProfitYear = document.getElementById('dashProfitYear');
-
-  if (elCombinedRevenue) elCombinedRevenue.textContent = formatLKR(combinedRevenue);
+  const elLifetimeReloadCommission = document.getElementById('dashReloadCommissionTotal');
+  const elLifetimeStationeryProfit = document.getElementById('dashStationeryProfitTotal');
   if (elStatSales) elStatSales.textContent = formatLKR(statSales);
   if (elStatUnits) elStatUnits.textContent = String(statUnits);
   if (elReloadVol) elReloadVol.textContent = formatLKR(reloadVolume);
-  // Display the full currency amount without a shortened commission label.
-  if (elReloadComm) elReloadComm.textContent = formatLKR(reloadCommission);
-  if (elStatProfit) elStatProfit.textContent = formatLKR(statProfitToday);
+  if (elReloadComm) elReloadComm.textContent = formatSignedLKR(reloadCommission);
+  if (elStatProfit) elStatProfit.textContent = formatSignedLKR(statProfitToday);
   if (elCatalogCount) elCatalogCount.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
-  if (elCombinedProfit) elCombinedProfit.textContent = formatLKR(combinedTotalProfit);
-  if (elProfitToday) elProfitToday.textContent = formatLKR(todayProfit);
-  if (elProfitMonth) elProfitMonth.textContent = formatLKR(monthProfit);
-  if (elProfitYear) elProfitYear.textContent = formatLKR(yearProfit);
+  if (elLifetimeReloadCommission) elLifetimeReloadCommission.textContent = formatSignedLKR(lifetimeReloadCommission);
+  if (elLifetimeStationeryProfit) elLifetimeStationeryProfit.textContent = formatSignedLKR(lifetimeStationeryProfit);
 
   // Also update paired cards in Master Logs
   updateMasterLogsPairedCards();
@@ -1054,6 +1140,8 @@ function initMasterLogs() {
         APP_STATE.logDateScope = 'specific';
         APP_STATE.logDateFrom = val;
         APP_STATE.logDateTo = val;
+        if (fromInput) fromInput.value = '';
+        if (toInput) toInput.value = '';
         document.querySelectorAll('[data-log-date]').forEach(b => {
           b.className = 'log-date-btn px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border transition font-rounded text-xs';
         });
@@ -1083,6 +1171,8 @@ function initMasterLogs() {
 
       const scope = btn.getAttribute('data-log-date');
       APP_STATE.logDateScope = scope;
+      if (fromInput) fromInput.value = '';
+      if (toInput) toInput.value = '';
 
       if (scope === 'today') {
         APP_STATE.logDateFrom = getTodayDateString();
@@ -1110,9 +1200,14 @@ function initMasterLogs() {
   if (applyCustomDateBtn) {
     applyCustomDateBtn.addEventListener('click', () => {
       if (fromInput && fromInput.value) {
+        const rangeEnd = (toInput && toInput.value) ? toInput.value : fromInput.value;
+        if (rangeEnd < fromInput.value) {
+          showToast('The end date must be on or after the start date.', 'error');
+          return;
+        }
         APP_STATE.logDateScope = 'custom';
         APP_STATE.logDateFrom = fromInput.value;
-        APP_STATE.logDateTo = (toInput && toInput.value) ? toInput.value : fromInput.value;
+        APP_STATE.logDateTo = rangeEnd;
         if (specificDateInput) specificDateInput.value = '';
         document.querySelectorAll('[data-log-date]').forEach(b => {
           b.className = 'log-date-btn px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border transition font-rounded text-xs';
@@ -1250,7 +1345,7 @@ export function applyMasterLogFilters() {
 
   if (elLogReloadVol) elLogReloadVol.textContent = formatLKR(filteredReloadVol);
   // Display the full currency amount without a shortened commission label.
-  if (elLogReloadComm) elLogReloadComm.textContent = `+${formatLKR(filteredReloadComm)}`;
+  if (elLogReloadComm) elLogReloadComm.textContent = formatSignedLKR(filteredReloadComm);
   if (elLogReloadStats) elLogReloadStats.textContent = `${filteredReloadCount} reload transactions`;
 
   // Card 2: Filtered Stationery & Bills Card
@@ -1259,27 +1354,34 @@ export function applyMasterLogFilters() {
   const elLogStatStats = document.getElementById('logPairedStatStats');
 
   if (elLogStatSales) elLogStatSales.textContent = formatLKR(filteredStatSales);
-  if (elLogStatProfit) elLogStatProfit.textContent = `+${formatLKR(filteredStatProfit)}`;
+  if (elLogStatProfit) elLogStatProfit.textContent = formatSignedLKR(filteredStatProfit);
   if (elLogStatStats) elLogStatStats.textContent = `${filteredStatUnits} units sold | ${filteredStatCount} txs`;
 
   // Card 3: Dedicated Standalone Combined Total Profit Card
   const elLogCombinedTotalProfit = document.getElementById('logCombinedTotalProfit');
   const elLogCombinedProfitStats = document.getElementById('logCombinedProfitStats');
 
-  if (elLogCombinedTotalProfit) elLogCombinedTotalProfit.textContent = formatLKR(filteredTotalProfit);
-  if (elLogCombinedProfitStats) elLogCombinedProfitStats.textContent = `Reloads (${formatLKR(filteredReloadComm)}) + Stationery (${formatLKR(filteredStatProfit)})`;
+  if (elLogCombinedTotalProfit) elLogCombinedTotalProfit.textContent = formatSignedLKR(filteredTotalProfit);
+  if (elLogCombinedProfitStats) elLogCombinedProfitStats.textContent = `Reloads (${formatSignedLKR(filteredReloadComm)}) + Stationery (${formatSignedLKR(filteredStatProfit)})`;
 
   // Filter Scope Label
   const scopeLabel = document.getElementById('masterLogsDateScopeLabel');
   if (scopeLabel) {
     if (isAllTime) {
-      scopeLabel.textContent = 'All Time Records';
+      scopeLabel.textContent = 'Showing: All Time';
     } else if (fromDate === toDate) {
-      scopeLabel.textContent = fromDate === getTodayDateString() ? `Today (${fromDate})` : fromDate;
+      scopeLabel.textContent = fromDate === getTodayDateString() ? `Showing: Today (${fromDate})` : `Showing: ${fromDate}`;
     } else {
-      scopeLabel.textContent = `${fromDate} to ${toDate}`;
+      scopeLabel.textContent = `Showing: ${fromDate} → ${toDate}`;
     }
   }
+  const specificDateWrap = document.getElementById('logSpecificDateWrap');
+  specificDateWrap?.classList.toggle('filter-active', APP_STATE.logDateScope === 'specific');
+  const rangeDrawer = document.getElementById('moreFiltersDrawer');
+  rangeDrawer?.classList.toggle('range-active', APP_STATE.logDateScope === 'custom');
+  document.querySelectorAll('[data-log-date]').forEach(button => {
+    button.classList.toggle('active', button.getAttribute('data-log-date') === APP_STATE.logDateScope);
+  });
 
   // Update Category Badge Counts
   const countAll = document.getElementById('countLogAll');
@@ -1359,26 +1461,26 @@ function renderMasterLogsTable(rows) {
     }
 
     tr.innerHTML = `
-      <td class="py-2.5 px-3 font-mono text-xs whitespace-nowrap">
+      <td data-label="Time / Date" class="py-2.5 px-3 font-mono text-xs whitespace-nowrap">
         <div class="font-bold theme-text-main">${escapeHTML(item.time || '--:--')}</div>
         <div class="text-[10px] theme-text-dim">${escapeHTML(item.date || '')}</div>
       </td>
-      <td class="py-2.5 px-3">
+      <td data-label="Category / Item" class="py-2.5 px-3">
         <div class="flex items-center gap-2">
           ${typeBadge}
-          <span class="font-semibold text-xs theme-text-main">${escapeHTML(item.title)}</span>
+          <span class="font-semibold text-xs theme-text-main">${escapeHTML(item.type === 'RELOAD' ? item.title : toTitleCase(item.title))}</span>
         </div>
       </td>
-      <td class="py-2.5 px-3 font-mono text-xs theme-text-dim">
+      <td data-label="Reference / Number" class="py-2.5 px-3 font-mono text-xs theme-text-dim">
         ${escapeHTML(item.ref)}
       </td>
-      <td class="py-2.5 px-3 text-right font-mono font-bold text-xs theme-text-main currency-lkr">
+      <td data-label="Amount" class="py-2.5 px-3 text-right font-mono font-bold text-xs theme-text-main currency-lkr">
         ${formatLKR(item.amount)}
       </td>
-      <td class="py-2.5 px-3 text-right font-mono font-bold text-xs ${item.type === 'RELOAD' ? 'text-emerald-400' : 'text-sky-400'} currency-lkr">
-        +${formatLKR(item.profit)}
+      <td data-label="Profit" class="py-2.5 px-3 text-right font-mono font-bold text-xs ${item.type === 'RELOAD' ? 'text-emerald-400' : 'text-sky-400'} currency-lkr">
+        ${formatSignedLKR(item.profit)}
       </td>
-      <td class="py-2.5 px-3 text-center">
+      <td data-label="Action" class="py-2.5 px-3 text-center">
         <button type="button" class="delete-tx-btn min-h-11 min-w-11 p-1 text-red-400 hover:text-red-300 transition" title="Delete record" aria-label="Delete transaction">
           <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
@@ -1392,8 +1494,8 @@ function renderMasterLogsTable(rows) {
         try {
           const restored = await removeTransaction(item.type, item.raw);
           showToast(restored
-            ? 'Transaction deleted and stock restored'
-            : 'Transaction record deleted', 'success');
+            ? 'Transaction deleted, stock restored'
+            : 'Transaction deleted', 'success');
         } catch (err) {
           showToast(`Delete failed: ${err.message}`, 'error');
         }
@@ -1446,13 +1548,20 @@ export async function generateProfessionalPdfReport() {
   const toDate = APP_STATE.logDateTo || fromDate;
   const isAllTime = fromDate === '1970-01-01' || APP_STATE.logDateScope === 'all-time';
   const dateRangeStr = isAllTime ? 'All Time Transaction Records' : (fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`);
+  const searchQuery = APP_STATE.logSearchQuery || '';
+  const matchesActiveSearch = record => !searchQuery ||
+    (record.itemName || '').toLowerCase().includes(searchQuery) ||
+    (record.itemCode || '').toLowerCase().includes(searchQuery) ||
+    (record.phone || '').toLowerCase().includes(searchQuery) ||
+    (record.operator || '').toLowerCase().includes(searchQuery) ||
+    String(record.totalAmount ?? record.amount ?? '').includes(searchQuery);
 
   const stationeryList = APP_STATE.masterStationeryRecords
-    .filter(s => isAllTime || (s.date >= fromDate && s.date <= toDate))
+    .filter(s => (isAllTime || (s.date >= fromDate && s.date <= toDate)) && matchesActiveSearch(s))
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
 
   const reloadList = APP_STATE.masterReloadRecords
-    .filter(r => isAllTime || (r.date >= fromDate && r.date <= toDate))
+    .filter(r => (isAllTime || (r.date >= fromDate && r.date <= toDate)) && matchesActiveSearch(r))
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
 
   let totalStatSales = 0;
@@ -1513,34 +1622,34 @@ export async function generateProfessionalPdfReport() {
   const boxW = 58;
   const boxH = 20;
 
-  // Box 1: Stationery Sales & Profit
+  // Box 1: Reload Sales & Profit
   pdfDoc.setFillColor(248, 250, 252);
   pdfDoc.setDrawColor(226, 232, 240);
   pdfDoc.roundedRect(14, boxY, boxW, boxH, 2, 2, 'FD');
   pdfDoc.setFont('helvetica', 'bold');
   pdfDoc.setFontSize(7.5);
   pdfDoc.setTextColor(100, 116, 139);
-  pdfDoc.text('STATIONERY & BILLS REVENUE', 17, boxY + 5);
+  pdfDoc.text('FILTERED RELOADS', 17, boxY + 5);
   pdfDoc.setFontSize(12);
   pdfDoc.setTextColor(15, 23, 42);
-  pdfDoc.text(formatLKR(totalStatSales), 17, boxY + 12);
+  pdfDoc.text(formatLKR(totalReloadVol), 17, boxY + 12);
   pdfDoc.setFontSize(7);
   pdfDoc.setTextColor(2, 132, 199);
-  pdfDoc.text(`Profit: +${formatLKR(totalStatProfit)} (${totalUnitsSold} items)`, 17, boxY + 17);
+  pdfDoc.text(`Profit: ${formatSignedLKR(totalReloadComm)} (${reloadList.length} txs)`, 17, boxY + 17);
 
-  // Box 2: Reload Sales & Profit
+  // Box 2: Stationery & Bills Sales and Profit
   pdfDoc.setFillColor(248, 250, 252);
   pdfDoc.roundedRect(76, boxY, boxW, boxH, 2, 2, 'FD');
   pdfDoc.setFont('helvetica', 'bold');
   pdfDoc.setFontSize(7.5);
   pdfDoc.setTextColor(100, 116, 139);
-  pdfDoc.text('MOBILE RELOADS VOLUME', 79, boxY + 5);
+  pdfDoc.text('FILTERED STATIONERY & BILLS', 79, boxY + 5);
   pdfDoc.setFontSize(12);
   pdfDoc.setTextColor(15, 23, 42);
-  pdfDoc.text(formatLKR(totalReloadVol), 79, boxY + 12);
+  pdfDoc.text(formatLKR(totalStatSales), 79, boxY + 12);
   pdfDoc.setFontSize(7);
   pdfDoc.setTextColor(16, 185, 129);
-  pdfDoc.text(`Profit: +${formatLKR(totalReloadComm)} (${reloadList.length} txs)`, 79, boxY + 17);
+  pdfDoc.text(`Profit: ${formatSignedLKR(totalStatProfit)} (${totalUnitsSold} units)`, 79, boxY + 17);
 
   // Box 3: Combined Total Profit
   pdfDoc.setFillColor(240, 253, 244);
@@ -1549,10 +1658,10 @@ export async function generateProfessionalPdfReport() {
   pdfDoc.setFont('helvetica', 'bold');
   pdfDoc.setFontSize(7.5);
   pdfDoc.setTextColor(22, 101, 52);
-  pdfDoc.text('COMBINED TOTAL PROFIT', 141, boxY + 5);
+  pdfDoc.text('TOTAL PROFIT', 141, boxY + 5);
   pdfDoc.setFontSize(12);
   pdfDoc.setTextColor(21, 128, 61);
-  pdfDoc.text(formatLKR(totalNetProfit), 141, boxY + 12);
+  pdfDoc.text(formatSignedLKR(totalNetProfit), 141, boxY + 12);
   pdfDoc.setFontSize(7);
   pdfDoc.setTextColor(71, 85, 105);
   pdfDoc.text(`Total Turnover: ${formatLKR(totalStoreRevenue)}`, 141, boxY + 17);
@@ -1564,11 +1673,11 @@ export async function generateProfessionalPdfReport() {
     tableData.push([
       `${s.date || ''} ${s.time || ''}`,
       s.itemType === 'service' ? 'Service/Bill' : 'Stationery',
-      s.itemName || '-',
+      toTitleCase(s.itemName || '-'),
       s.itemCode || '-',
       String(s.quantity || 1),
       formatLKR(Number(s.totalAmount || s.sellingPrice || 0)),
-      `+${formatLKR(Number(s.profit || 0))}`
+      formatSignedLKR(Number(s.profit ?? (Number(s.sellingPrice || 0) - Number(s.costPrice || 0)) * Number(s.quantity || 1)))
     ]);
   });
 
@@ -1580,7 +1689,7 @@ export async function generateProfessionalPdfReport() {
       r.phone || 'Walk-in',
       '1',
       formatLKR(Number(r.amount || 0)),
-      `+${formatLKR(Number(r.commissionAmount || 0))}`
+      formatSignedLKR(Number(r.commissionAmount || 0))
     ]);
   });
 
@@ -1649,6 +1758,7 @@ function initStockInventory() {
     sortSelect.value = APP_STATE.stockSortOrder;
     sortSelect.addEventListener('change', () => {
       APP_STATE.stockSortOrder = sortSelect.value;
+      localStorage.setItem('al_stock_sort_order', APP_STATE.stockSortOrder);
       renderStockTable();
     });
   }
@@ -1735,7 +1845,7 @@ export function renderStockTable() {
     tr.innerHTML = `
       <td class="py-3 px-3 sm:px-4 font-mono font-bold text-xs theme-text-main">${escapeHTML(item.code)}</td>
       <td class="py-3 px-3 sm:px-4">
-        <div class="font-bold text-xs theme-text-main">${escapeHTML(item.name)}</div>
+        <div class="font-bold text-xs theme-text-main">${escapeHTML(toTitleCase(item.name))}</div>
         <div class="text-[11px] theme-text-dim">${escapeHTML(item.category || 'General')}</div>
       </td>
       <td class="py-3 px-3 sm:px-4">${typeCol}</td>
@@ -1774,9 +1884,10 @@ function selectCatalogItemForPOS(item) {
   const priceInput = document.getElementById('posSellingPrice');
   const priceLabel = document.getElementById('posSellingPriceLabel');
   const qtyInput = document.getElementById('posQuantity');
+  const qtyContainer = document.getElementById('posQtyContainer');
   const submitBtnText = document.getElementById('posSubmitBtnText');
 
-  if (input) input.value = item.name;
+  if (input) input.value = toTitleCase(item.name);
   if (codeBadge) {
     codeBadge.textContent = item.code;
     codeBadge.classList.remove('hidden');
@@ -1818,7 +1929,9 @@ function selectCatalogItemForPOS(item) {
 
   if (qtyInput) {
     qtyInput.value = '1';
+    qtyInput.required = !isService;
   }
+  qtyContainer?.classList.toggle('hidden', isService);
 
   if (submitBtnText) {
     submitBtnText.textContent = isService ? 'Log Bill Payment' : 'Log Stationery Sale';
@@ -1883,7 +1996,7 @@ function initStationeryPOS() {
           div.innerHTML = `
             <div class="flex items-center gap-2">
               <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(item.code)}</span>
-              <span class="font-bold text-xs theme-text-main">${escapeHTML(item.name)}</span>
+              <span class="font-bold text-xs theme-text-main">${escapeHTML(toTitleCase(item.name))}</span>
             </div>
             <div class="text-right">
               <div class="font-bold text-xs theme-text-main font-mono">${formatLKR(item.sellingPrice)}</div>
@@ -1957,9 +2070,8 @@ function initStationeryPOS() {
       let lineProfit = 0;
 
       if (isService) {
-        // Utility bills: No stock count. Profit is service fee or margin if defined, else 0
         costPrice = matchedItem ? roundCurrency(matchedItem.costPrice || 0) : 0;
-        unitProfit = roundCurrency(costPrice > 0 ? sellingPrice - costPrice : 0);
+        unitProfit = roundCurrency(sellingPrice - costPrice);
         lineProfit = roundCurrency(unitProfit * quantity);
       } else {
         costPrice = matchedItem ? roundCurrency(matchedItem.costPrice || 0) : 0;
@@ -2044,6 +2156,8 @@ function initStationeryPOS() {
         if (priceLabel) priceLabel.textContent = 'Selling Price / Amount [Rs.]';
         if (submitBtnText) submitBtnText.textContent = 'Log Stationery Sale';
         if (qtyInput) qtyInput.value = '1';
+        if (qtyInput) qtyInput.required = true;
+        document.getElementById('posQtyContainer')?.classList.remove('hidden');
         updatePOSTotalPreview();
         itemInput.focus();
       } catch (err) {
@@ -2084,14 +2198,14 @@ function renderRecentStationeryFeed() {
       <div class="flex items-center gap-2">
         ${badge}
         <div>
-          <span class="font-bold theme-text-main">${escapeHTML(item.itemName)}</span>
+          <span class="font-bold theme-text-main">${escapeHTML(toTitleCase(item.itemName))}</span>
           <span class="text-[11px] theme-text-dim"> &times; ${escapeHTML(item.quantity || 1)} &bull; ${escapeHTML(item.time || '')}</span>
         </div>
       </div>
       <div class="flex items-center gap-2">
         <div class="text-right">
           <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.totalAmount)}</span>
-          <span class="text-[10px] theme-text-dim block">+${formatLKR(item.profit || 0)} margin</span>
+          <span class="text-[10px] theme-text-dim block">${formatSignedLKR(item.profit ?? ((Number(item.sellingPrice || 0) - Number(item.costPrice || 0)) * Number(item.quantity || 1)))} margin</span>
         </div>
         <button type="button" class="recent-delete-btn min-h-11 min-w-11 text-red-400 hover:text-red-300" aria-label="Delete transaction" title="Delete transaction">
           <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -2102,7 +2216,7 @@ function renderRecentStationeryFeed() {
       if (!confirm(`Delete transaction for "${item.itemName}"?`)) return;
       try {
         const restored = await removeTransaction('STATIONERY', item);
-        showToast(restored ? 'Transaction deleted and stock restored' : 'Transaction record deleted', 'success');
+        showToast(restored ? 'Transaction deleted, stock restored' : 'Transaction deleted', 'success');
       } catch (err) {
         showToast(`Delete failed: ${err.message}`, 'error');
       }
@@ -2180,7 +2294,7 @@ function updateReloadCommissionPreview() {
   const commission = roundCurrency((amount * rate) / 100);
 
   if (commPreview) {
-    commPreview.textContent = formatLKR(commission);
+    commPreview.textContent = formatSignedLKR(commission);
   }
   if (totalPreview) {
     totalPreview.textContent = formatLKR(amount);
@@ -2273,7 +2387,7 @@ function initMobileReloads() {
 
       try {
         await addDoc(collection(db, 'reload_transactions'), payload);
-        showToast(`Recorded ${operator} reload of ${formatLKR(amount)} (+${formatLKR(commissionAmount)} commission)`, 'success');
+        showToast(`Recorded ${operator} reload of ${formatLKR(amount)} (${formatSignedLKR(commissionAmount)} commission)`, 'success');
         form.reset();
         if (detectedBadge) detectedBadge.classList.add('hidden');
         selectOperator(operator);
@@ -2316,7 +2430,7 @@ function renderRecentReloadsFeed() {
         <div class="flex items-center gap-2">
           <div class="text-right">
             <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.amount)}</span>
-            <span class="text-[10px] theme-text-dim block font-mono">+${formatLKR(item.commissionAmount)} commission</span>
+            <span class="text-[10px] theme-text-dim block font-mono">${formatSignedLKR(item.commissionAmount)} commission</span>
           </div>
           <button type="button" class="recent-delete-btn min-h-11 min-w-11 text-red-400 hover:text-red-300" aria-label="Delete transaction" title="Delete transaction">
             <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -2369,12 +2483,9 @@ function initSettingsCatalog() {
     if (isService) {
       if (stockQtyContainer) stockQtyContainer.classList.add('hidden');
       if (thresholdContainer) thresholdContainer.classList.add('hidden');
-      if (costPriceContainer) costPriceContainer.classList.add('hidden');
+      if (costPriceContainer) costPriceContainer.classList.remove('hidden');
       if (sellingPriceLabel) sellingPriceLabel.textContent = 'Default Base Fee / Amount [Rs.]';
-      if (costPriceInput) {
-        costPriceInput.required = false;
-        costPriceInput.value = '0.00';
-      }
+      if (costPriceInput) costPriceInput.required = true;
       if (stockInput) {
         stockInput.required = false;
         stockInput.value = '0';
@@ -2439,7 +2550,7 @@ function initSettingsCatalog() {
       const isService = form.querySelector('input[name="catalogItemType"]:checked')?.value === 'service';
       const itemType = isService ? 'service' : 'product';
 
-      const costPrice = isService ? 0 : roundCurrency(costPriceInput.value);
+      const costPrice = roundCurrency(costPriceInput.value);
       const sellingPrice = roundCurrency(sellingPriceInput.value);
       const stockQuantity = isService ? 0 : Math.max(0, parseInt(stockInput.value, 10) || 0);
       const lowStockThreshold = isService ? 0 : Math.max(0, parseInt(thresholdInput.value, 10) || 5);
@@ -2491,6 +2602,7 @@ function initSettingsCatalog() {
     sortSelect.value = APP_STATE.catalogSortOrder;
     sortSelect.addEventListener('change', () => {
       APP_STATE.catalogSortOrder = sortSelect.value;
+      localStorage.setItem('al_catalog_sort_order', APP_STATE.catalogSortOrder);
       renderCatalogTable();
     });
   }
@@ -2568,8 +2680,8 @@ export function renderCatalogTable() {
       ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service/Bill</span>`
       : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">Product</span>`;
 
-    const costDisplay = isService ? '<span class="theme-text-dim font-mono">N/A</span>' : `<span class="font-mono font-bold text-amber-400">${formatLKR(item.costPrice)}</span>`;
-    const profitDisplay = isService ? '<span class="theme-text-dim font-mono">Custom</span>' : `<span class="font-mono font-bold text-sky-400">+${formatLKR(item.sellingPrice - item.costPrice)}</span>`;
+    const costDisplay = `<span class="font-mono font-bold text-amber-400">${formatLKR(item.costPrice)}</span>`;
+    const profitDisplay = `<span class="font-mono font-bold text-sky-400">${formatSignedLKR(item.sellingPrice - item.costPrice)}</span>`;
     const stockDisplay = isService ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[11px] font-bold">No Qty</span>` : `<span class="font-mono font-bold ${item.stockQuantity <= 5 ? 'text-red-400' : 'theme-text-main'}">${escapeHTML(item.stockQuantity)}</span>`;
     const actions = APP_STATE.currentRole === 'admin'
       ? `<div class="flex items-center justify-center gap-1.5">
@@ -2581,7 +2693,7 @@ export function renderCatalogTable() {
     tr.innerHTML = `
       <td class="py-2.5 px-3 font-mono font-bold text-xs theme-text-main">${escapeHTML(item.code)}</td>
       <td class="py-2.5 px-3">
-        <div class="font-bold text-xs theme-text-main">${escapeHTML(item.name)}</div>
+        <div class="font-bold text-xs theme-text-main">${escapeHTML(toTitleCase(item.name))}</div>
         <div class="text-[10px] theme-text-dim">${escapeHTML(item.category || 'General')}</div>
       </td>
       <td class="py-2.5 px-3">${typeBadge}</td>
@@ -2601,7 +2713,7 @@ export function renderCatalogTable() {
         if (APP_STATE.currentRole !== 'admin') return;
         document.getElementById('catalogDocId').value = item.id;
         document.getElementById('catalogCode').value = item.code;
-        document.getElementById('catalogName').value = item.name;
+        document.getElementById('catalogName').value = toTitleCase(item.name);
         document.getElementById('catalogCategory').value = item.category || '';
         document.getElementById('catalogCostPrice').value = item.costPrice || 0;
         document.getElementById('catalogSellingPrice').value = item.sellingPrice || 0;
@@ -2657,7 +2769,7 @@ function updateBackupStatusDisplay() {
   if (statCatalog) statCatalog.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
   if (statPresets) statPresets.textContent = `${APP_STATE.reloadPresets.length} Presets`;
 
-  const savedRaw = localStorage.getItem('al_settings_backup_snapshot');
+  const savedRaw = localStorage.getItem(backupSnapshotKey());
   if (savedRaw) {
     try {
       const snap = JSON.parse(savedRaw);
@@ -2678,15 +2790,19 @@ function updateBackupStatusDisplay() {
   }
 }
 
+function backupSnapshotKey() {
+  return `al_settings_backup_snapshot_${auth.currentUser?.uid || 'signed-out'}`;
+}
+
 function createConfigurationSnapshot() {
   return {
-    version: '5.0',
+    version: '5.1',
     appName: 'AL Communication',
     timestamp: new Date().toISOString(),
     formattedDate: new Date().toLocaleString(),
     catalog: APP_STATE.inventoryCatalog.map(item => ({
       code: item.code,
-      name: item.name,
+      name: toTitleCase(item.name),
       category: item.category || 'General',
       itemType: item.itemType || 'product',
       costPrice: Number(item.costPrice) || 0,
@@ -2696,13 +2812,20 @@ function createConfigurationSnapshot() {
     })),
     commissionRates: { ...APP_STATE.commissionRates },
     reloadPresets: [...APP_STATE.reloadPresets],
-    activeTheme: APP_STATE.activeTheme
+    activeTheme: APP_STATE.activeTheme,
+    preferences: {
+      activeTheme: APP_STATE.activeTheme,
+      gradientBlurEnabled: APP_STATE.gradientBlurEnabled,
+      dashboardOrder: APP_STATE.dashboardOrder,
+      stockSortOrder: APP_STATE.stockSortOrder,
+      catalogSortOrder: APP_STATE.catalogSortOrder
+    }
   };
 }
 
 export async function applyConfigurationBackup(snapshot) {
-  if (APP_STATE.currentRole !== 'admin') {
-    showToast('Only an admin can restore application settings.', 'error');
+  if (!APP_STATE.currentUser) {
+    showToast('Sign in before restoring a backup.', 'error');
     return false;
   }
   if (!snapshot || typeof snapshot !== 'object') {
@@ -2710,15 +2833,16 @@ export async function applyConfigurationBackup(snapshot) {
     return false;
   }
 
+  let preferencesSynced = true;
   try {
     // 1. Restore Commission Rates
-    if (snapshot.commissionRates) {
+    if (snapshot.commissionRates && APP_STATE.currentRole === 'admin') {
       APP_STATE.commissionRates = { ...snapshot.commissionRates };
       await setDoc(doc(db, 'settings', 'rates'), APP_STATE.commissionRates, { merge: true });
     }
 
     // 2. Restore Reload Presets
-    if (Array.isArray(snapshot.reloadPresets)) {
+    if (Array.isArray(snapshot.reloadPresets) && APP_STATE.currentRole === 'admin') {
       APP_STATE.reloadPresets = [...snapshot.reloadPresets];
       await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
       renderPresetPills();
@@ -2728,9 +2852,38 @@ export async function applyConfigurationBackup(snapshot) {
     if (snapshot.activeTheme) {
       applyTheme(snapshot.activeTheme);
     }
+    if (snapshot.preferences) {
+      const preferences = snapshot.preferences;
+      if (preferences.activeTheme) applyTheme(preferences.activeTheme);
+      if (typeof preferences.gradientBlurEnabled === 'boolean') {
+        setGradientBlurEnabled(preferences.gradientBlurEnabled);
+      }
+      if (preferences.dashboardOrder?.metrics && preferences.dashboardOrder?.actions) {
+        APP_STATE.dashboardOrder = preferences.dashboardOrder;
+        applyDashboardOrder(document.getElementById('dashboardGrid'), preferences.dashboardOrder.metrics);
+        applyDashboardOrder(document.getElementById('dashboardActionsGrid'), preferences.dashboardOrder.actions);
+      }
+      if (['name-asc', 'name-desc', 'selling-desc', 'selling-asc', 'cost-desc', 'cost-asc', 'stock-desc', 'stock-asc', 'newest', 'oldest'].includes(preferences.stockSortOrder)) {
+        APP_STATE.stockSortOrder = preferences.stockSortOrder;
+        localStorage.setItem('al_stock_sort_order', preferences.stockSortOrder);
+        const stockSortSelect = document.getElementById('stockSortSelect');
+        if (stockSortSelect) stockSortSelect.value = preferences.stockSortOrder;
+      }
+      if (['name-asc', 'name-desc', 'selling-desc', 'selling-asc', 'cost-desc', 'cost-asc', 'stock-desc', 'stock-asc', 'newest', 'oldest'].includes(preferences.catalogSortOrder)) {
+        APP_STATE.catalogSortOrder = preferences.catalogSortOrder;
+        localStorage.setItem('al_catalog_sort_order', preferences.catalogSortOrder);
+        const catalogSortSelect = document.getElementById('catalogSortSelect');
+        if (catalogSortSelect) catalogSortSelect.value = preferences.catalogSortOrder;
+      }
+      preferencesSynced = await saveUserPreferences({
+        activeTheme: APP_STATE.activeTheme,
+        gradientBlurEnabled: APP_STATE.gradientBlurEnabled,
+        dashboardOrder: APP_STATE.dashboardOrder
+      });
+    }
 
     // 4. Restore / Sync Catalog Items in Firestore
-    if (Array.isArray(snapshot.catalog)) {
+    if (Array.isArray(snapshot.catalog) && APP_STATE.currentRole === 'admin') {
       let restoredCount = 0;
       for (const item of snapshot.catalog) {
         if (!item.code || !item.name) continue;
@@ -2755,13 +2908,19 @@ export async function applyConfigurationBackup(snapshot) {
         }
         restoredCount++;
       }
-      showToast(`Restored configuration: ${restoredCount} catalog items, rates & presets`, 'success');
     }
 
     updateBackupStatusDisplay();
     renderCatalogTable();
     renderStockTable();
     updateDashboardMetrics();
+    if (!preferencesSynced) {
+      showToast('Backup applied locally, but personal preferences could not sync to Firestore.', 'error');
+      return false;
+    }
+    showToast(APP_STATE.currentRole === 'admin'
+      ? 'Backup settings restored successfully.'
+      : 'Personal preferences restored. Shared catalog, presets, and rates require an admin.', 'success');
     return true;
   } catch (err) {
     logDebug(`Restore error: ${err.message}`, 'ERROR');
@@ -2775,13 +2934,59 @@ function initBackupRestoreSystem() {
   const downloadJsonBtn = document.getElementById('backupDownloadJsonBtn');
   const restoreSnapshotBtn = document.getElementById('backupRestoreSnapshotBtn');
   const uploadInput = document.getElementById('backupUploadInput');
+  const restoreDefaultsBtn = document.getElementById('restoreDefaultsBtn');
+
+  restoreDefaultsBtn?.addEventListener('click', async () => {
+    const globalSettingsIncluded = APP_STATE.currentRole === 'admin';
+    const confirmation = globalSettingsIncluded
+      ? 'Restore the default theme, header blur, dashboard layout, sort order, reload presets, and commission rates?'
+      : 'Restore your default theme, header blur, dashboard layout, and sort order?';
+    if (!confirm(confirmation)) return;
+    try {
+      applyTheme('modern-slate');
+      setGradientBlurEnabled(true);
+      APP_STATE.stockSortOrder = 'name-asc';
+      APP_STATE.catalogSortOrder = 'name-asc';
+      localStorage.setItem('al_stock_sort_order', 'name-asc');
+      localStorage.setItem('al_catalog_sort_order', 'name-asc');
+      const stockSortSelect = document.getElementById('stockSortSelect');
+      const catalogSortSelect = document.getElementById('catalogSortSelect');
+      if (stockSortSelect) stockSortSelect.value = 'name-asc';
+      if (catalogSortSelect) catalogSortSelect.value = 'name-asc';
+      resetDashboardLayout();
+      if (globalSettingsIncluded) {
+        const defaultRates = { AIRTEL: 6.80, DIALOG: 3.80, MOBITEL: 6.80, HUTCH: 5.00 };
+        const defaultPresets = [50, 100, 200, 500, 1000];
+        APP_STATE.commissionRates = defaultRates;
+        APP_STATE.reloadPresets = defaultPresets;
+        await Promise.all([
+          setDoc(doc(db, 'settings', 'rates'), defaultRates, { merge: true }),
+          setDoc(doc(db, 'settings', 'presets'), { list: defaultPresets }, { merge: true })
+        ]);
+        renderPresetPills();
+      }
+      const preferencesSynced = await saveUserPreferences({
+        activeTheme: 'modern-slate',
+        gradientBlurEnabled: true,
+        dashboardOrder: APP_STATE.dashboardOrder
+      });
+      if (!preferencesSynced) {
+        showToast('Defaults applied locally, but preferences could not sync to Firestore.', 'error');
+        return;
+      }
+      renderStockTable();
+      renderCatalogTable();
+      showToast('Default settings restored.', 'success');
+    } catch (error) {
+      showToast(`Could not restore defaults: ${error.message}`, 'error');
+    }
+  });
 
   // Save Snapshot to localStorage
   if (saveSnapshotBtn) {
     saveSnapshotBtn.addEventListener('click', () => {
-      if (APP_STATE.currentRole !== 'admin') return;
       const snap = createConfigurationSnapshot();
-      localStorage.setItem('al_settings_backup_snapshot', JSON.stringify(snap));
+      localStorage.setItem(backupSnapshotKey(), JSON.stringify(snap));
       updateBackupStatusDisplay();
       showToast(`Snapshot saved to local storage (${snap.catalog.length} items)`, 'success');
     });
@@ -2790,7 +2995,6 @@ function initBackupRestoreSystem() {
   // Download .JSON Backup File
   if (downloadJsonBtn) {
     downloadJsonBtn.addEventListener('click', () => {
-      if (APP_STATE.currentRole !== 'admin') return;
       const snap = createConfigurationSnapshot();
       const jsonStr = JSON.stringify(snap, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -2809,8 +3013,7 @@ function initBackupRestoreSystem() {
   // Restore from localStorage Snapshot
   if (restoreSnapshotBtn) {
     restoreSnapshotBtn.addEventListener('click', async () => {
-      if (APP_STATE.currentRole !== 'admin') return;
-      const savedRaw = localStorage.getItem('al_settings_backup_snapshot');
+      const savedRaw = localStorage.getItem(backupSnapshotKey());
       if (!savedRaw) {
         showToast('No saved snapshot found in local storage. Save one first or upload a JSON backup file.', 'error');
         return;
@@ -2831,11 +3034,6 @@ function initBackupRestoreSystem() {
   // Upload and Restore from JSON file
   if (uploadInput) {
     uploadInput.addEventListener('change', (e) => {
-      if (APP_STATE.currentRole !== 'admin') {
-        uploadInput.value = '';
-        showToast('Only an admin can restore application settings.', 'error');
-        return;
-      }
       const file = e.target.files?.[0];
       if (!file) return;
 
@@ -2843,11 +3041,11 @@ function initBackupRestoreSystem() {
       reader.onload = async (evt) => {
         try {
           const snap = JSON.parse(evt.target.result);
-          if (!snap.catalog && !snap.commissionRates) {
-            throw new Error('Unrecognized backup format. Missing catalog or rates.');
+          if (!snap.catalog && !snap.commissionRates && !snap.preferences && !snap.reloadPresets) {
+            throw new Error('Unrecognized backup format. No supported settings were found.');
           }
 
-          if (confirm(`Restore configuration from "${file.name}" (${snap.catalog?.length || 0} items)?`)) {
+          if (confirm(`Restore configuration from "${file.name}" (${snap.catalog?.length || 0} catalog items)?`)) {
             await applyConfigurationBackup(snap);
           }
         } catch (err) {
@@ -3084,7 +3282,7 @@ function updateProfileDisplay(user = APP_STATE.currentUser) {
   const isAdmin = APP_STATE.currentRole === 'admin';
   if (email) email.textContent = user?.email || '';
   if (roleBadge) {
-    roleBadge.textContent = isAdmin ? 'Admin' : 'Standard User';
+    roleBadge.textContent = isAdmin ? 'Admin' : 'Staff / User';
     roleBadge.className = `inline-flex mt-3 px-2.5 py-1 rounded-full text-xs font-bold border ${
       isAdmin
         ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
@@ -3123,7 +3321,7 @@ function renderAdminUsers() {
       userEmail.textContent = profile.email || 'Email unavailable';
       const role = document.createElement('div');
       role.className = 'mt-1 text-xs theme-text-dim';
-      role.textContent = profile.role === 'admin' ? 'Admin' : 'Standard User';
+      role.textContent = profile.role === 'admin' ? 'Admin' : 'Staff / User';
       identity.append(userEmail, role);
       row.appendChild(identity);
 
@@ -3135,7 +3333,7 @@ function renderAdminUsers() {
         roleButton.addEventListener('click', async () => {
           if (!auth.currentUser || APP_STATE.currentRole !== 'admin') return;
           const nextRole = profile.role === 'admin' ? 'user' : 'admin';
-          if (!confirm(`Set ${profile.email} role to ${nextRole === 'admin' ? 'Admin' : 'Standard User'}?`)) return;
+          if (!confirm(`Set ${profile.email} role to ${nextRole === 'admin' ? 'Admin' : 'Staff / User'}?`)) return;
           try {
             await updateDoc(doc(db, 'users', profile.id), {
               role: nextRole,
@@ -3160,10 +3358,6 @@ function applyRolePermissions() {
   document.getElementById('addPresetForm')?.classList.toggle('hidden', !isAdmin);
   document.getElementById('resetPresetsDefaultBtn')?.classList.toggle('hidden', !isAdmin);
   document.querySelectorAll('.del-preset-btn').forEach(button => button.classList.toggle('hidden', !isAdmin));
-  document.getElementById('backupRestoreSnapshotBtn')?.classList.toggle('hidden', !isAdmin);
-  document.querySelector('label[for="backupUploadInput"]')?.classList.toggle('hidden', !isAdmin);
-  document.getElementById('backupSaveSnapshotBtn')?.classList.toggle('hidden', !isAdmin);
-  document.getElementById('backupDownloadJsonBtn')?.classList.toggle('hidden', !isAdmin);
   renderCatalogTable();
   renderAdminUsers();
 }
@@ -3174,8 +3368,8 @@ function initProfileControls() {
   const resetButton = document.getElementById('profileResetPasswordBtn');
   const securityButton = document.getElementById('profileSecurityBtn');
   const layoutButton = document.getElementById('profileResetLayoutBtn');
-  const uiStyleButton = document.getElementById('profileUIStyleToggleBtn');
   const blurButton = document.getElementById('profileBlurToggleBtn');
+  const themeButton = document.getElementById('profileThemeToggleBtn');
   const signOutButton = document.getElementById('profileSignOutBtn');
   const createAccountForm = document.getElementById('createStaffAccountForm');
 
@@ -3210,8 +3404,12 @@ function initProfileControls() {
     switchSettingsTab('security');
   });
   layoutButton?.addEventListener('click', resetDashboardLayout);
-  uiStyleButton?.addEventListener('click', () => setUIStyle(APP_STATE.uiStyle === 'glass' ? 'default' : 'glass', true));
   blurButton?.addEventListener('click', () => setGradientBlurEnabled(!APP_STATE.gradientBlurEnabled, true));
+  themeButton?.addEventListener('click', () => {
+    const nextTheme = APP_STATE.activeTheme === 'emerald-store' ? 'modern-slate' : 'emerald-store';
+    applyTheme(nextTheme);
+    saveUserPreferences({ activeTheme: nextTheme });
+  });
 
   signOutButton?.addEventListener('click', async () => {
     try {
@@ -3231,7 +3429,12 @@ function initProfileControls() {
     }
     const email = document.getElementById('staffAccountEmail')?.value.trim();
     const password = document.getElementById('staffAccountPassword')?.value;
-    if (!email || !password || password.length < 8) {
+    const confirmPassword = document.getElementById('staffAccountPasswordConfirm')?.value;
+    if (!email || !password || password.length < 8 || password !== confirmPassword) {
+      showToast(password !== confirmPassword ? 'Passwords do not match.' : 'Enter an email and a password of at least 8 characters.', 'error');
+      return;
+    }
+    if (!email.includes('@')) {
       showToast('Enter an email and a password of at least 8 characters.', 'error');
       return;
     }
@@ -3743,7 +3946,6 @@ function initCloudSyncListeners() {
       const cached = JSON.parse(localStorage.getItem(prefKey) || '{}');
       if (cached.activeTheme) applyTheme(cached.activeTheme);
       if (typeof cached.gradientBlurEnabled === 'boolean') setGradientBlurEnabled(cached.gradientBlurEnabled);
-      if (cached.uiStyle) setUIStyle(cached.uiStyle);
       if (cached.dashboardOrder) APP_STATE.dashboardOrder = cached.dashboardOrder;
       applyDashboardOrder(document.getElementById('dashboardGrid'), APP_STATE.dashboardOrder.metrics);
       applyDashboardOrder(document.getElementById('dashboardActionsGrid'), APP_STATE.dashboardOrder.actions);
@@ -3832,7 +4034,6 @@ function initCloudSyncListeners() {
     if (localKey) localStorage.setItem(localKey, JSON.stringify(preferences));
     if (preferences.activeTheme) applyTheme(preferences.activeTheme);
     if (typeof preferences.gradientBlurEnabled === 'boolean') setGradientBlurEnabled(preferences.gradientBlurEnabled);
-    if (preferences.uiStyle) setUIStyle(preferences.uiStyle);
     if (preferences.dashboardOrder?.metrics && preferences.dashboardOrder?.actions) {
       APP_STATE.dashboardOrder = preferences.dashboardOrder;
       applyDashboardOrder(document.getElementById('dashboardGrid'), preferences.dashboardOrder.metrics);

@@ -49,6 +49,8 @@ export const firebaseConfig = {
   appId: "1:627092911084:web:80de6c0a270957842086c9"
 };
 
+// Deployment note: enable Firebase App Check in the Firebase Console for additional abuse protection.
+
 let app;
 let auth;
 let db;
