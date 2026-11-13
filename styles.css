@@ -2,12 +2,18 @@
    AL COMMUNICATION — VERSION 5.1 EXPANDABLE SEARCH, WIDE SETTINGS & ROUNDED UI
    Plus Jakarta Sans & Outfit Rounded Typography, Tabular LKR Numerics,
    Motion Graphics Sticky Header, Generous Global Search Dropdown, Compact Tabs
-   (Pure Solid Modern High-Contrast Architecture — Glassmorphism Purged)
+   High-Contrast Architecture with Optional, Theme-Matched Gradient Blur
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
    1. Typography & Global Reset
    -------------------------------------------------------------------------- */
+@property --gradient-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 135deg;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -41,6 +47,8 @@
   --header-bg: #0f172a;
   --badge-service: #818cf8;
   --badge-service-bg: rgba(129, 140, 248, 0.15);
+  --gradient-cyan: rgba(14, 165, 233, 0.22);
+  --gradient-emerald: rgba(16, 185, 129, 0.16);
 }
 
 /* Theme 2: Emerald Light (High-Contrast Clean White / Emerald) */
@@ -67,6 +75,8 @@
   --header-bg: #ffffff;
   --badge-service: #6366f1;
   --badge-service-bg: rgba(99, 102, 241, 0.12);
+  --gradient-cyan: rgba(56, 189, 248, 0.18);
+  --gradient-emerald: rgba(16, 185, 129, 0.12);
 }
 
 /* Theme 3: Sapphire Blue (Midnight Deep Solid) */
@@ -93,6 +103,8 @@
   --header-bg: #091229;
   --badge-service: #a855f7;
   --badge-service-bg: rgba(168, 85, 247, 0.15);
+  --gradient-cyan: rgba(59, 130, 246, 0.24);
+  --gradient-emerald: rgba(14, 165, 233, 0.15);
 }
 
 /* Theme 4: Warm Amber (Commercial Warm Slate) */
@@ -119,6 +131,8 @@
   --header-bg: #1c1510;
   --badge-service: #fb923c;
   --badge-service-bg: rgba(251, 146, 60, 0.15);
+  --gradient-cyan: rgba(245, 158, 11, 0.2);
+  --gradient-emerald: rgba(16, 185, 129, 0.13);
 }
 
 html {
@@ -151,6 +165,12 @@ main,
 }
 
 button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.tap-target {
+  min-width: 44px;
   min-height: 44px;
 }
 
@@ -200,6 +220,7 @@ button,
   background-color: var(--header-bg);
   position: relative;
   isolation: isolate;
+  transition: background-color 300ms ease, color 300ms ease;
 }
 
 [data-gradient-blur="on"] .theme-header {
@@ -207,6 +228,7 @@ button,
   -webkit-backdrop-filter: saturate(145%) blur(14px);
   backdrop-filter: saturate(145%) blur(14px);
   transform: translateZ(0);
+  transition: background-color 300ms ease;
 }
 
 [data-gradient-blur="on"] .theme-header::before {
@@ -216,8 +238,15 @@ button,
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(ellipse at 12% 0%, rgba(14, 165, 233, 0.22), transparent 45%),
-    radial-gradient(ellipse at 92% 10%, rgba(16, 185, 129, 0.16), transparent 40%);
+    radial-gradient(ellipse at 12% 0%, var(--gradient-cyan), transparent 45%),
+    radial-gradient(ellipse at 92% 10%, var(--gradient-emerald), transparent 40%);
+  transition: opacity 300ms ease, background 300ms ease;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-gradient-blur="on"] .theme-header {
+    background: linear-gradient(115deg, var(--header-bg), color-mix(in srgb, var(--accent) 12%, var(--header-bg)));
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -228,7 +257,7 @@ header.sticky {
   top: 0;
   z-index: 50;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.15);
-  transition: all 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: background-color 300ms ease, color 300ms ease, box-shadow 350ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .brand-logo-img {
@@ -432,6 +461,28 @@ header.search-active .search-expand-box {
   gap: 1rem;
 }
 
+.dash-card[data-card-id],
+.quick-action-grid > [data-card-id] {
+  touch-action: pan-y;
+  cursor: grab;
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+.is-dragging {
+  z-index: 4;
+  opacity: 0.82;
+  transform: translateZ(0) scale(1.025);
+  box-shadow: 0 16px 36px rgba(2, 8, 23, 0.28);
+  cursor: grabbing;
+  user-select: none;
+}
+
+[data-ui-style="glass"] .dash-card,
+[data-ui-style="glass"] .profile-panel {
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border-color));
+  box-shadow: 0 12px 30px rgba(2, 8, 23, 0.18), 0 0 24px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
 @media (min-width: 640px) {
   .dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -503,6 +554,14 @@ header.search-active .search-expand-box {
 
 .quick-action-btn:active {
   transform: scale(0.98);
+}
+
+.dash-card.is-dragging,
+.quick-action-btn.is-dragging {
+  z-index: 4;
+  opacity: 0.82;
+  transform: translateZ(0) scale(1.025);
+  box-shadow: 0 16px 36px rgba(2, 8, 23, 0.28);
 }
 
 /* --------------------------------------------------------------------------
@@ -595,8 +654,8 @@ header.search-active .search-expand-box {
 
 [data-gradient-blur="on"] .modal-backdrop {
   background:
-    radial-gradient(ellipse at 15% 15%, rgba(14, 165, 233, 0.2), transparent 48%),
-    radial-gradient(ellipse at 85% 85%, rgba(16, 185, 129, 0.16), transparent 45%),
+    radial-gradient(ellipse at 15% 15%, var(--gradient-cyan), transparent 48%),
+    radial-gradient(ellipse at 85% 85%, var(--gradient-emerald), transparent 45%),
     rgba(2, 6, 23, 0.68);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
@@ -612,10 +671,85 @@ header.search-active .search-expand-box {
 
 .gradient-surface {
   background:
-    radial-gradient(ellipse at 8% 0%, rgba(14, 165, 233, 0.2), transparent 48%),
-    radial-gradient(ellipse at 100% 100%, rgba(16, 185, 129, 0.14), transparent 48%),
+    radial-gradient(ellipse at 8% 0%, var(--gradient-cyan), transparent 48%),
+    radial-gradient(ellipse at 100% 100%, var(--gradient-emerald), transparent 48%),
     var(--bg-surface);
   transform: translateZ(0);
+}
+
+.theme-header::before,
+.gradient-surface,
+[data-gradient-blur="on"] .modal-backdrop {
+  transition: background 300ms ease;
+}
+
+[data-theme="emerald-store"][data-gradient-blur="on"] .theme-header::before,
+[data-theme="emerald-store"] .gradient-surface {
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(56, 189, 248, 0.18), transparent 45%),
+    radial-gradient(ellipse at 92% 10%, rgba(16, 185, 129, 0.12), transparent 40%);
+}
+
+[data-theme="emerald-store"][data-gradient-blur="on"] .modal-backdrop {
+  background:
+    radial-gradient(ellipse at 15% 15%, rgba(56, 189, 248, 0.18), transparent 48%),
+    radial-gradient(ellipse at 85% 85%, rgba(16, 185, 129, 0.12), transparent 45%),
+    rgba(2, 6, 23, 0.62);
+}
+
+[data-theme="sapphire-blue"][data-gradient-blur="on"] .theme-header::before,
+[data-theme="sapphire-blue"] .gradient-surface {
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(59, 130, 246, 0.24), transparent 45%),
+    radial-gradient(ellipse at 92% 10%, rgba(14, 165, 233, 0.15), transparent 40%);
+}
+
+[data-theme="sapphire-blue"][data-gradient-blur="on"] .modal-backdrop {
+  background:
+    radial-gradient(ellipse at 15% 15%, rgba(59, 130, 246, 0.24), transparent 48%),
+    radial-gradient(ellipse at 85% 85%, rgba(14, 165, 233, 0.15), transparent 45%),
+    rgba(2, 6, 23, 0.68);
+}
+
+[data-theme="warm-amber"][data-gradient-blur="on"] .theme-header::before,
+[data-theme="warm-amber"] .gradient-surface {
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(245, 158, 11, 0.2), transparent 45%),
+    radial-gradient(ellipse at 92% 10%, rgba(16, 185, 129, 0.13), transparent 40%);
+}
+
+[data-theme="warm-amber"][data-gradient-blur="on"] .modal-backdrop {
+  background:
+    radial-gradient(ellipse at 15% 15%, rgba(245, 158, 11, 0.2), transparent 48%),
+    radial-gradient(ellipse at 85% 85%, rgba(16, 185, 129, 0.13), transparent 45%),
+    rgba(2, 6, 23, 0.68);
+}
+
+[data-theme="emerald-store"] .gradient-surface,
+[data-theme="sapphire-blue"] .gradient-surface,
+[data-theme="warm-amber"] .gradient-surface {
+  background-color: var(--bg-surface);
+}
+
+.profile-panel {
+  position: relative;
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+@media (max-width: 639px) {
+  .modal-backdrop {
+    align-items: stretch;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) !important;
+    overflow-y: auto;
+  }
+
+  .modal-content {
+    width: 100%;
+    max-width: none;
+    min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    border-radius: 0;
+  }
 }
 
 [data-gradient-blur="off"] .theme-header,
@@ -796,7 +930,7 @@ header.search-active .search-expand-box {
 
 .quantity-stepper button {
   width: 40px;
-  height: 42px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -813,7 +947,7 @@ header.search-active .search-expand-box {
 
 .quantity-stepper input {
   width: 60px;
-  height: 42px;
+  height: 44px;
   text-align: center;
   background-color: transparent;
   border: none;
@@ -985,8 +1119,17 @@ header.search-active .search-expand-box {
 
   .actions-group > button,
   .search-wrapper > button {
-    width: 30px !important;
-    flex: 0 0 30px;
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px !important;
+    flex: 0 0 44px;
+  }
+
+  #headerSearchToggleBtn,
+  #themeQuickToggleBtn,
+  .search-wrapper,
+  .clock-group {
+    display: none !important;
   }
 
   .mobile-nav-btn span {
@@ -1028,6 +1171,13 @@ header.search-active .search-expand-box {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+
+  [data-gradient-blur="on"] .theme-header,
+  [data-gradient-blur="on"] .modal-content,
+  [data-gradient-blur="on"] .profile-panel {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 

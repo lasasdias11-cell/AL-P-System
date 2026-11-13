@@ -54,6 +54,7 @@ let auth;
 let db;
 let isFirebaseInitialized = false;
 let initError = null;
+export let authPersistenceReady = Promise.resolve(false);
 
 try {
   if (!getApps().length) {
@@ -63,13 +64,15 @@ try {
   }
   auth = getAuth(app);
   
-  // Explicitly enforce IndexedDB/localStorage persistent auth across mobile and desktop
-  setPersistence(auth, browserLocalPersistence)
+  // Explicitly enforce persistent auth across mobile and desktop.
+  authPersistenceReady = setPersistence(auth, browserLocalPersistence)
     .then(() => {
       console.log("[Firebase Auth] Local persistence successfully active.");
+      return true;
     })
     .catch((persErr) => {
       console.warn("[Firebase Auth] Persistence setup notice:", persErr.message);
+      return false;
     });
 
   db = getFirestore(app);
@@ -84,6 +87,9 @@ export const secondaryApp = getApps().find(existingApp => existingApp.name === '
 export const secondaryAuth = getAuth(secondaryApp);
 
 export {
+  initializeApp,
+  getAuth,
+  getFirestore,
   app,
   auth,
   db,

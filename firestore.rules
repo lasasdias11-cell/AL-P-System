@@ -1,124 +1,188 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthenticated() {
+    function signedIn() {
       return request.auth != null;
     }
 
-    function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.email == 'lasasdias11@gmail.com' ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
-      );
+    function isOwnerAccount() {
+      return signedIn() && request.auth.token.email == 'lasasdias11@gmail.com';
     }
 
-    function validNonNegativeNumber(value) {
+    function isAdmin() {
+      return isOwnerAccount() ||
+        (signedIn() &&
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    function nonNegative(value) {
       return value is number && value >= 0;
     }
 
-    function validCommissionRates(data) {
-      return data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH']) &&
-        validNonNegativeNumber(data.AIRTEL) &&
-        validNonNegativeNumber(data.DIALOG) &&
-        validNonNegativeNumber(data.MOBITEL) &&
-        validNonNegativeNumber(data.HUTCH);
+    function validUserProfile(data) {
+      return data.keys().hasOnly(['email', 'role', 'createdAt', 'updatedAt', 'lastLogin']) &&
+        data.email is string &&
+        data.role in ['admin', 'user'] &&
+        (!('createdAt' in data) || data.createdAt is timestamp) &&
+        (!('updatedAt' in data) || data.updatedAt is timestamp) &&
+        (!('lastLogin' in data) || data.lastLogin is timestamp);
+    }
+
+    function validInventory(data) {
+      return data.keys().hasOnly([
+          'code', 'name', 'category', 'itemType', 'sellingPrice', 'costPrice',
+          'stockQuantity', 'lowStockThreshold', 'createdAt', 'updatedAt'
+        ]) &&
+        data.code is string && data.code.size() > 0 &&
+        data.name is string && data.name.size() > 0 &&
+        data.category is string &&
+        data.itemType in ['product', 'service'] &&
+        nonNegative(data.sellingPrice) &&
+        nonNegative(data.costPrice) &&
+        nonNegative(data.stockQuantity) &&
+        nonNegative(data.lowStockThreshold);
+    }
+
+    function validStationeryTransaction(data) {
+      return data.keys().hasOnly([
+          'date', 'time', 'createdBy', 'itemCode', 'itemName', 'inventoryId',
+          'category', 'itemType', 'costPrice', 'sellingPrice', 'unitProfit',
+          'profit', 'quantity', 'totalAmount', 'timestamp', 'updatedAt'
+        ]) &&
+        data.createdBy is string &&
+        data.itemCode is string &&
+        data.itemName is string &&
+        data.category is string &&
+        data.itemType in ['product', 'service'] &&
+        nonNegative(data.costPrice) &&
+        nonNegative(data.sellingPrice) &&
+        data.unitProfit is number &&
+        data.profit is number &&
+        data.quantity is number && data.quantity > 0 &&
+        nonNegative(data.totalAmount) &&
+        data.date is string &&
+        (!('time' in data) || data.time is string) &&
+        (!('inventoryId' in data) || data.inventoryId is string) &&
+        (!('timestamp' in data) || data.timestamp is timestamp) &&
+        (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function validReloadTransaction(data) {
+      return data.keys().hasOnly([
+          'date', 'time', 'createdBy', 'operator', 'phone', 'amount',
+          'commissionRate', 'commissionAmount', 'timestamp', 'updatedAt'
+        ]) &&
+        data.createdBy is string &&
+        data.operator in ['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH'] &&
+        data.phone is string &&
+        nonNegative(data.amount) && data.amount > 0 &&
+        nonNegative(data.commissionRate) &&
+        nonNegative(data.commissionAmount) &&
+        data.date is string &&
+        (!('time' in data) || data.time is string) &&
+        (!('timestamp' in data) || data.timestamp is timestamp) &&
+        (!('updatedAt' in data) || data.updatedAt is timestamp);
     }
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow create, update: if isAdmin() &&
-        request.resource.data.keys().hasOnly(['email', 'role', 'createdAt', 'updatedAt']) &&
-        request.resource.data.email is string &&
-        request.resource.data.role in ['admin', 'staff'];
-      allow delete: if isAdmin();
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if (isAdmin() &&
+          validUserProfile(request.resource.data)) ||
+        (signedIn() &&
+          request.auth.uid == userId &&
+          validUserProfile(request.resource.data) &&
+          request.resource.data.email == request.auth.token.email &&
+          request.resource.data.role == (isOwnerAccount() ? 'admin' : 'user'));
+      allow update: if isAdmin() && validUserProfile(request.resource.data) ||
+        (signedIn() && request.auth.uid == userId &&
+          validUserProfile(request.resource.data) &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['email', 'lastLogin', 'updatedAt']));
+      allow delete: if isAdmin() && userId != request.auth.uid;
     }
 
     match /inventory/{itemId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() &&
-        request.resource.data.code is string &&
-        request.resource.data.code.size() > 0 &&
-        request.resource.data.name is string &&
-        request.resource.data.name.size() > 0 &&
-        request.resource.data.category is string &&
-        request.resource.data.itemType in ['product', 'service'] &&
-        validNonNegativeNumber(request.resource.data.sellingPrice) &&
-        validNonNegativeNumber(request.resource.data.costPrice) &&
-        validNonNegativeNumber(request.resource.data.stockQuantity) &&
-        validNonNegativeNumber(request.resource.data.lowStockThreshold);
+      allow read: if signedIn();
+      allow create: if isAdmin() && validInventory(request.resource.data);
+      allow update: if isAdmin() && validInventory(request.resource.data) ||
+        (signedIn() &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['stockQuantity', 'updatedAt']) &&
+          nonNegative(request.resource.data.stockQuantity) &&
+          (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp));
       allow delete: if isAdmin();
     }
 
     match /stationery_transactions/{transactionId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() &&
-        request.resource.data.itemCode is string &&
-        request.resource.data.itemName is string &&
-        request.resource.data.category is string &&
-        request.resource.data.itemType in ['product', 'service'] &&
-        validNonNegativeNumber(request.resource.data.sellingPrice) &&
-        validNonNegativeNumber(request.resource.data.costPrice) &&
-        request.resource.data.unitProfit is number &&
-        request.resource.data.profit is number &&
-        request.resource.data.quantity is number &&
-        request.resource.data.quantity > 0 &&
-        validNonNegativeNumber(request.resource.data.totalAmount) &&
-        request.resource.data.date is string;
-      allow update: if isAuthenticated() &&
-        request.resource.data.itemCode is string &&
-        request.resource.data.itemName is string &&
-        request.resource.data.itemType in ['product', 'service'] &&
-        validNonNegativeNumber(request.resource.data.sellingPrice) &&
-        validNonNegativeNumber(request.resource.data.costPrice) &&
-        request.resource.data.unitProfit is number &&
-        request.resource.data.profit is number &&
-        request.resource.data.quantity is number &&
-        request.resource.data.quantity > 0 &&
-        validNonNegativeNumber(request.resource.data.totalAmount) &&
-        request.resource.data.date is string;
-      allow delete: if isAuthenticated();
+      allow read: if signedIn() &&
+        (isAdmin() || resource.data.createdBy == request.auth.uid);
+      allow create: if signedIn() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        validStationeryTransaction(request.resource.data);
+      allow update: if isAdmin() && validStationeryTransaction(request.resource.data);
+      allow delete: if signedIn() &&
+        (isAdmin() || resource.data.createdBy == request.auth.uid);
     }
 
     match /reload_transactions/{reloadId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() &&
-        request.resource.data.operator in ['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH'] &&
-        validNonNegativeNumber(request.resource.data.amount) &&
-        request.resource.data.amount > 0 &&
-        validNonNegativeNumber(request.resource.data.commissionRate) &&
-        validNonNegativeNumber(request.resource.data.commissionAmount) &&
-        request.resource.data.date is string;
-      allow update: if isAuthenticated() &&
-        request.resource.data.operator in ['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH'] &&
-        validNonNegativeNumber(request.resource.data.amount) &&
-        request.resource.data.amount > 0 &&
-        validNonNegativeNumber(request.resource.data.commissionRate) &&
-        validNonNegativeNumber(request.resource.data.commissionAmount) &&
-        request.resource.data.date is string;
-      allow delete: if isAuthenticated();
+      allow read: if signedIn() &&
+        (isAdmin() || resource.data.createdBy == request.auth.uid);
+      allow create: if signedIn() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        validReloadTransaction(request.resource.data);
+      allow update: if isAdmin() && validReloadTransaction(request.resource.data);
+      allow delete: if signedIn() &&
+        (isAdmin() || resource.data.createdBy == request.auth.uid);
     }
 
     match /settings/{settingDoc} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAdmin() && (
-        (settingDoc == 'rates' && validCommissionRates(request.resource.data)) ||
-        (settingDoc == 'presets' &&
+      allow read: if signedIn();
+      allow create, update: if isAdmin() &&
+        ((settingDoc == 'rates' &&
+          request.resource.data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH']) &&
+          nonNegative(request.resource.data.AIRTEL) &&
+          nonNegative(request.resource.data.DIALOG) &&
+          nonNegative(request.resource.data.MOBITEL) &&
+          nonNegative(request.resource.data.HUTCH)) ||
+         (settingDoc == 'presets' &&
           request.resource.data.keys().hasOnly(['list']) &&
-          request.resource.data.list is list)
-      );
+          request.resource.data.list is list));
       allow delete: if isAdmin();
     }
 
+    match /user_settings/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create, update: if signedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.keys().hasOnly([
+          'activeTheme', 'gradientBlurEnabled', 'uiStyle', 'dashboardOrder', 'updatedAt'
+        ]) &&
+        (!('activeTheme' in request.resource.data) ||
+          request.resource.data.activeTheme in ['modern-slate', 'emerald-store', 'sapphire-blue', 'warm-amber']) &&
+        (!('gradientBlurEnabled' in request.resource.data) ||
+          request.resource.data.gradientBlurEnabled is bool) &&
+        (!('uiStyle' in request.resource.data) ||
+          request.resource.data.uiStyle in ['default', 'glass']) &&
+        (!('dashboardOrder' in request.resource.data) ||
+          (request.resource.data.dashboardOrder is map &&
+           request.resource.data.dashboardOrder.keys().hasOnly(['metrics', 'actions']) &&
+           request.resource.data.dashboardOrder.metrics is list &&
+           request.resource.data.dashboardOrder.actions is list)) &&
+        (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
+      allow delete: if signedIn() && request.auth.uid == userId;
+    }
+
     match /diagnostics/{diagId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() &&
+      allow read: if signedIn();
+      allow create: if signedIn() &&
         request.resource.data.test is string &&
         request.resource.data.timestamp is timestamp;
     }
 
     match /system_health/{healthDoc} {
-      allow read: if isAuthenticated();
+      allow read: if signedIn();
       allow write: if isAdmin();
     }
 

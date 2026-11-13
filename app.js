@@ -11,6 +11,7 @@ import {
   auth,
   db,
   secondaryAuth,
+  authPersistenceReady,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -35,16 +36,36 @@ import {
   runTransaction
 } from './firebase-config.js';
 
+const ADMIN_EMAIL = 'lasasdias11@gmail.com';
+const DEFAULT_DASHBOARD_ORDER = {
+  metrics: [
+    'card-dash-stationery',
+    'card-dash-reloads',
+    'card-dash-commission',
+    'card-dash-stationery-profit',
+    'card-dash-catalog',
+    'card-dash-combined-profit',
+    'profit-today',
+    'profit-month',
+    'profit-year'
+  ],
+  actions: ['action-stationery', 'action-reloads', 'action-stock', 'action-logs']
+};
+
 // =============================================================================
 // 1. GLOBAL APPLICATION STATE (V5.0 ARCHITECTURE)
 // =============================================================================
 
 export const APP_STATE = {
   currentUser: null,
-  currentRole: 'staff',
+  currentRole: 'user',
   activeView: 'dashboard',
+  previousView: 'dashboard',
   activeTheme: localStorage.getItem('al_theme_preference') || 'modern-slate',
   gradientBlurEnabled: localStorage.getItem('al_gradient_blur') !== 'false',
+  uiStyle: localStorage.getItem('al_ui_style') || 'default',
+  dashboardOrder: DEFAULT_DASHBOARD_ORDER,
+  userProfiles: [],
   inventoryCatalog: [],
   todayStationeryTransactions: [],
   todayReloadTransactions: [],
@@ -161,16 +182,23 @@ function escapeHTML(str) {
 }
 
 async function removeTransaction(type, transactionRecord) {
-  if (!auth.currentUser) throw new Error('Sign in before deleting transactions.');
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error('Sign in before deleting transactions.');
+  const currentUserId = currentUser.uid;
+  const isAdmin = APP_STATE.currentRole === 'admin';
 
   const collectionName = type === 'RELOAD' ? 'reload_transactions' : 'stationery_transactions';
   const transactionRef = doc(db, collectionName, transactionRecord.id);
-  await runTransaction(db, async firestoreTransaction => {
+  const stockRestored = await runTransaction(db, async firestoreTransaction => {
     const transactionSnapshot = await firestoreTransaction.get(transactionRef);
     if (!transactionSnapshot.exists()) throw new Error('This transaction no longer exists.');
 
     const data = transactionSnapshot.data();
+    if (!isAdmin && data.createdBy !== currentUserId) {
+      throw new Error('You can delete only transactions recorded by your account.');
+    }
     const isPhysicalSale = type !== 'RELOAD' && data.itemType !== 'service';
+    let restored = false;
     if (isPhysicalSale) {
       const catalogItem = data.inventoryId
         ? { id: data.inventoryId }
@@ -182,7 +210,7 @@ async function removeTransaction(type, transactionRecord) {
         if (!inventorySnapshot.exists()) {
           throw new Error('The original inventory item is missing; the transaction was not deleted.');
         }
-        const quantity = Number(data.quantity || 1);
+        const quantity = Number(data.quantity ?? 1);
         if (!Number.isFinite(quantity) || quantity <= 0) {
           throw new Error('The transaction has an invalid quantity; the transaction was not deleted.');
         }
@@ -190,11 +218,16 @@ async function removeTransaction(type, transactionRecord) {
           stockQuantity: increment(quantity),
           updatedAt: serverTimestamp()
         });
+        restored = true;
+      } else if (data.inventoryId) {
+        throw new Error('The original inventory item is missing; the transaction was not deleted.');
       }
     }
 
     firestoreTransaction.delete(transactionRef);
+    return restored;
   });
+  return stockRestored;
 }
 
 // =============================================================================
@@ -291,6 +324,7 @@ export function applyTheme(themeName) {
 function initThemeSystem() {
   applyTheme(APP_STATE.activeTheme);
   setGradientBlurEnabled(APP_STATE.gradientBlurEnabled);
+  setUIStyle(APP_STATE.uiStyle);
 
   // Quick Header Light/Dark Toggle
   const quickToggle = document.getElementById('themeQuickToggleBtn');
@@ -298,6 +332,7 @@ function initThemeSystem() {
     quickToggle.addEventListener('click', () => {
       const nextTheme = APP_STATE.activeTheme === 'emerald-store' ? 'modern-slate' : 'emerald-store';
       applyTheme(nextTheme);
+      saveUserPreferences({ activeTheme: nextTheme });
       showToast(`Switched to ${nextTheme === 'emerald-store' ? 'Light Mode' : 'Dark Mode'}`, 'info');
     });
   }
@@ -307,6 +342,7 @@ function initThemeSystem() {
     btn.addEventListener('click', () => {
       const chosen = btn.getAttribute('data-theme-choice');
       applyTheme(chosen);
+      saveUserPreferences({ activeTheme: chosen });
       showToast(`Theme applied: ${chosen}`, 'success');
     });
   });
@@ -315,12 +351,20 @@ function initThemeSystem() {
   if (blurToggle) {
     blurToggle.checked = APP_STATE.gradientBlurEnabled;
     blurToggle.addEventListener('change', () => {
-      setGradientBlurEnabled(blurToggle.checked);
+      setGradientBlurEnabled(blurToggle.checked, true);
     });
   }
+
+  const uiStyleToggle = document.getElementById('uiStyleToggle');
+  if (uiStyleToggle) {
+    uiStyleToggle.checked = APP_STATE.uiStyle === 'glass';
+    uiStyleToggle.addEventListener('change', () => setUIStyle(uiStyleToggle.checked ? 'glass' : 'default', true));
+  }
+
+  document.getElementById('resetDashboardLayoutBtn')?.addEventListener('click', resetDashboardLayout);
 }
 
-function setGradientBlurEnabled(enabled) {
+function setGradientBlurEnabled(enabled, persist = false) {
   APP_STATE.gradientBlurEnabled = Boolean(enabled);
   document.documentElement.dataset.gradientBlur = enabled ? 'on' : 'off';
   localStorage.setItem('al_gradient_blur', String(Boolean(enabled)));
@@ -328,6 +372,20 @@ function setGradientBlurEnabled(enabled) {
   const stateLabel = document.getElementById('gradientBlurState');
   if (toggle) toggle.checked = Boolean(enabled);
   if (stateLabel) stateLabel.textContent = enabled ? 'On' : 'Off';
+  const profileToggle = document.getElementById('profileBlurToggleBtn');
+  if (profileToggle) profileToggle.textContent = `Gradient Blur: ${enabled ? 'On' : 'Off'}`;
+  if (persist) saveUserPreferences({ gradientBlurEnabled: Boolean(enabled) });
+}
+
+function setUIStyle(style, persist = false) {
+  APP_STATE.uiStyle = style === 'glass' ? 'glass' : 'default';
+  document.documentElement.dataset.uiStyle = APP_STATE.uiStyle;
+  localStorage.setItem('al_ui_style', APP_STATE.uiStyle);
+  const toggle = document.getElementById('uiStyleToggle');
+  if (toggle) toggle.checked = APP_STATE.uiStyle === 'glass';
+  const profileToggle = document.getElementById('profileUIStyleToggleBtn');
+  if (profileToggle) profileToggle.textContent = `UI Style: ${APP_STATE.uiStyle === 'glass' ? 'Glass' : 'Default'}`;
+  if (persist) saveUserPreferences({ uiStyle: APP_STATE.uiStyle });
 }
 
 // =============================================================================
@@ -383,9 +441,14 @@ export function detectOperatorFromPrefix(phone) {
 // =============================================================================
 
 export function switchView(viewName) {
-  const validViews = ['dashboard', 'stationery', 'reloads', 'stock', 'logs'];
+  if (!auth.currentUser) {
+    showToast('Sign in before opening protected pages.', 'error');
+    return false;
+  }
+  const validViews = ['dashboard', 'stationery', 'reloads', 'stock', 'logs', 'profile'];
   if (!validViews.includes(viewName)) viewName = 'dashboard';
 
+  if (viewName !== 'profile') APP_STATE.previousView = viewName;
   APP_STATE.activeView = viewName;
 
   // Toggle view containers
@@ -415,6 +478,7 @@ export function switchView(viewName) {
       btn.className = 'mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted';
     }
   });
+  document.getElementById('openProfileBtn')?.classList.toggle('active', viewName === 'profile');
 
   // Contextual view refreshes
   if (viewName === 'stock') {
@@ -427,6 +491,7 @@ export function switchView(viewName) {
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
   logDebug(`Switched active view to: ${viewName}`);
+  return true;
 }
 
 function initNavigation() {
@@ -909,9 +974,28 @@ export function updateDashboardMetrics() {
     reloadCommission += Number(r.commissionAmount || 0);
   });
 
+  const today = getTodayDateString();
+  const periodProfit = (prefixLength) => {
+    const matchesPeriod = record => String(record.date || '').slice(0, prefixLength) === today.slice(0, prefixLength);
+    const stationeryProfit = APP_STATE.masterStationeryRecords
+      .filter(matchesPeriod)
+      .reduce((sum, record) => sum + Number(
+        record.profit !== undefined
+          ? record.profit
+          : (Number(record.sellingPrice || 0) - Number(record.costPrice || 0)) * Number(record.quantity || 1)
+      ), 0);
+    const reloadProfit = APP_STATE.masterReloadRecords
+      .filter(matchesPeriod)
+      .reduce((sum, record) => sum + Number(record.commissionAmount || 0), 0);
+    return roundCurrency(stationeryProfit + reloadProfit);
+  };
+  const todayProfit = roundCurrency(statProfitToday + reloadCommission);
+  const monthProfit = periodProfit(7);
+  const yearProfit = periodProfit(4);
+
   // Combined Totals
   const combinedRevenue = roundCurrency(statSales + reloadVolume);
-  const combinedTotalProfit = roundCurrency(statProfitToday + reloadCommission);
+  const combinedTotalProfit = todayProfit;
 
   // Exact 6 Dashboard Metric Cards
   const elCombinedRevenue = document.getElementById('dashTodayCombinedRevenue');
@@ -922,16 +1006,22 @@ export function updateDashboardMetrics() {
   const elStatProfit = document.getElementById('dashStationeryProfit');
   const elCatalogCount = document.getElementById('dashCatalogCount');
   const elCombinedProfit = document.getElementById('dashCombinedTotalProfit');
+  const elProfitToday = document.getElementById('dashProfitToday');
+  const elProfitMonth = document.getElementById('dashProfitMonth');
+  const elProfitYear = document.getElementById('dashProfitYear');
 
   if (elCombinedRevenue) elCombinedRevenue.textContent = formatLKR(combinedRevenue);
   if (elStatSales) elStatSales.textContent = formatLKR(statSales);
   if (elStatUnits) elStatUnits.textContent = String(statUnits);
   if (elReloadVol) elReloadVol.textContent = formatLKR(reloadVolume);
-  // Clean LKR amount only - strictly no "Comm." text
+  // Display the full currency amount without a shortened commission label.
   if (elReloadComm) elReloadComm.textContent = formatLKR(reloadCommission);
   if (elStatProfit) elStatProfit.textContent = formatLKR(statProfitToday);
   if (elCatalogCount) elCatalogCount.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
   if (elCombinedProfit) elCombinedProfit.textContent = formatLKR(combinedTotalProfit);
+  if (elProfitToday) elProfitToday.textContent = formatLKR(todayProfit);
+  if (elProfitMonth) elProfitMonth.textContent = formatLKR(monthProfit);
+  if (elProfitYear) elProfitYear.textContent = formatLKR(yearProfit);
 
   // Also update paired cards in Master Logs
   updateMasterLogsPairedCards();
@@ -1159,7 +1249,7 @@ export function applyMasterLogFilters() {
   const elLogReloadStats = document.getElementById('logPairedReloadStats');
 
   if (elLogReloadVol) elLogReloadVol.textContent = formatLKR(filteredReloadVol);
-  // Clean LKR amount only - strictly NO "Comm." text
+  // Display the full currency amount without a shortened commission label.
   if (elLogReloadComm) elLogReloadComm.textContent = `+${formatLKR(filteredReloadComm)}`;
   if (elLogReloadStats) elLogReloadStats.textContent = `${filteredReloadCount} reload transactions`;
 
@@ -1289,7 +1379,7 @@ function renderMasterLogsTable(rows) {
         +${formatLKR(item.profit)}
       </td>
       <td class="py-2.5 px-3 text-center">
-        <button type="button" class="delete-tx-btn p-1 text-red-400 hover:text-red-300 transition" title="Delete record" aria-label="Delete transaction">
+        <button type="button" class="delete-tx-btn min-h-11 min-w-11 p-1 text-red-400 hover:text-red-300 transition" title="Delete record" aria-label="Delete transaction">
           <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </td>
@@ -1300,8 +1390,8 @@ function renderMasterLogsTable(rows) {
       deleteBtn.addEventListener('click', async () => {
         if (!confirm(`Delete transaction for "${item.title}" (${formatLKR(item.amount)})?`)) return;
         try {
-          await removeTransaction(item.type, item.raw);
-          showToast(item.type === 'STATIONERY' && item.raw.itemType !== 'service'
+          const restored = await removeTransaction(item.type, item.raw);
+          showToast(restored
             ? 'Transaction deleted and stock restored'
             : 'Transaction record deleted', 'success');
         } catch (err) {
@@ -1895,6 +1985,7 @@ function initStationeryPOS() {
       const transactionPayload = {
         date: getTodayDateString(),
         time: getCurrentTimeString(),
+        createdBy: auth.currentUser.uid,
         itemCode,
         itemName,
         ...(matchedItem?.id && !isService ? { inventoryId: matchedItem.id } : {}),
@@ -2002,7 +2093,7 @@ function renderRecentStationeryFeed() {
           <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.totalAmount)}</span>
           <span class="text-[10px] theme-text-dim block">+${formatLKR(item.profit || 0)} margin</span>
         </div>
-        <button type="button" class="recent-delete-btn text-red-400 hover:text-red-300" aria-label="Delete transaction" title="Delete transaction">
+        <button type="button" class="recent-delete-btn min-h-11 min-w-11 text-red-400 hover:text-red-300" aria-label="Delete transaction" title="Delete transaction">
           <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>
@@ -2010,8 +2101,8 @@ function renderRecentStationeryFeed() {
     div.querySelector('.recent-delete-btn')?.addEventListener('click', async () => {
       if (!confirm(`Delete transaction for "${item.itemName}"?`)) return;
       try {
-        await removeTransaction('STATIONERY', item);
-        showToast(item.itemType === 'service' ? 'Transaction record deleted' : 'Transaction deleted and stock restored', 'success');
+        const restored = await removeTransaction('STATIONERY', item);
+        showToast(restored ? 'Transaction deleted and stock restored' : 'Transaction record deleted', 'success');
       } catch (err) {
         showToast(`Delete failed: ${err.message}`, 'error');
       }
@@ -2171,6 +2262,7 @@ function initMobileReloads() {
       const payload = {
         date: getTodayDateString(),
         time: getCurrentTimeString(),
+        createdBy: auth.currentUser.uid,
         operator,
         phone: phone || 'Walk-in Customer',
         amount,
@@ -2181,7 +2273,7 @@ function initMobileReloads() {
 
       try {
         await addDoc(collection(db, 'reload_transactions'), payload);
-        showToast(`Recorded ${operator} reload of ${formatLKR(amount)} (+${formatLKR(commissionAmount)} comm.)`, 'success');
+        showToast(`Recorded ${operator} reload of ${formatLKR(amount)} (+${formatLKR(commissionAmount)} commission)`, 'success');
         form.reset();
         if (detectedBadge) detectedBadge.classList.add('hidden');
         selectOperator(operator);
@@ -2224,9 +2316,9 @@ function renderRecentReloadsFeed() {
         <div class="flex items-center gap-2">
           <div class="text-right">
             <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.amount)}</span>
-            <span class="text-[10px] theme-text-dim block font-mono">+${formatLKR(item.commissionAmount)} comm.</span>
+            <span class="text-[10px] theme-text-dim block font-mono">+${formatLKR(item.commissionAmount)} commission</span>
           </div>
-          <button type="button" class="recent-delete-btn text-red-400 hover:text-red-300" aria-label="Delete transaction" title="Delete transaction">
+          <button type="button" class="recent-delete-btn min-h-11 min-w-11 text-red-400 hover:text-red-300" aria-label="Delete transaction" title="Delete transaction">
             <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
           </button>
       </div>
@@ -2336,6 +2428,10 @@ function initSettingsCatalog() {
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (APP_STATE.currentRole !== 'admin') {
+        showToast('Only an admin can edit the master catalog.', 'error');
+        return;
+      }
       const code = codeInput.value.trim().toUpperCase();
       const rawName = nameInput.value.trim();
       const name = toTitleCase(rawName); // Auto Title Case
@@ -2402,6 +2498,10 @@ function initSettingsCatalog() {
   // Seed Button
   if (seedBtn) {
     seedBtn.addEventListener('click', async () => {
+      if (APP_STATE.currentRole !== 'admin') {
+        showToast('Only an admin can add catalog items.', 'error');
+        return;
+      }
       if (!confirm('Seed standard Sri Lankan retail stationery and utility bills into your catalog? Existing codes will not be overwritten.')) return;
 
       let addedCount = 0;
@@ -2471,6 +2571,12 @@ export function renderCatalogTable() {
     const costDisplay = isService ? '<span class="theme-text-dim font-mono">N/A</span>' : `<span class="font-mono font-bold text-amber-400">${formatLKR(item.costPrice)}</span>`;
     const profitDisplay = isService ? '<span class="theme-text-dim font-mono">Custom</span>' : `<span class="font-mono font-bold text-sky-400">+${formatLKR(item.sellingPrice - item.costPrice)}</span>`;
     const stockDisplay = isService ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[11px] font-bold">No Qty</span>` : `<span class="font-mono font-bold ${item.stockQuantity <= 5 ? 'text-red-400' : 'theme-text-main'}">${escapeHTML(item.stockQuantity)}</span>`;
+    const actions = APP_STATE.currentRole === 'admin'
+      ? `<div class="flex items-center justify-center gap-1.5">
+          <button type="button" class="edit-cat-btn min-h-11 px-2 py-1 rounded bg-sky-500/15 text-sky-400 hover:bg-sky-500 hover:text-white text-[11px] font-bold transition">Edit</button>
+          <button type="button" class="del-cat-btn min-h-11 px-2 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-[11px] font-bold transition">Delete</button>
+        </div>`
+      : '<span class="text-xs theme-text-dim">Read only</span>';
 
     tr.innerHTML = `
       <td class="py-2.5 px-3 font-mono font-bold text-xs theme-text-main">${escapeHTML(item.code)}</td>
@@ -2484,10 +2590,7 @@ export function renderCatalogTable() {
       <td class="py-2.5 px-3 text-right text-xs">${profitDisplay}</td>
       <td class="py-2.5 px-3 text-center text-xs">${stockDisplay}</td>
       <td class="py-2.5 px-3 text-center">
-        <div class="flex items-center justify-center gap-1.5">
-          <button type="button" class="edit-cat-btn px-2 py-1 rounded bg-sky-500/15 text-sky-400 hover:bg-sky-500 hover:text-white text-[11px] font-bold transition">Edit</button>
-          <button type="button" class="del-cat-btn px-2 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-[11px] font-bold transition">Delete</button>
-        </div>
+        ${actions}
       </td>
     `;
 
@@ -2495,6 +2598,7 @@ export function renderCatalogTable() {
     const editBtn = tr.querySelector('.edit-cat-btn');
     if (editBtn) {
       editBtn.addEventListener('click', () => {
+        if (APP_STATE.currentRole !== 'admin') return;
         document.getElementById('catalogDocId').value = item.id;
         document.getElementById('catalogCode').value = item.code;
         document.getElementById('catalogName').value = item.name;
@@ -2522,6 +2626,10 @@ export function renderCatalogTable() {
     const delBtn = tr.querySelector('.del-cat-btn');
     if (delBtn) {
       delBtn.addEventListener('click', async () => {
+        if (APP_STATE.currentRole !== 'admin') {
+          showToast('Only an admin can delete catalog items.', 'error');
+          return;
+        }
         if (!confirm(`Delete "${item.name}" (${item.code}) from master inventory catalog?`)) return;
         try {
           await deleteDoc(doc(db, 'inventory', item.id));
@@ -2593,6 +2701,10 @@ function createConfigurationSnapshot() {
 }
 
 export async function applyConfigurationBackup(snapshot) {
+  if (APP_STATE.currentRole !== 'admin') {
+    showToast('Only an admin can restore application settings.', 'error');
+    return false;
+  }
   if (!snapshot || typeof snapshot !== 'object') {
     showToast('Invalid backup file or snapshot structure', 'error');
     return false;
@@ -2667,6 +2779,7 @@ function initBackupRestoreSystem() {
   // Save Snapshot to localStorage
   if (saveSnapshotBtn) {
     saveSnapshotBtn.addEventListener('click', () => {
+      if (APP_STATE.currentRole !== 'admin') return;
       const snap = createConfigurationSnapshot();
       localStorage.setItem('al_settings_backup_snapshot', JSON.stringify(snap));
       updateBackupStatusDisplay();
@@ -2677,6 +2790,7 @@ function initBackupRestoreSystem() {
   // Download .JSON Backup File
   if (downloadJsonBtn) {
     downloadJsonBtn.addEventListener('click', () => {
+      if (APP_STATE.currentRole !== 'admin') return;
       const snap = createConfigurationSnapshot();
       const jsonStr = JSON.stringify(snap, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -2695,6 +2809,7 @@ function initBackupRestoreSystem() {
   // Restore from localStorage Snapshot
   if (restoreSnapshotBtn) {
     restoreSnapshotBtn.addEventListener('click', async () => {
+      if (APP_STATE.currentRole !== 'admin') return;
       const savedRaw = localStorage.getItem('al_settings_backup_snapshot');
       if (!savedRaw) {
         showToast('No saved snapshot found in local storage. Save one first or upload a JSON backup file.', 'error');
@@ -2716,6 +2831,11 @@ function initBackupRestoreSystem() {
   // Upload and Restore from JSON file
   if (uploadInput) {
     uploadInput.addEventListener('change', (e) => {
+      if (APP_STATE.currentRole !== 'admin') {
+        uploadInput.value = '';
+        showToast('Only an admin can restore application settings.', 'error');
+        return;
+      }
       const file = e.target.files?.[0];
       if (!file) return;
 
@@ -2760,9 +2880,13 @@ function initSettingsPanels() {
       span.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border theme-border theme-bg-surface text-xs font-bold font-mono';
       span.innerHTML = `
         <span>Rs. ${escapeHTML(val)}</span>
-        <button type="button" class="del-preset-btn text-red-400 hover:text-red-300 ml-1 text-sm font-bold">&times;</button>
+        <button type="button" class="del-preset-btn min-h-11 min-w-11 text-red-400 hover:text-red-300 ml-1 text-sm font-bold" aria-label="Remove preset Rs. ${escapeHTML(val)}">&times;</button>
       `;
       span.querySelector('.del-preset-btn')?.addEventListener('click', async () => {
+        if (APP_STATE.currentRole !== 'admin') {
+          showToast('Only an admin can change reload presets.', 'error');
+          return;
+        }
         APP_STATE.reloadPresets = APP_STATE.reloadPresets.filter(p => p !== val);
         await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
         renderSettingsPresetsTags();
@@ -2778,6 +2902,10 @@ function initSettingsPanels() {
   if (addPresetForm) {
     addPresetForm.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (APP_STATE.currentRole !== 'admin') {
+        showToast('Only an admin can change reload presets.', 'error');
+        return;
+      }
       const input = document.getElementById('newPresetAmountInput');
       const val = parseInt(input?.value, 10);
       if (!val || val < 10) return;
@@ -2795,6 +2923,7 @@ function initSettingsPanels() {
 
   if (resetPresetsBtn) {
     resetPresetsBtn.addEventListener('click', async () => {
+      if (APP_STATE.currentRole !== 'admin') return;
       APP_STATE.reloadPresets = [50, 100, 200, 500, 1000];
       await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
       renderSettingsPresetsTags();
@@ -2808,6 +2937,10 @@ function initSettingsPanels() {
   if (commForm) {
     commForm.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (APP_STATE.currentRole !== 'admin') {
+        showToast('Only an admin can change commission rates.', 'error');
+        return;
+      }
       const airtel = parseFloat(document.getElementById('rateAirtelInput')?.value) || 6.80;
       const dialog = parseFloat(document.getElementById('rateDialogInput')?.value) || 3.80;
       const mobitel = parseFloat(document.getElementById('rateMobitelInput')?.value) || 6.80;
@@ -2845,7 +2978,19 @@ function initSettingsPanels() {
       }
       try {
         await updateEmail(auth.currentUser, newEmail);
-        showToast(`Email updated to ${newEmail}`, 'success');
+        let profileSynced = true;
+        try {
+          await setDoc(doc(db, 'users', auth.currentUser.uid), {
+            email: newEmail,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        } catch (syncError) {
+          profileSynced = false;
+          logDebug(`Updated email profile sync failed: ${syncError.message}`, 'ERROR');
+        }
+        showToast(profileSynced
+          ? `Email updated to ${newEmail}`
+          : 'Email changed, but the account profile could not be synced.', profileSynced ? 'success' : 'error');
         const badge = document.getElementById('userEmailBadge');
         if (badge) badge.textContent = newEmail;
         APP_STATE.currentUser = auth.currentUser;
@@ -2934,10 +3079,12 @@ function updateProfileDisplay(user = APP_STATE.currentUser) {
   const email = document.getElementById('profileAccountEmail');
   const roleBadge = document.getElementById('profileAccountRole');
   const createAccountPanel = document.getElementById('createStaffAccountPanel');
+  const usersPanel = document.getElementById('adminUsersPanel');
+  const lastLogin = document.getElementById('profileLastLogin');
   const isAdmin = APP_STATE.currentRole === 'admin';
   if (email) email.textContent = user?.email || '';
   if (roleBadge) {
-    roleBadge.textContent = isAdmin ? 'Admin' : 'Staff / User';
+    roleBadge.textContent = isAdmin ? 'Admin' : 'Standard User';
     roleBadge.className = `inline-flex mt-3 px-2.5 py-1 rounded-full text-xs font-bold border ${
       isAdmin
         ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
@@ -2945,13 +3092,90 @@ function updateProfileDisplay(user = APP_STATE.currentUser) {
     }`;
   }
   if (createAccountPanel) createAccountPanel.classList.toggle('hidden', !isAdmin);
+  if (usersPanel) usersPanel.classList.toggle('hidden', !isAdmin);
+  const loginTime = APP_STATE.userProfiles.find(profile => profile.id === user?.uid)?.lastLogin;
+  if (lastLogin) lastLogin.textContent = loginTime?.toDate ? loginTime.toDate().toLocaleString() : 'Current session';
+  renderAdminUsers();
+}
+
+function renderAdminUsers() {
+  const list = document.getElementById('adminUsersList');
+  if (!list || APP_STATE.currentRole !== 'admin') return;
+  list.replaceChildren();
+  if (!APP_STATE.userProfiles.length) {
+    const empty = document.createElement('p');
+    empty.className = 'text-xs theme-text-dim';
+    empty.textContent = 'No account profiles have synced yet.';
+    list.appendChild(empty);
+    return;
+  }
+
+  APP_STATE.userProfiles
+    .slice()
+    .sort((a, b) => String(a.email || '').localeCompare(String(b.email || '')))
+    .forEach(profile => {
+      const row = document.createElement('div');
+      row.className = 'flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border theme-border theme-bg-surface';
+      const identity = document.createElement('div');
+      identity.className = 'min-w-0';
+      const userEmail = document.createElement('div');
+      userEmail.className = 'break-all text-sm font-semibold theme-text-main';
+      userEmail.textContent = profile.email || 'Email unavailable';
+      const role = document.createElement('div');
+      role.className = 'mt-1 text-xs theme-text-dim';
+      role.textContent = profile.role === 'admin' ? 'Admin' : 'Standard User';
+      identity.append(userEmail, role);
+      row.appendChild(identity);
+
+      if (profile.id !== auth.currentUser?.uid && profile.email?.toLowerCase() !== ADMIN_EMAIL) {
+        const roleButton = document.createElement('button');
+        roleButton.type = 'button';
+        roleButton.className = 'min-h-11 px-3 py-2 rounded-lg text-xs font-bold border theme-border hover:theme-bg-elevated';
+        roleButton.textContent = profile.role === 'admin' ? 'Demote to User' : 'Promote to Admin';
+        roleButton.addEventListener('click', async () => {
+          if (!auth.currentUser || APP_STATE.currentRole !== 'admin') return;
+          const nextRole = profile.role === 'admin' ? 'user' : 'admin';
+          if (!confirm(`Set ${profile.email} role to ${nextRole === 'admin' ? 'Admin' : 'Standard User'}?`)) return;
+          try {
+            await updateDoc(doc(db, 'users', profile.id), {
+              role: nextRole,
+              updatedAt: serverTimestamp()
+            });
+            showToast(`Updated role for ${profile.email}`, 'success');
+          } catch (error) {
+            showToast(`Role update failed: ${error.message}`, 'error');
+          }
+        });
+        row.appendChild(roleButton);
+      }
+      list.appendChild(row);
+    });
+}
+
+function applyRolePermissions() {
+  const isAdmin = APP_STATE.currentRole === 'admin';
+  document.getElementById('catalogItemForm')?.classList.toggle('hidden', !isAdmin);
+  document.getElementById('seedCatalogBtn')?.classList.toggle('hidden', !isAdmin);
+  document.getElementById('commissionsForm')?.classList.toggle('hidden', !isAdmin);
+  document.getElementById('addPresetForm')?.classList.toggle('hidden', !isAdmin);
+  document.getElementById('resetPresetsDefaultBtn')?.classList.toggle('hidden', !isAdmin);
+  document.querySelectorAll('.del-preset-btn').forEach(button => button.classList.toggle('hidden', !isAdmin));
+  document.getElementById('backupRestoreSnapshotBtn')?.classList.toggle('hidden', !isAdmin);
+  document.querySelector('label[for="backupUploadInput"]')?.classList.toggle('hidden', !isAdmin);
+  document.getElementById('backupSaveSnapshotBtn')?.classList.toggle('hidden', !isAdmin);
+  document.getElementById('backupDownloadJsonBtn')?.classList.toggle('hidden', !isAdmin);
+  renderCatalogTable();
+  renderAdminUsers();
 }
 
 function initProfileControls() {
-  const modal = document.getElementById('profileModal');
   const openButton = document.getElementById('openProfileBtn');
-  const closeButton = document.getElementById('closeProfileBtn');
+  const backButton = document.getElementById('profileBackBtn');
   const resetButton = document.getElementById('profileResetPasswordBtn');
+  const securityButton = document.getElementById('profileSecurityBtn');
+  const layoutButton = document.getElementById('profileResetLayoutBtn');
+  const uiStyleButton = document.getElementById('profileUIStyleToggleBtn');
+  const blurButton = document.getElementById('profileBlurToggleBtn');
   const signOutButton = document.getElementById('profileSignOutBtn');
   const createAccountForm = document.getElementById('createStaffAccountForm');
 
@@ -2961,11 +3185,10 @@ function initProfileControls() {
       return;
     }
     updateProfileDisplay();
-    modal?.classList.remove('hidden');
+    switchView('profile');
   });
-  closeButton?.addEventListener('click', () => modal?.classList.add('hidden'));
-  modal?.addEventListener('click', event => {
-    if (event.target === modal) modal.classList.add('hidden');
+  backButton?.addEventListener('click', () => {
+    switchView(APP_STATE.previousView || 'dashboard');
   });
 
   resetButton?.addEventListener('click', async () => {
@@ -2982,10 +3205,18 @@ function initProfileControls() {
     }
   });
 
+  securityButton?.addEventListener('click', () => {
+    openSettingsModal();
+    switchSettingsTab('security');
+  });
+  layoutButton?.addEventListener('click', resetDashboardLayout);
+  uiStyleButton?.addEventListener('click', () => setUIStyle(APP_STATE.uiStyle === 'glass' ? 'default' : 'glass', true));
+  blurButton?.addEventListener('click', () => setGradientBlurEnabled(!APP_STATE.gradientBlurEnabled, true));
+
   signOutButton?.addEventListener('click', async () => {
     try {
       await signOut(auth);
-      modal?.classList.add('hidden');
+      clearSignedInState();
       showToast('Signed out of session', 'info');
     } catch (error) {
       showToast(`Sign out failed: ${error.message}`, 'error');
@@ -3011,11 +3242,12 @@ function initProfileControls() {
       createdUser = credential.user;
       await setDoc(doc(db, 'users', createdUser.uid), {
         email,
-        role: 'staff',
-        createdAt: serverTimestamp()
+        role: 'user',
+        createdAt: serverTimestamp(),
+        lastLogin: serverTimestamp()
       });
       createAccountForm.reset();
-      showToast(`Staff account created for ${email}`, 'success');
+      showToast(`Standard user account created for ${email}`, 'success');
     } catch (error) {
       showToast(`Account creation failed: ${error.message}`, 'error');
     } finally {
@@ -3034,6 +3266,65 @@ function initProfileControls() {
 // 18. AUTHENTICATION & SESSION PERSISTENCE (Requirement 7)
 // =============================================================================
 
+let loginFailureCount = 0;
+let loginLockedUntil = 0;
+
+function friendlyAuthError(error) {
+  const messages = {
+    'auth/email-already-in-use': 'An account already uses this email address.',
+    'auth/invalid-email': 'Enter a valid email address.',
+    'auth/weak-password': 'Choose a stronger password with at least 8 characters.',
+    'auth/invalid-credential': 'The email or password is incorrect.',
+    'auth/wrong-password': 'The email or password is incorrect.',
+    'auth/user-not-found': 'The email or password is incorrect.',
+    'auth/user-disabled': 'This account has been disabled. Contact the administrator.',
+    'auth/network-request-failed': 'Network error. Check your connection and try again.',
+    'auth/too-many-requests': 'Too many attempts. Wait a little before trying again.'
+  };
+  return messages[error?.code] || error?.message || 'Authentication could not be completed.';
+}
+
+const profileInitializationPromises = new Map();
+
+function initializeUserProfile(user) {
+  if (!auth.currentUser || auth.currentUser.uid !== user.uid) return Promise.resolve();
+  if (profileInitializationPromises.has(user.uid)) return profileInitializationPromises.get(user.uid);
+
+  const initialization = (async () => {
+    const userRef = doc(db, 'users', user.uid);
+    const profileSnapshot = await getDoc(userRef);
+    const isOwner = user.email?.toLowerCase() === ADMIN_EMAIL;
+    const profileData = profileSnapshot.data();
+
+    if (isOwner) {
+      await setDoc(userRef, {
+        email: user.email || '',
+        role: 'admin',
+        ...(profileSnapshot.exists() ? {} : { createdAt: serverTimestamp() }),
+        lastLogin: serverTimestamp()
+      }, { merge: true });
+    } else if (profileSnapshot.exists()) {
+      await setDoc(userRef, {
+        email: user.email || '',
+        lastLogin: serverTimestamp()
+      }, { merge: true });
+    } else {
+      await setDoc(userRef, {
+        email: user.email || '',
+        role: 'user',
+        createdAt: serverTimestamp(),
+        lastLogin: serverTimestamp()
+      });
+    }
+    if (profileData?.role && profileData.role !== APP_STATE.currentRole && !isOwner) {
+      APP_STATE.currentRole = profileData.role;
+      applyRolePermissions();
+    }
+  })();
+  profileInitializationPromises.set(user.uid, initialization);
+  return initialization.finally(() => profileInitializationPromises.delete(user.uid));
+}
+
 function initAuthentication() {
   const gateScreen = document.getElementById('authGateScreen');
   const loginScreen = document.getElementById('loginScreen');
@@ -3047,6 +3338,73 @@ function initAuthentication() {
   const closeResetBtn = document.getElementById('closeResetModalBtn');
   const cancelResetBtn = document.getElementById('cancelResetBtn');
   const resetForm = document.getElementById('passwordResetForm');
+  const signupModal = document.getElementById('signupModal');
+  const signupForm = document.getElementById('signupForm');
+  const signupAlert = document.getElementById('signupAlert');
+  const showSignupBtn = document.getElementById('showSignupBtn');
+  const closeSignupBtn = document.getElementById('closeSignupBtn');
+
+  showSignupBtn?.addEventListener('click', () => {
+    signupAlert?.classList.add('hidden');
+    signupModal?.classList.remove('hidden');
+  });
+  closeSignupBtn?.addEventListener('click', () => signupModal?.classList.add('hidden'));
+  signupModal?.addEventListener('click', event => {
+    if (event.target === signupModal) signupModal.classList.add('hidden');
+  });
+
+  signupForm?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const email = document.getElementById('signupEmail')?.value.trim();
+    const password = document.getElementById('signupPassword')?.value || '';
+    const confirmPassword = document.getElementById('signupPasswordConfirm')?.value || '';
+    if (!email || password.length < 8) {
+      if (signupAlert) {
+        signupAlert.textContent = 'Enter a valid email and a password of at least 8 characters.';
+        signupAlert.className = 'p-3 rounded-xl text-sm bg-red-500/15 border border-red-500/30 text-red-400';
+      }
+      return;
+    }
+    if (password !== confirmPassword) {
+      if (signupAlert) {
+        signupAlert.textContent = 'The passwords do not match.';
+        signupAlert.className = 'p-3 rounded-xl text-sm bg-red-500/15 border border-red-500/30 text-red-400';
+      }
+      return;
+    }
+    if (email.toLowerCase() === ADMIN_EMAIL) {
+      if (signupAlert) {
+        signupAlert.textContent = 'The owner account must be provisioned by the administrator.';
+        signupAlert.className = 'p-3 rounded-xl text-sm bg-red-500/15 border border-red-500/30 text-red-400';
+      }
+      return;
+    }
+
+    let createdUser = null;
+    try {
+      await authPersistenceReady;
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      createdUser = credential.user;
+      await initializeUserProfile(createdUser);
+      signupForm.reset();
+      signupModal?.classList.add('hidden');
+      showToast('Account created. You are now signed in.', 'success');
+      switchView('dashboard');
+    } catch (error) {
+      if (createdUser && auth.currentUser?.uid === createdUser.uid) {
+        try {
+          await signOut(auth);
+        } catch (signOutError) {
+          logDebug(`Sign-up cleanup sign-out failed: ${signOutError.message}`, 'ERROR');
+        }
+      }
+      if (signupAlert) {
+        signupAlert.textContent = friendlyAuthError(error);
+        signupAlert.className = 'p-3 rounded-xl text-sm bg-red-500/15 border border-red-500/30 text-red-400';
+      }
+      showToast(`Sign-up failed: ${friendlyAuthError(error)}`, 'error');
+    }
+  });
 
   if (togglePassBtn && passInput) {
     togglePassBtn.addEventListener('click', () => {
@@ -3080,53 +3438,58 @@ function initAuthentication() {
   }
 
   // Firebase Auth State Listener (Persistent)
-  onAuthStateChanged(auth, (user) => {
+  authPersistenceReady.then(() => onAuthStateChanged(auth, (user) => {
     if (gateScreen) gateScreen.classList.add('hidden');
 
     if (user) {
       APP_STATE.currentUser = user;
-      APP_STATE.currentRole = user.email?.toLowerCase() === 'lasasdias11@gmail.com' ? 'admin' : 'staff';
+      APP_STATE.currentRole = user.email?.toLowerCase() === ADMIN_EMAIL ? 'admin' : 'user';
       if (loginScreen) loginScreen.classList.add('hidden');
       if (appShell) appShell.classList.remove('hidden');
 
       const userBadge = document.getElementById('userEmailBadge');
-      if (userBadge) userBadge.textContent = user.email || 'Store Owner';
+      if (userBadge) userBadge.textContent = user.email || 'Account';
       updateProfileDisplay(user);
+      applyRolePermissions();
 
-      logDebug(`Persistent session confirmed: ${user.email}`);
+      logDebug('Persistent session confirmed.');
       if (cloudSyncUserId !== user.uid) {
         stopCloudSyncListeners();
         cloudSyncUserId = user.uid;
-        if (APP_STATE.currentRole === 'admin') {
-          setDoc(doc(db, 'users', user.uid), {
-            email: user.email || '',
-            role: 'admin',
-            updatedAt: serverTimestamp()
-          }, { merge: true }).catch(error => {
-            logDebug(`Admin profile initialization failed: ${error.message}`, 'ERROR');
-          });
-        }
-        cloudSyncUnsubscribers.push(onSnapshot(doc(db, 'users', user.uid), snapshot => {
+        roleSyncUnsubscribe = onSnapshot(doc(db, 'users', user.uid), snapshot => {
           if (auth.currentUser?.uid !== user.uid) return;
-          const role = user.email?.toLowerCase() === 'lasasdias11@gmail.com'
+          const role = user.email?.toLowerCase() === ADMIN_EMAIL
             ? 'admin'
-            : snapshot.data()?.role === 'admin' ? 'admin' : 'staff';
+            : snapshot.data()?.role === 'admin' ? 'admin' : 'user';
+          const roleChanged = APP_STATE.currentRole !== role;
           APP_STATE.currentRole = role;
           updateProfileDisplay(user);
+          applyRolePermissions();
+          if (roleChanged) initCloudSyncListeners();
         }, error => {
           logDebug(`Account role sync failed: ${error.message}`, 'ERROR');
-        }));
+        });
         initCloudSyncListeners();
+        initializeUserProfile(user).catch(error => {
+          logDebug(`Account profile initialization failed: ${error.message}`, 'ERROR');
+          showToast(`Account profile could not be synced: ${error.message}`, 'error');
+        });
       }
     } else {
-      APP_STATE.currentUser = null;
-      APP_STATE.currentRole = 'staff';
+      clearSignedInState();
       stopCloudSyncListeners();
-      document.getElementById('profileModal')?.classList.add('hidden');
       if (appShell) appShell.classList.add('hidden');
       if (loginScreen) loginScreen.classList.remove('hidden');
       logDebug('Awaiting owner authentication...');
     }
+  }, error => {
+    if (gateScreen) gateScreen.classList.add('hidden');
+    if (loginScreen) loginScreen.classList.remove('hidden');
+    logDebug(`Authentication state listener failed: ${error.message}`, 'ERROR');
+  })).catch(error => {
+    if (gateScreen) gateScreen.classList.add('hidden');
+    if (loginScreen) loginScreen.classList.remove('hidden');
+    logDebug(`Authentication initialization failed: ${error.message}`, 'ERROR');
   });
 
   // Login Submit
@@ -3137,25 +3500,49 @@ function initAuthentication() {
       const password = document.getElementById('loginPassword')?.value;
       const btnText = document.getElementById('loginBtnText');
       const spinner = document.getElementById('loginBtnSpinner');
+      const submitButton = loginForm.querySelector('button[type="submit"]');
 
       if (!email || !password) return;
+      const remainingLock = loginLockedUntil - Date.now();
+      if (remainingLock > 0) {
+        const seconds = Math.ceil(remainingLock / 1000);
+        const message = `Too many failed sign-in attempts. Try again in ${seconds} seconds.`;
+        if (loginAlert) {
+          loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-red-500/15 border border-red-500/30 text-red-400 block';
+          loginAlert.textContent = message;
+        }
+        return;
+      }
 
       if (loginAlert) loginAlert.classList.add('hidden');
       if (btnText) btnText.textContent = 'Verifying Credentials...';
       if (spinner) spinner.classList.remove('hidden');
+      if (submitButton) submitButton.disabled = true;
 
       try {
+        await authPersistenceReady;
         await signInWithEmailAndPassword(auth, email, password);
+        loginFailureCount = 0;
+        loginLockedUntil = 0;
         showToast('Login successful. Session established.', 'success');
       } catch (err) {
+        loginFailureCount += 1;
+        const errorMessage = friendlyAuthError(err);
+        if (loginFailureCount >= 5) {
+          loginLockedUntil = Date.now() + 30000;
+          loginFailureCount = 0;
+        }
         if (loginAlert) {
           loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-red-500/15 border border-red-500/30 text-red-400 block';
-          loginAlert.textContent = `Authentication Failed: ${err.message}`;
+          loginAlert.textContent = loginLockedUntil
+            ? 'Too many failed sign-in attempts. Sign-in is paused for 30 seconds.'
+            : errorMessage;
         }
-        showToast(`Login failed: ${err.message}`, 'error');
+        showToast(`Login failed: ${errorMessage}`, 'error');
       } finally {
         if (btnText) btnText.textContent = 'Sign In to Counter Ledger';
         if (spinner) spinner.classList.add('hidden');
+        if (submitButton) submitButton.disabled = false;
       }
     });
   }
@@ -3167,16 +3554,203 @@ function initAuthentication() {
 
 let cloudSyncUnsubscribers = [];
 let cloudSyncUserId = null;
+let roleSyncUnsubscribe = null;
+let dragSaveTimer = null;
+let activeDashboardDrag = null;
+let dashboardPressTimer = null;
+let suppressDashboardClickUntil = 0;
+
+function dashboardPreferenceKey(uid = auth.currentUser?.uid) {
+  return uid ? `al_preferences_${uid}` : null;
+}
+
+function saveUserPreferences(patch) {
+  if (!patch || typeof patch !== 'object') return Promise.resolve(false);
+  const uid = auth.currentUser?.uid;
+  const key = dashboardPreferenceKey(uid);
+  if (key) {
+    let cached = {};
+    try {
+      cached = JSON.parse(localStorage.getItem(key) || '{}');
+    } catch (error) {
+      logDebug(`Stored preferences could not be read: ${error.message}`, 'WARN');
+    }
+    const updated = { ...cached, ...patch };
+    localStorage.setItem(key, JSON.stringify(updated));
+  }
+  if (!uid) return Promise.resolve(false);
+
+  return setDoc(doc(db, 'user_settings', uid), {
+    ...patch,
+    updatedAt: serverTimestamp()
+  }, { merge: true }).then(() => true).catch(error => {
+    logDebug(`Preference sync failed: ${error.message}`, 'ERROR');
+    showToast(`Preference could not be synced: ${error.message}`, 'error');
+    return false;
+  });
+}
+
+function applyDashboardOrder(container, order) {
+  if (!container || !Array.isArray(order)) return;
+  const cards = new Map(
+    [...container.querySelectorAll(':scope > [data-card-id]')]
+      .map(card => [card.dataset.cardId, card])
+  );
+  order.forEach(id => {
+    const card = cards.get(id);
+    if (card) {
+      container.appendChild(card);
+      cards.delete(id);
+    }
+  });
+  cards.forEach(card => container.appendChild(card));
+}
+
+function persistDashboardOrder() {
+  if (dragSaveTimer) clearTimeout(dragSaveTimer);
+  dragSaveTimer = setTimeout(() => {
+    const metrics = [...document.querySelectorAll('#dashboardGrid > [data-card-id]')]
+      .map(card => card.dataset.cardId);
+    const actions = [...document.querySelectorAll('#dashboardActionsGrid > [data-card-id]')]
+      .map(card => card.dataset.cardId);
+    APP_STATE.dashboardOrder = { metrics, actions };
+    saveUserPreferences({ dashboardOrder: APP_STATE.dashboardOrder });
+  }, 150);
+}
+
+function resetDashboardLayout() {
+  APP_STATE.dashboardOrder = {
+    metrics: [...DEFAULT_DASHBOARD_ORDER.metrics],
+    actions: [...DEFAULT_DASHBOARD_ORDER.actions]
+  };
+  applyDashboardOrder(document.getElementById('dashboardGrid'), APP_STATE.dashboardOrder.metrics);
+  applyDashboardOrder(document.getElementById('dashboardActionsGrid'), APP_STATE.dashboardOrder.actions);
+  persistDashboardOrder();
+  showToast('Dashboard layout restored.', 'success');
+}
+
+function initDashboardReordering() {
+  const containers = [
+    document.getElementById('dashboardGrid'),
+    document.getElementById('dashboardActionsGrid')
+  ].filter(Boolean);
+
+  const beginDrag = (card, event) => {
+    activeDashboardDrag = { card, container: card.parentElement, pointerId: event.pointerId, moved: false };
+    card.classList.add('is-dragging');
+    card.setPointerCapture?.(event.pointerId);
+  };
+  const finishDrag = () => {
+    if (!activeDashboardDrag) return;
+    activeDashboardDrag.card.classList.remove('is-dragging');
+    const moved = activeDashboardDrag.moved;
+    activeDashboardDrag = null;
+    if (moved) {
+      persistDashboardOrder();
+      suppressDashboardClickUntil = Date.now() + 250;
+    }
+  };
+
+  containers.forEach(container => {
+    container.addEventListener('pointerdown', event => {
+      const card = event.target.closest('[data-card-id]');
+      const control = event.target.closest('button,a,input,select,textarea');
+      if (!card || card.parentElement !== container || (control && control !== card)) return;
+      const touchInput = event.pointerType === 'touch';
+      if (touchInput) {
+        dashboardPressTimer = setTimeout(() => beginDrag(card, event), 350);
+      } else if (event.button === 0) {
+        beginDrag(card, event);
+      }
+    });
+    container.addEventListener('pointermove', event => {
+      if (!activeDashboardDrag || activeDashboardDrag.container !== container) return;
+      event.preventDefault();
+      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-card-id]');
+      if (!target || target === activeDashboardDrag.card || target.parentElement !== container) return;
+      const rect = target.getBoundingClientRect();
+      const sourceRect = activeDashboardDrag.card.getBoundingClientRect();
+      const sameRow = Math.abs(rect.top - sourceRect.top) < Math.min(rect.height, sourceRect.height) / 2;
+      const placeAfter = sameRow
+        ? event.clientX > rect.left + rect.width / 2
+        : event.clientY > rect.top + rect.height / 2;
+      container.insertBefore(activeDashboardDrag.card, placeAfter ? target.nextSibling : target);
+      activeDashboardDrag.moved = true;
+    }, { passive: false });
+    container.addEventListener('pointerup', () => {
+      if (dashboardPressTimer) clearTimeout(dashboardPressTimer);
+      dashboardPressTimer = null;
+      finishDrag();
+    });
+    container.addEventListener('pointercancel', () => {
+      if (dashboardPressTimer) clearTimeout(dashboardPressTimer);
+      dashboardPressTimer = null;
+      finishDrag();
+    });
+    container.addEventListener('pointerleave', () => {
+      if (dashboardPressTimer && !activeDashboardDrag) {
+        clearTimeout(dashboardPressTimer);
+        dashboardPressTimer = null;
+      }
+    });
+    container.addEventListener('click', event => {
+      if (Date.now() < suppressDashboardClickUntil) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
+  });
+}
+
+function clearSignedInState() {
+  APP_STATE.currentUser = null;
+  APP_STATE.currentRole = 'user';
+  APP_STATE.userProfiles = [];
+  APP_STATE.todayStationeryTransactions = [];
+  APP_STATE.todayReloadTransactions = [];
+  APP_STATE.masterStationeryRecords = [];
+  APP_STATE.masterReloadRecords = [];
+  APP_STATE.inventoryCatalog = [];
+  APP_STATE.activeView = 'dashboard';
+  document.getElementById('viewProfile')?.classList.add('hidden');
+  document.getElementById('viewDashboard')?.classList.remove('hidden');
+  document.getElementById('signupModal')?.classList.add('hidden');
+  document.getElementById('userEmailBadge')?.replaceChildren();
+  document.getElementById('profileAccountEmail')?.replaceChildren();
+  document.getElementById('profileAccountRole')?.replaceChildren();
+  document.getElementById('adminUsersList')?.replaceChildren();
+  applyRolePermissions();
+}
 
 function stopCloudSyncListeners() {
   cloudSyncUnsubscribers.forEach(unsubscribe => unsubscribe());
   cloudSyncUnsubscribers = [];
+  roleSyncUnsubscribe?.();
+  roleSyncUnsubscribe = null;
   cloudSyncUserId = null;
 }
 
 function initCloudSyncListeners() {
-  const todayStr = getTodayDateString();
+  cloudSyncUnsubscribers.forEach(unsubscribe => unsubscribe());
+  cloudSyncUnsubscribers = [];
   const watch = (...args) => cloudSyncUnsubscribers.push(onSnapshot(...args));
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const prefKey = dashboardPreferenceKey(user.uid);
+  if (prefKey) {
+    try {
+      const cached = JSON.parse(localStorage.getItem(prefKey) || '{}');
+      if (cached.activeTheme) applyTheme(cached.activeTheme);
+      if (typeof cached.gradientBlurEnabled === 'boolean') setGradientBlurEnabled(cached.gradientBlurEnabled);
+      if (cached.uiStyle) setUIStyle(cached.uiStyle);
+      if (cached.dashboardOrder) APP_STATE.dashboardOrder = cached.dashboardOrder;
+      applyDashboardOrder(document.getElementById('dashboardGrid'), APP_STATE.dashboardOrder.metrics);
+      applyDashboardOrder(document.getElementById('dashboardActionsGrid'), APP_STATE.dashboardOrder.actions);
+    } catch (error) {
+      logDebug(`Stored preferences could not be applied: ${error.message}`, 'WARN');
+    }
+  }
 
   // 1. Inventory Catalog Listener
   watch(collection(db, 'inventory'), (snapshot) => {
@@ -3194,58 +3768,41 @@ function initCloudSyncListeners() {
     logDebug(`Catalog sync notice: ${err.message}`, 'WARN');
   });
 
-  // 2. Today's Stationery & Bills Listener
-  const statQuery = query(
-    collection(db, 'stationery_transactions'),
-    where('date', '==', todayStr)
-  );
-  watch(statQuery, (snapshot) => {
-    const txs = [];
-    snapshot.forEach(docSnap => {
-      txs.push({ id: docSnap.id, ...docSnap.data() });
-    });
-    txs.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
-    APP_STATE.todayStationeryTransactions = txs;
+  // 2. Real-time stationery history, scoped to the signed-in user for standard accounts.
+  const stationeryQuery = APP_STATE.currentRole === 'admin'
+    ? collection(db, 'stationery_transactions')
+    : query(collection(db, 'stationery_transactions'), where('createdBy', '==', user.uid));
+  watch(stationeryQuery, snapshot => {
+    const records = [];
+    snapshot.forEach(docSnap => records.push({ id: docSnap.id, ...docSnap.data() }));
+    APP_STATE.masterStationeryRecords = records;
+    APP_STATE.todayStationeryTransactions = records.filter(record => record.date === getTodayDateString());
+    APP_STATE.todayStationeryTransactions.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
     renderRecentStationeryFeed();
+    applyMasterLogFilters();
     updateDashboardMetrics();
   }, (err) => {
     logDebug(`Stationery sync notice: ${err.message}`, 'WARN');
   });
 
-  // 3. Today's Reloads Listener
-  const reloadQuery = query(
-    collection(db, 'reload_transactions'),
-    where('date', '==', todayStr)
-  );
-  watch(reloadQuery, (snapshot) => {
-    const reloads = [];
-    snapshot.forEach(docSnap => {
-      reloads.push({ id: docSnap.id, ...docSnap.data() });
-    });
-    reloads.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
-    APP_STATE.todayReloadTransactions = reloads;
+  // 3. Real-time reload history, scoped to the signed-in user for standard accounts.
+  const reloadQuery = APP_STATE.currentRole === 'admin'
+    ? collection(db, 'reload_transactions')
+    : query(collection(db, 'reload_transactions'), where('createdBy', '==', user.uid));
+  watch(reloadQuery, snapshot => {
+    const records = [];
+    snapshot.forEach(docSnap => records.push({ id: docSnap.id, ...docSnap.data() }));
+    APP_STATE.masterReloadRecords = records;
+    APP_STATE.todayReloadTransactions = records.filter(record => record.date === getTodayDateString());
+    APP_STATE.todayReloadTransactions.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
     renderRecentReloadsFeed();
+    applyMasterLogFilters();
     updateDashboardMetrics();
   }, (err) => {
     logDebug(`Reloads sync notice: ${err.message}`, 'WARN');
   });
 
-  // 4. Master All-Time Records (For Ledger & PDF)
-  watch(collection(db, 'stationery_transactions'), (snapshot) => {
-    const list = [];
-    snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
-    APP_STATE.masterStationeryRecords = list;
-    applyMasterLogFilters();
-  });
-
-  watch(collection(db, 'reload_transactions'), (snapshot) => {
-    const list = [];
-    snapshot.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
-    APP_STATE.masterReloadRecords = list;
-    applyMasterLogFilters();
-  });
-
-  // 5. System Settings Listener (Rates & Presets)
+  // 4. System settings and per-user profile/preferences.
   watch(doc(db, 'settings', 'rates'), (docSnap) => {
     if (docSnap.exists()) {
       APP_STATE.commissionRates = { ...APP_STATE.commissionRates, ...docSnap.data() };
@@ -3267,6 +3824,30 @@ function initCloudSyncListeners() {
       renderPresetPills();
     }
   });
+
+  watch(doc(db, 'user_settings', user.uid), snapshot => {
+    if (!snapshot.exists()) return;
+    const preferences = snapshot.data();
+    const localKey = dashboardPreferenceKey(user.uid);
+    if (localKey) localStorage.setItem(localKey, JSON.stringify(preferences));
+    if (preferences.activeTheme) applyTheme(preferences.activeTheme);
+    if (typeof preferences.gradientBlurEnabled === 'boolean') setGradientBlurEnabled(preferences.gradientBlurEnabled);
+    if (preferences.uiStyle) setUIStyle(preferences.uiStyle);
+    if (preferences.dashboardOrder?.metrics && preferences.dashboardOrder?.actions) {
+      APP_STATE.dashboardOrder = preferences.dashboardOrder;
+      applyDashboardOrder(document.getElementById('dashboardGrid'), preferences.dashboardOrder.metrics);
+      applyDashboardOrder(document.getElementById('dashboardActionsGrid'), preferences.dashboardOrder.actions);
+    }
+  }, error => logDebug(`User preferences sync failed: ${error.message}`, 'ERROR'));
+
+  if (APP_STATE.currentRole === 'admin') {
+    watch(collection(db, 'users'), snapshot => {
+      APP_STATE.userProfiles = snapshot.docs.map(userDoc => ({ id: userDoc.id, ...userDoc.data() }));
+      updateProfileDisplay();
+    }, error => logDebug(`Account list sync failed: ${error.message}`, 'ERROR'));
+  } else {
+    APP_STATE.userProfiles = [];
+  }
 }
 
 // =============================================================================
@@ -3279,6 +3860,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initThemeSystem();
   startLiveClock();
   initNavigation();
+  initDashboardReordering();
   initGlobalSearch();
   initStationeryPOS();
   initMobileReloads();
