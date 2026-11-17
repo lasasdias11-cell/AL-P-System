@@ -1,24 +1,19 @@
-/* ==========================================================================
-   AL COMMUNICATION — VERSION 5.1 EXPANDABLE SEARCH, WIDE SETTINGS & ROUNDED UI
-   Plus Jakarta Sans & Outfit Rounded Typography, Tabular LKR Numerics,
-   Motion Graphics Sticky Header, Generous Global Search Dropdown, Compact Tabs
-   (Pure Solid Modern High-Contrast Architecture — Glassmorphism Purged)
-   ========================================================================== */
+@property --gradient-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 135deg;
+}
 
-/* --------------------------------------------------------------------------
-   1. Typography & Global Reset
-   -------------------------------------------------------------------------- */
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
 :root {
   --font-base: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-rounded: 'Plus Jakarta Sans', 'Outfit', var(--font-base);
-  --font-display: 'Outfit', 'Plus Jakarta Sans', var(--font-base);
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-rounded: var(--font-base);
+  --font-display: 'Outfit', var(--font-base);
+  --font-mono: var(--font-base);
 
-  /* Theme 1: Modern Slate (Default Dark Mode) */
   --bg-app: #0b1120;
   --bg-surface: #1e293b;
   --bg-surface-elevated: #283548;
@@ -41,9 +36,10 @@
   --header-bg: #0f172a;
   --badge-service: #818cf8;
   --badge-service-bg: rgba(129, 140, 248, 0.15);
+  --gradient-cyan: rgba(14, 165, 233, 0.22);
+  --gradient-emerald: rgba(16, 185, 129, 0.16);
 }
 
-/* Theme 2: Emerald Light (High-Contrast Clean White / Emerald) */
 [data-theme="emerald-store"], body.light-theme {
   --bg-app: #f8fafc;
   --bg-surface: #ffffff;
@@ -67,9 +63,10 @@
   --header-bg: #ffffff;
   --badge-service: #6366f1;
   --badge-service-bg: rgba(99, 102, 241, 0.12);
+  --gradient-cyan: rgba(56, 189, 248, 0.18);
+  --gradient-emerald: rgba(16, 185, 129, 0.12);
 }
 
-/* Theme 3: Sapphire Blue (Midnight Deep Solid) */
 [data-theme="sapphire-blue"] {
   --bg-app: #060d1f;
   --bg-surface: #0f1c3f;
@@ -93,9 +90,10 @@
   --header-bg: #091229;
   --badge-service: #a855f7;
   --badge-service-bg: rgba(168, 85, 247, 0.15);
+  --gradient-cyan: rgba(59, 130, 246, 0.24);
+  --gradient-emerald: rgba(14, 165, 233, 0.15);
 }
 
-/* Theme 4: Warm Amber (Commercial Warm Slate) */
 [data-theme="warm-amber"] {
   --bg-app: #18120c;
   --bg-surface: #261e16;
@@ -119,6 +117,8 @@
   --header-bg: #1c1510;
   --badge-service: #fb923c;
   --badge-service-bg: rgba(251, 146, 60, 0.15);
+  --gradient-cyan: rgba(245, 158, 11, 0.2);
+  --gradient-emerald: rgba(16, 185, 129, 0.13);
 }
 
 html {
@@ -127,6 +127,8 @@ html {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   scroll-behavior: smooth;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -137,12 +139,29 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   font-family: var(--font-base);
+  width: 100%;
+  overflow-x: hidden;
 }
 
-/* --------------------------------------------------------------------------
-   2. Beautiful Rounded Typography Integration (Task 3)
-   -------------------------------------------------------------------------- */
+#appShell,
+main,
+.header-inner {
+  min-width: 0;
+  max-width: 100%;
+}
+
+button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.tap-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 h1, h2, h3, h4, h5, h6,
+button,
 .font-rounded,
 .brand-title,
 .dash-card,
@@ -156,7 +175,6 @@ h1, h2, h3, h4, h5, h6,
   font-family: var(--font-rounded);
 }
 
-/* Tabular Sri Lankan Rupee Currency Alignment */
 .currency-lkr {
   font-family: var(--font-rounded);
   font-variant-numeric: tabular-nums;
@@ -164,9 +182,6 @@ h1, h2, h3, h4, h5, h6,
   font-feature-settings: "tnum" 1, "cv05" 1;
 }
 
-/* --------------------------------------------------------------------------
-   3. Utility Classes & Theme Bridge
-   -------------------------------------------------------------------------- */
 .theme-bg-app { background-color: var(--bg-app); }
 .theme-bg-surface { background-color: var(--bg-surface); }
 .theme-bg-elevated { background-color: var(--bg-surface-elevated); }
@@ -182,18 +197,43 @@ h1, h2, h3, h4, h5, h6,
 .theme-shadow { box-shadow: var(--card-shadow); }
 .theme-header {
   background-color: var(--header-bg);
-  /* Pure Solid Header without any backdrop blur */
+  position: relative;
+  isolation: isolate;
+  transition: background-color 300ms ease, color 300ms ease;
 }
 
-/* --------------------------------------------------------------------------
-   4. Sticky Branded Header & Motion Graphics Navigation
-   -------------------------------------------------------------------------- */
+[data-gradient-blur="on"] #mainHeader.theme-header {
+  background-color: color-mix(in srgb, var(--header-bg) 82%, transparent);
+  -webkit-backdrop-filter: saturate(145%) blur(14px);
+  backdrop-filter: saturate(145%) blur(14px);
+  transform: translateZ(0);
+  transition: background-color 300ms ease;
+}
+
+[data-gradient-blur="on"] #mainHeader.theme-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 12% 0%, var(--gradient-cyan), transparent 45%),
+    radial-gradient(ellipse at 92% 10%, var(--gradient-emerald), transparent 40%);
+  transition: opacity 300ms ease, background 300ms ease;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-gradient-blur="on"] #mainHeader.theme-header {
+    background: linear-gradient(115deg, var(--header-bg), color-mix(in srgb, var(--accent) 12%, var(--header-bg)));
+  }
+}
+
 header.sticky {
   position: sticky;
   top: 0;
   z-index: 50;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.15);
-  transition: all 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: background-color 300ms ease, color 300ms ease, box-shadow 350ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .brand-logo-img {
@@ -224,7 +264,47 @@ header.sticky {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
-/* Mobile Nav Bar */
+.nav-tab-btn.active,
+.nav-settings-btn.active {
+  color: var(--text-main);
+  background-color: var(--bg-surface-elevated);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+}
+
+.mobile-menu-toggle {
+  display: inline-flex;
+}
+
+.mobile-menu-drawer {
+  position: fixed;
+  top: 4.25rem;
+  right: max(0.75rem, env(safe-area-inset-right));
+  z-index: 60;
+  width: min(19rem, calc(100vw - 1.5rem));
+}
+
+.mobile-menu-panel {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border-radius: 1rem;
+}
+
+.mobile-menu-nav-btn {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.65rem;
+  text-align: left;
+  color: var(--text-muted);
+}
+
+.mobile-menu-nav-btn:hover,
+.mobile-menu-nav-btn:focus-visible {
+  color: var(--text-main);
+  background-color: var(--bg-surface-elevated);
+}
+
 .mobile-nav-btn {
   transition: color 0.15s ease;
   user-select: none;
@@ -239,9 +319,6 @@ header.sticky {
   stroke: var(--accent) !important;
 }
 
-/* --------------------------------------------------------------------------
-   5. Interactive Expandable Search Bar with Motion Graphics (Task 1)
-   -------------------------------------------------------------------------- */
 .search-wrapper {
   position: relative;
   display: flex;
@@ -259,7 +336,6 @@ header.sticky {
   margin-right: 0;
 }
 
-/* When search is active on desktop: expand smoothly */
 header.search-active .search-expand-box {
   width: 310px;
   opacity: 1;
@@ -267,7 +343,12 @@ header.search-active .search-expand-box {
   margin-right: 0.5rem;
 }
 
-/* Surrounding items smoothly shrink/slide with cubic-bezier */
+@media (min-width: 1536px) {
+  header.search-active .search-expand-box {
+    width: 340px;
+  }
+}
+
 .brand-group,
 .nav-group,
 .clock-group,
@@ -285,8 +366,12 @@ header.search-active .search-expand-box {
   }
 }
 
-/* Mobile search overlay when active: expands cleanly across header */
 @media (max-width: 767px) {
+  #themeQuickToggleBtn,
+  #openSettingsBtn {
+    display: none !important;
+  }
+
   header.search-active .brand-group {
     display: none;
   }
@@ -302,6 +387,13 @@ header.search-active .search-expand-box {
   header.search-active .search-wrapper {
     flex: 1;
     width: 100%;
+  }
+}
+
+@media (min-width: 1280px) {
+  .mobile-menu-toggle,
+  .mobile-menu-drawer {
+    display: none !important;
   }
 }
 
@@ -323,7 +415,6 @@ header.search-active .search-expand-box {
   background-color: var(--bg-surface);
 }
 
-/* Properly Sized, Readable Categorized Search Results Dropdown */
 .global-search-results {
   position: absolute;
   top: calc(100% + 10px);
@@ -344,8 +435,12 @@ header.search-active .search-expand-box {
 
 @media (max-width: 640px) {
   .global-search-results {
-    width: calc(100vw - 20px);
-    right: -48px;
+    position: fixed;
+    top: 4.5rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    max-width: none;
     min-width: 0;
   }
 }
@@ -388,13 +483,26 @@ header.search-active .search-expand-box {
   background-color: var(--bg-surface-elevated);
 }
 
-/* --------------------------------------------------------------------------
-   6. Dashboard Grid & Metric Cards
-   -------------------------------------------------------------------------- */
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));
   gap: 1rem;
+}
+
+.dash-card[data-card-id],
+.quick-action-grid > [data-card-id] {
+  touch-action: pan-y;
+  cursor: grab;
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+.is-dragging {
+  z-index: 4;
+  opacity: 0.82;
+  transform: translateZ(0) scale(1.025);
+  box-shadow: 0 16px 36px rgba(2, 8, 23, 0.28);
+  cursor: grabbing;
+  user-select: none;
 }
 
 @media (min-width: 640px) {
@@ -411,6 +519,7 @@ header.search-active .search-expand-box {
 
 .dash-card {
   position: relative;
+  min-width: 0;
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 1.125rem;
@@ -425,7 +534,6 @@ header.search-active .search-expand-box {
   box-shadow: 0 8px 20px -3px rgba(0, 0, 0, 0.35);
 }
 
-/* Quick Action Tiles */
 .quick-action-grid {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));
@@ -440,12 +548,13 @@ header.search-active .search-expand-box {
 
 @media (min-width: 1024px) {
   .quick-action-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 .quick-action-btn {
   width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -459,6 +568,15 @@ header.search-active .search-expand-box {
   transition: all 0.18s ease-in-out;
 }
 
+.quick-action-btn > div,
+.quick-action-btn > div > div {
+  min-width: 0;
+}
+
+.quick-action-btn > div > div > div {
+  overflow-wrap: anywhere;
+}
+
 .quick-action-btn:hover {
   background-color: var(--bg-surface-elevated);
   border-color: var(--accent);
@@ -470,9 +588,53 @@ header.search-active .search-expand-box {
   transform: scale(0.98);
 }
 
-/* --------------------------------------------------------------------------
-   7. Master Logs Summary Cards (Paired High-Contrast Blocks)
-   -------------------------------------------------------------------------- */
+.dash-card.is-dragging,
+.quick-action-btn.is-dragging {
+  z-index: 4;
+  opacity: 0.82;
+  transform: translateZ(0) scale(1.025);
+  box-shadow: 0 16px 36px rgba(2, 8, 23, 0.28);
+}
+
+.dashboard-delete-mode > [data-card-id] {
+  outline: 1px dashed var(--danger);
+  outline-offset: 2px;
+  padding-top: 2.5rem;
+}
+
+.dashboard-delete-mode > [data-card-id]::after {
+  content: "×";
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 0.625rem;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 1.25rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.dashboard-delete-mode > [data-card-id] {
+  position: relative;
+}
+
+.card-removing {
+  opacity: 0;
+  transform: scale(0.97);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.profile-panel {
+  min-width: 0;
+}
+
 .logs-summary-grid {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));
@@ -492,18 +654,49 @@ header.search-active .search-expand-box {
 }
 
 .more-filters-drawer {
-  animation: slideDownFade 0.25s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0 solid var(--border-color);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 0.25s cubic-bezier(0.25, 1, 0.5, 1),
+    margin-top 0.25s cubic-bezier(0.25, 1, 0.5, 1),
+    padding-top 0.25s cubic-bezier(0.25, 1, 0.5, 1),
+    border-top-width 0.25s ease,
+    opacity 0.2s ease,
+    visibility 0s linear 0.25s;
 }
 
-@keyframes slideDownFade {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.more-filters-drawer > div {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.more-filters-drawer.is-open {
+  grid-template-rows: 1fr;
+  margin-top: 0.25rem;
+  padding-top: 0.75rem;
+  border-top-width: 1px;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.log-date-btn.active,
+#logSpecificDateWrap.filter-active {
+  color: var(--text-main);
+  border-color: var(--accent);
+  background-color: var(--accent-light);
+  border-radius: 0.6rem;
+  outline: 1px solid var(--accent);
+  padding: 0.2rem 0.35rem;
+}
+
+#moreFiltersDrawer.range-active > div {
+  border-color: var(--accent);
 }
 
 .log-paired-card {
@@ -528,9 +721,6 @@ header.search-active .search-expand-box {
   justify-content: space-between;
 }
 
-/* --------------------------------------------------------------------------
-   8. Settings Modal Expansion & Compact Tab Strip (Task 2)
-   -------------------------------------------------------------------------- */
 .modal-backdrop {
   background-color: rgba(0, 0, 0, 0.75);
 }
@@ -541,7 +731,185 @@ header.search-active .search-expand-box {
   box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.6);
 }
 
-/* Compact Single-Row Settings Tabs */
+[data-gradient-blur="on"] .profile-panel {
+  background-color: color-mix(in srgb, var(--bg-surface) 90%, transparent);
+  -webkit-backdrop-filter: saturate(135%) blur(12px);
+  backdrop-filter: saturate(135%) blur(12px);
+  transform: translateZ(0);
+}
+
+.gradient-surface {
+  background:
+    radial-gradient(ellipse at 8% 0%, var(--gradient-cyan), transparent 48%),
+    radial-gradient(ellipse at 100% 100%, var(--gradient-emerald), transparent 48%),
+    var(--bg-surface);
+  transform: translateZ(0);
+}
+
+#mainHeader.theme-header::before,
+.gradient-surface {
+  transition: background 300ms ease;
+}
+
+[data-theme="emerald-store"][data-gradient-blur="on"] #mainHeader.theme-header::before,
+[data-theme="emerald-store"] .gradient-surface {
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(56, 189, 248, 0.18), transparent 45%),
+    radial-gradient(ellipse at 92% 10%, rgba(16, 185, 129, 0.12), transparent 40%);
+}
+
+[data-theme="sapphire-blue"][data-gradient-blur="on"] #mainHeader.theme-header::before,
+[data-theme="sapphire-blue"] .gradient-surface {
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(59, 130, 246, 0.24), transparent 45%),
+    radial-gradient(ellipse at 92% 10%, rgba(14, 165, 233, 0.15), transparent 40%);
+}
+
+[data-theme="warm-amber"][data-gradient-blur="on"] #mainHeader.theme-header::before,
+[data-theme="warm-amber"] .gradient-surface {
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(245, 158, 11, 0.2), transparent 45%),
+    radial-gradient(ellipse at 92% 10%, rgba(16, 185, 129, 0.13), transparent 40%);
+}
+
+[data-theme="emerald-store"] .gradient-surface,
+[data-theme="sapphire-blue"] .gradient-surface,
+[data-theme="warm-amber"] .gradient-surface {
+  background-color: var(--bg-surface);
+}
+
+.profile-panel {
+  position: relative;
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+@media (max-width: 639px) {
+  .modal-backdrop {
+    align-items: stretch;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) !important;
+    overflow-y: auto;
+  }
+
+  .modal-content {
+    width: 100%;
+    max-width: none;
+    min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    border-radius: 0;
+  }
+
+  .master-logs-table-wrap {
+    overflow: visible;
+    border: 0;
+  }
+
+  .master-logs-table thead {
+    display: none;
+  }
+
+  .master-logs-table,
+  .master-logs-table tbody,
+  .master-logs-table tbody tr,
+  .master-logs-table tbody td {
+    display: block;
+    width: 100%;
+  }
+
+  .master-logs-table tbody tr {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.875rem;
+    overflow: hidden;
+    background: var(--bg-surface);
+  }
+
+  .master-logs-table tbody td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.65rem 0.75rem;
+    text-align: right;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .master-logs-table tbody td > * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .master-logs-table tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 38%;
+    text-align: left;
+    color: var(--text-dim);
+    font-weight: 600;
+    font-family: var(--font-rounded);
+  }
+
+  .master-logs-table tbody td[colspan] {
+    display: block;
+    text-align: center;
+  }
+
+  .master-logs-table tbody td[colspan]::before {
+    content: none;
+  }
+
+  .master-logs-table tbody td:last-child {
+    justify-content: flex-end;
+    border-bottom: 0;
+  }
+
+  .master-logs-table tbody td:last-child::before {
+    margin-right: auto;
+  }
+}
+
+[data-gradient-blur="off"] #mainHeader.theme-header {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+[data-gradient-blur="off"] .gradient-surface {
+  background: var(--bg-surface);
+  transform: none;
+}
+
+.gradient-toggle-track {
+  width: 2.75rem;
+  height: 1.5rem;
+  padding: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background: var(--border-color);
+  transition: background-color 0.2s ease;
+}
+
+.gradient-toggle-track > span {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+}
+
+.gradient-toggle input:checked + .gradient-toggle-track {
+  background: var(--accent);
+}
+
+.gradient-toggle input:checked + .gradient-toggle-track > span {
+  transform: translateX(1.25rem);
+}
+
+.gradient-toggle input:focus-visible + .gradient-toggle-track {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
 .settings-tabs-wrapper {
   scrollbar-width: thin;
   scrollbar-color: var(--border-color) transparent;
@@ -579,11 +947,9 @@ header.search-active .search-expand-box {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* --------------------------------------------------------------------------
-   9. Form Inputs, Modals & Controls
-   -------------------------------------------------------------------------- */
 .form-input {
   width: 100%;
+  min-height: 44px;
   padding: 0.65rem 0.875rem;
   border-radius: 0.65rem;
   border: 1px solid var(--border-color);
@@ -619,9 +985,9 @@ header.search-active .search-expand-box {
   box-shadow: 0 0 0 3px var(--accent-light);
 }
 
-/* Buttons */
 .btn-action {
   cursor: pointer;
+  padding: 0.625rem 1rem;
   transition: all 0.15s ease-in-out;
   display: inline-flex;
   align-items: center;
@@ -639,7 +1005,6 @@ header.search-active .search-expand-box {
   transform: scale(0.98);
 }
 
-/* Badges */
 .badge-stock-in {
   background-color: rgba(16, 185, 129, 0.15);
   color: #10b981;
@@ -664,7 +1029,6 @@ header.search-active .search-expand-box {
   border: 1px solid rgba(129, 140, 248, 0.3);
 }
 
-/* Quantity Steppers */
 .quantity-stepper {
   display: flex;
   align-items: center;
@@ -676,7 +1040,7 @@ header.search-active .search-expand-box {
 
 .quantity-stepper button {
   width: 40px;
-  height: 42px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -693,7 +1057,7 @@ header.search-active .search-expand-box {
 
 .quantity-stepper input {
   width: 60px;
-  height: 42px;
+  height: 44px;
   text-align: center;
   background-color: transparent;
   border: none;
@@ -702,7 +1066,6 @@ header.search-active .search-expand-box {
   font-weight: 700;
 }
 
-/* Preset Pills */
 .preset-pill {
   padding: 0.45rem 0.85rem;
   border-radius: 0.65rem;
@@ -724,9 +1087,6 @@ header.search-active .search-expand-box {
   transform: scale(0.96);
 }
 
-/* --------------------------------------------------------------------------
-   10. Icons & Utilities
-   -------------------------------------------------------------------------- */
 .icon-svg {
   width: 1.25rem;
   height: 1.25rem;
@@ -775,12 +1135,10 @@ header.search-active .search-expand-box {
   animation: pulseDotAnim 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Safe bottom spacing for mobile */
 .safe-bottom {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 
-/* Autocomplete Dropdown */
 .autocomplete-container {
   position: relative;
 }
@@ -819,7 +1177,6 @@ header.search-active .search-expand-box {
   background-color: var(--bg-surface-elevated);
 }
 
-/* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -835,7 +1192,185 @@ header.search-active .search-expand-box {
   background: var(--text-dim);
 }
 
-/* Print Optimization */
+@media (max-width: 359px) {
+  #appShell > nav {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+
+  .brand-logo-img {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .brand-group {
+    min-width: 0;
+  }
+
+  .brand-group > button > div {
+    max-width: 6rem;
+  }
+
+  .brand-group .font-bold.text-base {
+    font-size: 0.75rem;
+  }
+
+  .actions-group {
+    gap: 0.125rem;
+  }
+
+  .actions-group > button,
+  .search-wrapper > button {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px !important;
+    flex: 0 0 44px;
+  }
+
+  #themeQuickToggleBtn,
+  .clock-group {
+    display: none !important;
+  }
+
+  .mobile-nav-btn span {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 420px) {
+  #mobileSettingsBtn {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  body.theme-bg-app {
+    padding-bottom: 5rem;
+  }
+
+  @media (min-width: 1280px) and (max-width: 1535px) {
+    .header-inner {
+      gap: 0.5rem;
+    }
+
+    .nav-group nav {
+      gap: 0;
+    }
+
+    .nav-group .nav-tab-btn,
+    .nav-group .nav-settings-btn {
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+      font-size: 0.75rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card-removing {
+      transition-duration: 0.01ms;
+    }
+  }
+
+  .clock-group {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  main {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  body {
+    padding-bottom: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+
+  [data-gradient-blur="on"] #mainHeader.theme-header,
+  [data-gradient-blur="on"] .profile-panel {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+#mainHeader.header-scrolled {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35), 0 2px 6px -1px rgba(0, 0, 0, 0.2);
+  border-bottom-color: var(--border-color);
+}
+
+[data-gradient-blur="on"] #mainHeader.header-scrolled {
+  background-color: color-mix(in srgb, var(--header-bg) 92%, transparent);
+  -webkit-backdrop-filter: saturate(160%) blur(16px);
+  backdrop-filter: saturate(160%) blur(16px);
+}
+
+.price-tier-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0.875rem 1rem;
+  border-radius: 0.875rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--card-bg);
+  cursor: pointer;
+  transition: all 180ms ease;
+  position: relative;
+  text-align: left;
+}
+
+.price-tier-card:hover {
+  border-color: var(--accent);
+  background-color: var(--card-hover-bg);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.price-tier-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+  background-color: var(--card-hover-bg);
+}
+
+.catalog-price-tier-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 0.625rem;
+  background-color: var(--surface-bg);
+  border: 1px solid var(--border-color);
+}
+
+@media (max-width: 640px) {
+  .catalog-price-tier-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .catalog-price-tier-row .tier-remove-col {
+    grid-column: span 2;
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+
+.badge-price-tiers {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  font-family: inherit;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 @media print {
   header, nav, .no-print, button, .modal-backdrop {
     display: none !important;
@@ -847,4 +1382,32 @@ header.search-active .search-expand-box {
   .print-only {
     display: block !important;
   }
+}
+
+#loginScreen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(620px 420px at 15% 18%, rgba(56, 189, 248, 0.14), transparent 62%),
+    radial-gradient(720px 520px at 85% 78%, rgba(16, 185, 129, 0.10), transparent 62%),
+    radial-gradient(540px 420px at 72% 12%, rgba(99, 102, 241, 0.10), transparent 60%);
+  animation: loginMeshDrift 24s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+#loginScreen > div {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes loginMeshDrift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(3%, -2%, 0) scale(1.07); }
+  100% { transform: translate3d(-2%, 3%, 0) scale(1.03); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #loginScreen::before { animation: none; }
 }
