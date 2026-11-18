@@ -31,7 +31,8 @@ import {
   enableNetwork,
   disableNetwork,
   increment,
-  runTransaction
+  runTransaction,
+  writeBatch
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
 export const firebaseConfig = {
@@ -64,14 +65,14 @@ try {
       return true;
     })
     .catch((persErr) => {
-      console.warn("[Firebase Auth] Persistence setup notice:", persErr.message);
+      console.error("[Firebase Auth] Persistence setup error:", persErr.message);
       return false;
     });
 
   db = getFirestore(app);
   isFirebaseInitialized = true;
 } catch (error) {
-  console.warn("[Firebase Init Error]:", error);
+  console.error("[Firebase Init Error]:", error);
   initError = error;
 }
 
@@ -117,5 +118,6 @@ export {
   enableNetwork,
   disableNetwork,
   increment,
-  runTransaction
+  runTransaction,
+  writeBatch
 };

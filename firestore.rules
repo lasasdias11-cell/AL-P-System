@@ -38,7 +38,7 @@ service cloud.firestore {
         data.code is string && data.code.size() > 0 &&
         data.name is string && data.name.size() > 0 &&
         data.category is string &&
-        data.itemType in ['product', 'service'] &&
+        data.itemType in ['product', 'bill', 'service'] &&
         (!('type' in data) || data.type is string) &&
         (!('isServiceOrBill' in data) || data.isServiceOrBill is bool) &&
         nonNegative(data.sellingPrice) &&
@@ -53,13 +53,13 @@ service cloud.firestore {
           'date', 'time', 'createdBy', 'itemCode', 'itemName', 'inventoryId',
           'category', 'itemType', 'type', 'isServiceOrBill', 'costPrice',
           'sellingPrice', 'unitProfit', 'profit', 'quantity', 'totalAmount',
-          'priceTier', 'timestamp', 'updatedAt'
+          'priceTier', 'variantLabel', 'timestamp', 'updatedAt'
         ]) &&
         data.createdBy is string &&
         data.itemCode is string &&
         data.itemName is string &&
         data.category is string &&
-        data.itemType in ['product', 'service'] &&
+        data.itemType in ['product', 'bill', 'service'] &&
         (!('type' in data) || data.type is string) &&
         (!('isServiceOrBill' in data) || data.isServiceOrBill is bool) &&
         nonNegative(data.costPrice) &&
@@ -70,6 +70,7 @@ service cloud.firestore {
         nonNegative(data.totalAmount) &&
         data.date is string &&
         (!('priceTier' in data) || data.priceTier is string) &&
+        (!('variantLabel' in data) || data.variantLabel is string) &&
         (!('time' in data) || data.time is string) &&
         (!('inventoryId' in data) || data.inventoryId is string) &&
         (!('timestamp' in data) || data.timestamp is timestamp) &&
@@ -169,7 +170,8 @@ service cloud.firestore {
         request.auth.uid == userId &&
         request.resource.data.keys().hasOnly([
           'activeTheme', 'gradientBlurEnabled', 'dashboardOrder',
-          'hiddenDashboardCards', 'updatedAt'
+          'hiddenDashboardCards', 'inventorySort', 'catalogSort',
+          'stockSortOrder', 'catalogSortOrder', 'updatedAt'
         ]) &&
         (!('activeTheme' in request.resource.data) ||
           request.resource.data.activeTheme in ['modern-slate', 'emerald-store', 'sapphire-blue', 'warm-amber']) &&
@@ -182,6 +184,14 @@ service cloud.firestore {
            request.resource.data.dashboardOrder.actions is list)) &&
         (!('hiddenDashboardCards' in request.resource.data) ||
           request.resource.data.hiddenDashboardCards is list) &&
+        (!('inventorySort' in request.resource.data) ||
+          request.resource.data.inventorySort is string) &&
+        (!('catalogSort' in request.resource.data) ||
+          request.resource.data.catalogSort is string) &&
+        (!('stockSortOrder' in request.resource.data) ||
+          request.resource.data.stockSortOrder is string) &&
+        (!('catalogSortOrder' in request.resource.data) ||
+          request.resource.data.catalogSortOrder is string) &&
         (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
       allow delete: if signedIn() && request.auth.uid == userId;
     }

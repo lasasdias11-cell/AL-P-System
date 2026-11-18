@@ -206,6 +206,69 @@ export function isServiceItem(item) {
   return marker.includes('service') || marker.includes('bill') || item.isServiceOrBill === true;
 }
 
+const RIPPLE_TARGETS = 'button, a, .dash-card, .quick-action-btn, .nav-tab-btn, .mobile-nav-btn, .mobile-menu-nav-btn, .settings-tab-btn, .preset-pill, .price-tier-card, .search-result-item, .log-row, tr, [role="button"], .catalog-price-tier-row button, .op-select-btn';
+
+function spawnRipple(el, event) {
+  if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (el.closest('input, textarea, select, option')) return;
+  const rect = el.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  const maxDistX = Math.max(x, rect.width - x);
+  const maxDistY = Math.max(y, rect.height - y);
+  const radius = Math.hypot(maxDistX, maxDistY) * 2.2;
+  const wave = document.createElement('span');
+  wave.className = 'tc-water-wave';
+  wave.style.setProperty('--ripple-x', x + 'px');
+  wave.style.setProperty('--ripple-y', y + 'px');
+  wave.style.setProperty('--ripple-radius', radius + 'px');
+  el.appendChild(wave);
+  const cleanup = () => wave.remove();
+  wave.addEventListener('animationend', cleanup, { once: true });
+  setTimeout(cleanup, 600);
+}
+
+export function attachRippleEffect(el) {
+  if (!el || el.dataset.rippleAttached === 'true') return;
+  if (['INPUT', 'TEXTAREA', 'SELECT', 'OPTION'].includes(el.tagName)) return;
+  el.dataset.rippleAttached = 'true';
+  el.classList.add('has-ripple');
+}
+
+document.addEventListener('pointerdown', (event) => {
+  const el = event.target instanceof Element ? event.target.closest(RIPPLE_TARGETS) : null;
+  if (!el) return;
+  if (!el.classList.contains('has-ripple')) attachRippleEffect(el);
+  spawnRipple(el, event);
+}, true);
+
+export function showDeleteConfirm(message) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('deleteConfirmModal');
+    const msgEl = document.getElementById('deleteConfirmMessage');
+    const okBtn = document.getElementById('deleteConfirmOkBtn');
+    const cancelBtn = document.getElementById('deleteConfirmCancelBtn');
+    if (!modal || !msgEl || !okBtn || !cancelBtn) {
+      resolve(window.confirm(message));
+      return;
+    }
+    msgEl.textContent = message;
+    modal.classList.remove('hidden');
+    const finish = (value) => {
+      modal.classList.add('hidden');
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      modal.onclick = null;
+      resolve(value);
+    };
+    okBtn.onclick = () => finish(true);
+    cancelBtn.onclick = () => finish(false);
+    modal.onclick = (e) => { if (e.target === modal) finish(false); };
+    okBtn.focus();
+  });
+}
+
 async function removeTransaction(type, transactionRecord) {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error('Sign in before deleting transactions.');
@@ -267,6 +330,7 @@ function logDebug(message, type = 'INFO') {
     row.className = type === 'ERROR' ? 'text-red-400' : type === 'WARN' ? 'text-amber-400' : 'text-emerald-400';
     row.textContent = entry;
     terminal.insertBefore(row, terminal.firstChild);
+    terminal.scrollTop = 0;
   }
 }
 
@@ -1448,7 +1512,7 @@ function renderMasterLogsTable(rows) {
     const deleteBtn = tr.querySelector('.delete-tx-btn');
     if (deleteBtn) {
       deleteBtn.addEventListener('click', async () => {
-        if (!confirm(`Delete transaction for "${item.title}" (${formatLKR(item.amount)})?`)) return;
+        if (!(await showDeleteConfirm(`Delete transaction for "${item.title}" (${formatLKR(item.amount)})?`))) return;
         try {
           const restored = await removeTransaction(item.type, item.raw);
           showToast(restored
@@ -2317,7 +2381,7 @@ function renderRecentStationeryFeed() {
       </div>
     `;
     div.querySelector('.recent-delete-btn')?.addEventListener('click', async () => {
-      if (!confirm(`Delete transaction for "${item.itemName}"?`)) return;
+      if (!(await showDeleteConfirm(`Delete transaction for "${item.itemName}"?`))) return;
       try {
         const restored = await removeTransaction('STATIONERY', item);
         showToast(restored ? 'Transaction deleted, stock restored' : 'Transaction deleted', 'success');
@@ -2539,7 +2603,7 @@ function renderRecentReloadsFeed() {
       </div>
     `;
       div.querySelector('.recent-delete-btn')?.addEventListener('click', async () => {
-        if (!confirm(`Delete ${item.operator} reload for ${item.phone || 'Walk-in'}?`)) return;
+        if (!(await showDeleteConfirm(`Delete ${item.operator} reload for ${item.phone || 'Walk-in'}?`))) return;
         try {
           await removeTransaction('RELOAD', item);
           showToast('Transaction record deleted', 'success');
@@ -2794,7 +2858,7 @@ function initSettingsCatalog() {
         showToast('Only an admin can add catalog items.', 'error');
         return;
       }
-      if (!confirm('Seed standard Sri Lankan retail stationery and utility bills into your catalog? Existing codes will not be overwritten.')) return;
+      if (!(await showDeleteConfirm('Seed standard Sri Lankan retail stationery and utility bills into your catalog? Existing codes will not be overwritten.'))) return;
 
       let addedCount = 0;
       for (const item of SAMPLE_SRI_LANKAN_CATALOG) {
@@ -2931,7 +2995,7 @@ export function renderCatalogTable() {
           showToast('Only an admin can delete catalog items.', 'error');
           return;
         }
-        if (!confirm(`Delete "${item.name}" (${item.code}) from master inventory catalog?`)) return;
+        if (!(await showDeleteConfirm(`Delete "${item.name}" (${item.code}) from master inventory catalog?`))) return;
         try {
           await deleteDoc(doc(db, 'inventory', item.id));
           showToast(`Deleted ${item.name}`, 'success');
@@ -3142,7 +3206,7 @@ function initBackupRestoreSystem() {
     const confirmation = globalSettingsIncluded
       ? 'Restore the default theme, header blur, dashboard layout, sort order, reload presets, and commission rates?'
       : 'Restore your default theme, header blur, dashboard layout, and sort order?';
-    if (!confirm(confirmation)) return;
+    if (!(await showDeleteConfirm(confirmation))) return;
     try {
       applyTheme('modern-slate');
       setGradientBlurEnabled(true);
@@ -3221,7 +3285,7 @@ function initBackupRestoreSystem() {
       try {
         const snap = JSON.parse(savedRaw);
         const confirmMsg = `Restore configuration snapshot saved on ${snap.formattedDate || 'earlier'}?\nThis will restore ${snap.catalog?.length || 0} catalog items, network commissions, and reload presets.`;
-        if (!confirm(confirmMsg)) return;
+        if (!(await showDeleteConfirm(confirmMsg))) return;
 
         await applyConfigurationBackup(snap);
       } catch (e) {
@@ -3243,7 +3307,7 @@ function initBackupRestoreSystem() {
             throw new Error('Unrecognized backup format. No supported settings were found.');
           }
 
-          if (confirm(`Restore configuration from "${file.name}" (${snap.catalog?.length || 0} catalog items)?`)) {
+          if (await showDeleteConfirm(`Restore configuration from "${file.name}" (${snap.catalog?.length || 0} catalog items)?`)) {
             await applyConfigurationBackup(snap);
           }
         } catch (err) {
@@ -3523,7 +3587,7 @@ function renderAdminUsers() {
         roleButton.addEventListener('click', async () => {
           if (!auth.currentUser || APP_STATE.currentRole !== 'admin') return;
           const nextRole = profile.role === 'admin' ? 'user' : 'admin';
-          if (!confirm(`Set ${profile.email} role to ${nextRole === 'admin' ? 'Admin' : 'Staff / User'}?`)) return;
+          if (!(await showDeleteConfirm(`Set ${profile.email} role to ${nextRole === 'admin' ? 'Admin' : 'Staff / User'}?`))) return;
           try {
             await updateDoc(doc(db, 'users', profile.id), {
               role: nextRole,
@@ -3960,7 +4024,10 @@ function saveUserPreferences(patch) {
   return setDoc(doc(db, 'user_settings', uid), {
     ...patch,
     updatedAt: serverTimestamp()
-  }, { merge: true }).then(() => true).catch(error => {
+  }, { merge: true }).then(() => {
+    if (patch.activeTheme) showToast('Theme updated successfully', 'success');
+    return true;
+  }).catch(error => {
     logDebug(`Preference sync failed: ${error.message}`, 'ERROR');
     showToast(`Preference could not be synced: ${error.message}`, 'error');
     return false;
@@ -4025,7 +4092,7 @@ async function removeDashboardCard(card) {
   const cardId = card.dataset.cardId;
   if (!cardId || !dashboardCardNodes.has(cardId) || card.classList.contains('card-removing')) return;
   const label = card.querySelector('.font-semibold, .font-bold')?.textContent.trim() || cardId;
-  if (!confirm(`Remove "${label}" from the dashboard? Reset Dashboard Layout restores removed cards.`)) return;
+  if (!(await showDeleteConfirm(`Remove "${label}" from the dashboard? Reset Dashboard Layout restores removed cards.`))) return;
 
   card.classList.add('card-removing');
   await new Promise(resolve => setTimeout(resolve, 160));

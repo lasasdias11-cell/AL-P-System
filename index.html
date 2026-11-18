@@ -9,7 +9,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -18,10 +18,10 @@
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-            rounded: ['Inter', 'sans-serif'],
-            display: ['Outfit', 'sans-serif'],
-            mono: ['Inter', 'sans-serif'],
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            rounded: ['"Plus Jakarta Sans"', 'sans-serif'],
+            display: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"Plus Jakarta Sans"', 'sans-serif'],
           }
         }
       }
@@ -1836,6 +1836,18 @@
         <button type="button" id="cancelPriceSelectorBtn" class="px-4 py-2 rounded-xl text-xs font-semibold theme-bg-subtle border theme-border hover:theme-bg-elevated transition btn-action font-rounded">
           Close
         </button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="deleteConfirmModal" class="hidden fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="deleteConfirmTitle">
+    <div class="modal-content w-full max-w-sm rounded-t-2xl sm:rounded-2xl theme-bg-surface theme-border border theme-shadow p-5 space-y-4">
+      <h3 id="deleteConfirmTitle" class="text-base font-bold theme-text-main font-rounded">Confirm Deletion</h3>
+      <p id="deleteConfirmMessage" class="text-sm theme-text-muted"></p>
+      <div class="flex gap-3">
+        <button type="button" id="deleteConfirmCancelBtn" class="flex-1 min-h-11 px-4 py-2.5 rounded-xl border theme-border theme-text-main font-semibold">Cancel</button>
+        <button type="button" id="deleteConfirmOkBtn" class="flex-1 min-h-11 px-4 py-2.5 rounded-xl bg-red-500 text-white font-bold">Delete</button>
       </div>
     </div>
   </div>

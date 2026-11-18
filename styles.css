@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 @property --gradient-angle {
   syntax: "<angle>";
   inherits: false;
@@ -9,9 +11,9 @@
 }
 
 :root {
-  --font-base: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-base: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-rounded: var(--font-base);
-  --font-display: 'Outfit', var(--font-base);
+  --font-display: 'Plus Jakarta Sans', var(--font-base);
   --font-mono: var(--font-base);
 
   --bg-app: #0b1120;
@@ -38,6 +40,17 @@
   --badge-service-bg: rgba(129, 140, 248, 0.15);
   --gradient-cyan: rgba(14, 165, 233, 0.22);
   --gradient-emerald: rgba(16, 185, 129, 0.16);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --z-header: 50;
+  --z-modal: 60;
+  --z-toast: 70;
+  --accent-glow: rgba(96, 165, 250, 0.35);
 }
 
 [data-theme="emerald-store"], body.light-theme {
@@ -1410,4 +1423,354 @@ header.search-active .search-expand-box {
 
 @media (prefers-reduced-motion: reduce) {
   #loginScreen::before { animation: none; }
+}
+
+
+/* ===== GLASS PANELS ===== */
+.glass {
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+  -webkit-backdrop-filter: blur(24px) saturate(175%);
+  backdrop-filter: blur(24px) saturate(175%);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow:
+    0 20px 50px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+  border-radius: inherit;
+}
+[data-theme="emerald-store"] .glass,
+body.light-theme .glass {
+  background: linear-gradient(135deg, rgba(255,255,255,0.65), rgba(255,255,255,0.45));
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow:
+    0 8px 32px rgba(0,0,0,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.8);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  [data-theme="emerald-store"] .glass,
+  body.light-theme .glass {
+    background: rgba(255,255,255,0.97);
+    border: 1px solid rgba(0,0,0,0.12);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  }
+}
+
+/* ===== WATER RIPPLE EFFECT ===== */
+.has-ripple {
+  position: relative;
+  overflow: hidden;
+}
+.tc-water-wave {
+  position: absolute;
+  top: var(--ripple-y);
+  left: var(--ripple-x);
+  width: calc(var(--ripple-radius) * 2);
+  height: calc(var(--ripple-radius) * 2);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 70%);
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0.9;
+  pointer-events: none;
+  will-change: transform, opacity;
+  animation: tcRipple 400ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+[data-theme="emerald-store"] .tc-water-wave,
+body.light-theme .tc-water-wave {
+  background: radial-gradient(circle, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0) 70%);
+}
+@keyframes tcRipple {
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tc-water-wave { animation: none; display: none; }
+}
+
+/* ===== NEON RIM HOVER LIGHTING ===== */
+@media (hover: hover) {
+  .btn:hover, .run-btn:hover, .quick-action-btn:hover,
+  .mobile-nav-btn:hover, .nav-tab-btn:hover, .price-tier-card:hover,
+  .settings-tab-btn:hover, .tap-target:hover {
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45), 0 0 20px var(--accent-glow);
+    border-color: rgba(96,165,250,0.55);
+    transition: box-shadow 200ms ease, border-color 200ms ease, transform 200ms ease;
+  }
+}
+.btn:focus-visible, .run-btn:focus-visible, .quick-action-btn:focus-visible,
+.price-tier-card:focus-visible, .tap-target:focus-visible {
+  box-shadow: 0 10px 30px rgba(0,0,0,0.45), 0 0 20px var(--accent-glow);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.btn:active, .run-btn:active, .quick-action-btn:active,
+.mobile-nav-btn:active, .tap-target:active {
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3), 0 0 12px rgba(96,165,250,0.5);
+  transform: scale(0.97);
+  transition: box-shadow 300ms ease, border-color 300ms ease, transform 100ms ease;
+}
+
+/* ===== FLUID CLAMP TYPOGRAPHY ===== */
+h1, .h1 { font-size: clamp(1.5rem, 3vw, 2.25rem); line-height: 1.1; font-weight: 700; }
+h2, .h2 { font-size: clamp(1.25rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 700; }
+h3, .h3 { font-size: clamp(1.05rem, 1.8vw, 1.35rem); line-height: 1.25; font-weight: 600; }
+.metric-number {
+  font-size: clamp(1.25rem, 2.6vw, 2rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ===== MINMAX AUTO-FIT CARD GRIDS ===== */
+#dashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: clamp(12px, 2vw, 24px);
+}
+#dashboardActionsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  gap: clamp(10px, 1.5vw, 20px);
+}
+
+/* ===== MOBILE NAV SCROLL-SNAP ===== */
+nav.fixed.bottom-0 {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+nav.fixed.bottom-0::-webkit-scrollbar { display: none; }
+.mobile-nav-btn {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+/* ===== CARD ENTRANCE + METRIC PULSE ===== */
+@keyframes cardEntrance {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+[data-card-id] {
+  animation: cardEntrance 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes metricPulse {
+  0%  { opacity: 1; }
+  50% { opacity: 0.65; }
+  100%{ opacity: 1; }
+}
+.metric-updating {
+  animation: metricPulse 500ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-card-id], .metric-updating { animation: none; }
+}
+
+/* ===== MODAL BOTTOM SHEET ON MOBILE ===== */
+@media (max-width: 639px) {
+  #settingsModal > div,
+  #priceSelectorModal > div,
+  #editStationeryModal > div,
+  #passwordResetModal > div {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    border-radius: 1.5rem 1.5rem 0 0 !important;
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+}
+
+/* ===== DELETE CONFIRM MODAL ===== */
+#deleteConfirmModal {
+  z-index: 70;
+}
+#deleteConfirmModal > div {
+  max-width: 400px;
+  width: 90%;
+}
+@media (max-width: 639px) {
+  #deleteConfirmModal > div {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    border-radius: 1.5rem 1.5rem 0 0;
+    max-height: 80vh;
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
+/* ===== V7 GLASS / RIPPLE / FLUID TYPE ===== */
+:root {
+  --accent-glow: #60a5fa;
+  --z-header: 40;
+  --z-modal: 80;
+  --z-toast: 90;
+}
+
+.glass,
+.dash-card,
+.modal-content {
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+  -webkit-backdrop-filter: blur(24px) saturate(175%);
+  backdrop-filter: blur(24px) saturate(175%);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+body.light-theme .glass,
+body.light-theme .dash-card,
+body.light-theme .modal-content {
+  background: linear-gradient(135deg, rgba(255,255,255,0.55), rgba(255,255,255,0.35));
+  box-shadow: 0 12px 32px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass, .dash-card, .modal-content {
+    background: var(--bg-surface);
+  }
+}
+
+.btn, .btn-action, .quick-action-btn, .nav-tab-btn, .preset-pill, .price-tier-card, .settings-tab-btn {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+.btn:hover, .btn:focus-visible, .btn-action:hover, .btn-action:focus-visible,
+.quick-action-btn:hover, .quick-action-btn:focus-visible,
+.nav-tab-btn:hover, .nav-tab-btn:focus-visible,
+.preset-pill:hover, .preset-pill:focus-visible,
+.price-tier-card:hover, .price-tier-card:focus-visible,
+.settings-tab-btn:hover, .settings-tab-btn:focus-visible {
+  box-shadow: 0 10px 30px rgba(0,0,0,0.45), 0 0 20px rgba(96,165,250,0.35);
+  border-color: rgba(96,165,250,0.55);
+}
+.btn:active, .btn-action:active, .quick-action-btn:active,
+.nav-tab-btn:active, .preset-pill:active, .price-tier-card:active {
+  box-shadow: 0 0 12px rgba(96,165,250,0.5), inset 0 2px 6px rgba(0,0,0,0.25);
+}
+
+.has-ripple { position: relative; overflow: hidden; }
+.tc-water-wave {
+  position: absolute;
+  top: var(--ripple-y);
+  left: var(--ripple-x);
+  width: calc(var(--ripple-radius) * 2);
+  height: calc(var(--ripple-radius) * 2);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 70%);
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0.9;
+  pointer-events: none;
+  will-change: transform, opacity;
+  animation: tcRipple 400ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+[data-theme="modern-slate"] .tc-water-wave,
+[data-theme="emerald-store"] .tc-water-wave,
+[data-theme="sapphire-blue"] .tc-water-wave,
+[data-theme="warm-amber"] .tc-water-wave,
+body.light-theme .tc-water-wave {
+  background: radial-gradient(circle, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0) 70%);
+}
+@keyframes tcRipple {
+  to { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+
+h1 { font-size: clamp(1.5rem, 3vw, 2.25rem); line-height: 1.15; }
+h2 { font-size: clamp(1.25rem, 2.4vw, 1.75rem); line-height: 1.2; }
+h3 { font-size: clamp(1.05rem, 1.8vw, 1.35rem); line-height: 1.25; }
+body { font-size: clamp(0.875rem, 1vw, 1rem); line-height: 1.5; }
+.metric-value, .dash-card .text-xl, .dash-card .text-2xl {
+  font-size: clamp(1.25rem, 2.6vw, 2rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.btn, .btn-action, button { font-size: clamp(0.875rem, 1vw, 1rem); }
+
+.dashboard-grid, .quick-actions-grid, .log-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: clamp(12px, 2vw, 24px);
+}
+
+.mobile-bottom-nav, .mobile-nav-bar {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+.mobile-bottom-nav::-webkit-scrollbar, .mobile-nav-bar::-webkit-scrollbar { display: none; }
+.mobile-bottom-nav > *, .mobile-nav-bar > * {
+  scroll-snap-align: start;
+  touch-action: manipulation;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+@media (hover: none) {
+  .btn:hover, .btn-action:hover, .quick-action-btn:hover,
+  .nav-tab-btn:hover, .preset-pill:hover, .price-tier-card:hover,
+  .settings-tab-btn:hover {
+    box-shadow: none;
+    border-color: inherit;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tc-water-wave { animation: none; display: none; }
+}
+
+/* ===== V6.3 PAGE & MODAL TRANSITIONS ===== */
+@keyframes fadeInSlideUp {
+  from { opacity: 0; transform: translateY(18px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes pageChildIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes modalScaleIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.app-view:not(.hidden) {
+  animation: fadeInSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+.app-view:not(.hidden) > * {
+  animation: pageChildIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.app-view:not(.hidden) > *:nth-child(2) { animation-delay: 0.05s; }
+.app-view:not(.hidden) > *:nth-child(3) { animation-delay: 0.1s; }
+.app-view:not(.hidden) > *:nth-child(4) { animation-delay: 0.15s; }
+.app-view:not(.hidden) > *:nth-child(n+5) { animation-delay: 0.2s; }
+.modal-backdrop {
+  animation: backdropFadeIn 0.2s ease-out;
+}
+.modal-content {
+  animation: modalScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-view:not(.hidden), .app-view:not(.hidden) > *, .modal-backdrop, .modal-content { animation: none; }
 }
