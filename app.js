@@ -1,2787 +1,4392 @@
-import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  getAuth,
+  auth,
+  db,
+  secondaryAuth,
+  authPersistenceReady,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  updateProfile,
+  signOut,
   onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {
-  getFirestore,
+  updateEmail,
+  updatePassword,
+  sendPasswordResetEmail,
   collection,
   doc,
-  setDoc,
-  onSnapshot,
-  query,
-  orderBy,
+  addDoc,
   getDocs,
-  enableMultiTabIndexedDbPersistence
-} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  serverTimestamp,
+  increment,
+  runTransaction
+} from './firebase-config.js';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCaA5DXo3JkWGqGdjFBMPnKj5PlwAbCT-Y",
-  authDomain: "thursday-cricket.firebaseapp.com",
-  projectId: "thursday-cricket",
-  storageBucket: "thursday-cricket.appspot.com",
-  messagingSenderId: "752945537542",
-  appId: "1:752945537542:web:84be60617247fc045fd987"
+const ADMIN_EMAIL = 'lasasdias11@gmail.com';
+const DEFAULT_DASHBOARD_ORDER = {
+  metrics: [
+    'card-dash-stationery',
+    'card-dash-reloads',
+    'card-dash-commission',
+    'card-dash-stationery-profit',
+    'card-dash-catalog',
+    'card-dash-reload-profit-total',
+    'card-dash-stationery-profit-total'
+  ],
+  actions: ['action-stationery', 'action-reloads', 'action-stock', 'action-logs', 'action-settings', 'action-profile']
 };
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+if (!localStorage.getItem('al_sort_v2')) {
+  ['al_stock_sort_order', 'al_catalog_sort_order'].forEach(key => {
+    if (localStorage.getItem(key) === 'name-asc') localStorage.setItem(key, 'code-asc');
+  });
+  localStorage.setItem('al_sort_v2', '1');
+}
 
-// Consolidated from effects.js
-let modalResolver;
-let modalReturnFocus;
-let modalKeyHandler;
+export const APP_STATE = {
+  currentUser: null,
+  currentRole: 'user',
+  activeView: 'dashboard',
+  previousView: 'dashboard',
+  activeTheme: localStorage.getItem('al_theme_preference') || 'modern-slate',
+  gradientBlurEnabled: localStorage.getItem('al_gradient_blur') !== 'false',
+  dashboardOrder: DEFAULT_DASHBOARD_ORDER,
+  hiddenDashboardCards: [],
+  userProfiles: [],
+  inventoryCatalog: [],
+  todayStationeryTransactions: [],
+  todayReloadTransactions: [],
+  masterStationeryRecords: [],
+  masterReloadRecords: [],
+  commissionRates: {
+    AIRTEL: 6.80,
+    DIALOG: 3.80,
+    MOBITEL: 6.80,
+    HUTCH: 5.00
+  },
+  reloadPresets: [50, 100, 200, 500, 1000],
+  selectedCatalogItem: null,
+  posSelectedTierName: null,
+  posSelectedCostPrice: null,
+  selectedOperator: 'DIALOG',
+  stockSortOrder: localStorage.getItem('al_stock_sort_order') || 'code-asc',
+  catalogSortOrder: localStorage.getItem('al_catalog_sort_order') || 'code-asc',
+  stockFilter: 'ALL',
+  logTab: 'all',
+  logDateScope: 'today',
+  logDateFrom: '',
+  logDateTo: '',
+  logSearchQuery: '',
+  devLogs: []
+};
 
-function initRippleSystem() {
-  const layer = document.getElementById("ripple-layer");
-  if (!layer) throw new Error("Ripple layer is missing.");
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const SAMPLE_SRI_LANKAN_CATALOG = [
+  {
+    code: '1',
+    name: 'Atlas Cr Book 80 Pages (Single Rule)',
+    category: 'Exercise Books',
+    itemType: 'product',
+    costPrice: 155.00,
+    sellingPrice: 200.00,
+    stockQuantity: 50,
+    lowStockThreshold: 10,
+    prices: [
+      { name: 'Retail', costPrice: 155.00, sellingPrice: 200.00 },
+      { name: 'Wholesale', costPrice: 155.00, sellingPrice: 185.00 },
+      { name: 'School Bulk', costPrice: 155.00, sellingPrice: 175.00 }
+    ]
+  },
+  { code: '2', name: 'Atlas Cr Book 120 Pages (Single Rule)', category: 'Exercise Books', itemType: 'product', costPrice: 215.00, sellingPrice: 280.00, stockQuantity: 40, lowStockThreshold: 10 },
+  { code: '3', name: 'Atlas Cr Book 160 Pages (Single Rule)', category: 'Exercise Books', itemType: 'product', costPrice: 290.00, sellingPrice: 370.00, stockQuantity: 35, lowStockThreshold: 10 },
+  { code: '4', name: 'Atlas Cr Book 80 Pages (Square Rule)', category: 'Exercise Books', itemType: 'product', costPrice: 155.00, sellingPrice: 200.00, stockQuantity: 45, lowStockThreshold: 10 },
+  { code: '5', name: 'Atlas Chooty Pen Blue (0.5mm)', category: 'Pens & Pencils', itemType: 'product', costPrice: 22.00, sellingPrice: 30.00, stockQuantity: 200, lowStockThreshold: 25 },
+  { code: '6', name: 'Atlas Chooty Pen Black (0.5mm)', category: 'Pens & Pencils', itemType: 'product', costPrice: 22.00, sellingPrice: 30.00, stockQuantity: 150, lowStockThreshold: 25 },
+  { code: '7', name: 'Atlas Chooty Pen Red (0.5mm)', category: 'Pens & Pencils', itemType: 'product', costPrice: 22.00, sellingPrice: 30.00, stockQuantity: 100, lowStockThreshold: 20 },
+  { code: '8', name: 'Nataraj 2b Pencil Pack (10s)', category: 'Pens & Pencils', itemType: 'product', costPrice: 200.00, sellingPrice: 260.00, stockQuantity: 30, lowStockThreshold: 8 },
+  {
+    code: '9',
+    name: 'A4 Photocopy Paper 80gsm (Pack 500)',
+    category: 'Paper & Files',
+    itemType: 'product',
+    costPrice: 1380.00,
+    sellingPrice: 1600.00,
+    stockQuantity: 25,
+    lowStockThreshold: 5,
+    prices: [
+      { name: 'Retail Single', costPrice: 1380.00, sellingPrice: 1600.00 },
+      { name: 'Wholesale Box (5+)', costPrice: 1380.00, sellingPrice: 1520.00 }
+    ]
+  },
+  { code: '10', name: 'A4 Photocopy Single Page (B/W)', category: 'Photocopy & Print', itemType: 'product', costPrice: 3.50, sellingPrice: 10.00, stockQuantity: 1000, lowStockThreshold: 100 },
+  { code: '11', name: 'A4 Colour Print Single Page', category: 'Photocopy & Print', itemType: 'product', costPrice: 15.00, sellingPrice: 40.00, stockQuantity: 500, lowStockThreshold: 50 },
+  { code: '12', name: 'Bristol Board Sheet (White/Colours)', category: 'Art & Craft', itemType: 'product', costPrice: 42.00, sellingPrice: 60.00, stockQuantity: 80, lowStockThreshold: 15 },
+  { code: '13', name: 'Atlas Colour Pastels (12 Shades)', category: 'Art & Craft', itemType: 'product', costPrice: 175.00, sellingPrice: 230.00, stockQuantity: 25, lowStockThreshold: 5 },
+  { code: '14', name: 'Clear Display File Folder (A4)', category: 'Paper & Files', itemType: 'product', costPrice: 125.00, sellingPrice: 170.00, stockQuantity: 40, lowStockThreshold: 10 },
+  { code: '15', name: 'Uhu / Atlas Glue Stick 15g', category: 'Adhesives', itemType: 'product', costPrice: 110.00, sellingPrice: 150.00, stockQuantity: 30, lowStockThreshold: 8 },
 
-  document.addEventListener("pointerdown", (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    const isInteractive = target.closest("[data-ripple], button, .btn, .run-btn, .nav-btn, .mode-option, .theme-card, .prow, .innings-tab, .team-chip, .card, .glass-card, .icon");
-    const isEmptyBackground = target === document.body || target.matches(".bg, .content, section:empty, #app");
-    if (!isInteractive && !isEmptyBackground) return;
+  { code: 'BILL-01', name: 'Electricity Bill Payment (Ceb / Leco)', category: 'Utility Bills', itemType: 'service', costPrice: 0.00, sellingPrice: 0.00, stockQuantity: 0, lowStockThreshold: 0 },
+  { code: 'BILL-02', name: 'Water Supply Bill Payment (Nwsdb)', category: 'Utility Bills', itemType: 'service', costPrice: 0.00, sellingPrice: 0.00, stockQuantity: 0, lowStockThreshold: 0 },
+  { code: 'BILL-03', name: 'Slt / Mobitel Home Broadband Bill', category: 'Utility Bills', itemType: 'service', costPrice: 0.00, sellingPrice: 0.00, stockQuantity: 0, lowStockThreshold: 0 },
+  { code: 'BILL-04', name: 'Dialog Television / Home Bill', category: 'Utility Bills', itemType: 'service', costPrice: 0.00, sellingPrice: 0.00, stockQuantity: 0, lowStockThreshold: 0 }
+];
 
-    const ripple = document.createElement("span");
-    ripple.className = "ripple tc-water-wave";
-    ripple.style.left = `${event.clientX}px`;
-    ripple.style.top = `${event.clientY}px`;
-    layer.append(ripple);
-    if (reducedMotion.matches) {
-      requestAnimationFrame(() => ripple.remove());
-    } else {
-      ripple.addEventListener("animationend", () => ripple.remove(), { once: true });
+export function roundCurrency(amount) {
+  const num = Number(amount) || 0;
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+}
+
+export function formatLKR(amount, prefix = 'Rs. ') {
+  const rounded = roundCurrency(amount);
+  return prefix + rounded.toLocaleString('en-LK', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+export function formatSignedLKR(amount) {
+  const rounded = roundCurrency(amount);
+  return `${rounded < 0 ? '- ' : '+ '}${formatLKR(Math.abs(rounded))}`;
+}
+
+export function toTitleCase(str) {
+  if (!str) return '';
+  const acronyms = new Set(['A4', 'A5', 'LED', 'AA', 'AAA', 'USB', 'CEB', 'LECO', 'NWSDB', 'SLT', 'SIM', 'POS', 'GSM', 'CR', 'PVC']);
+  return String(str).trim().replace(/\s+/g, ' ').toLowerCase().replace(/[a-z0-9]+/gi, word => {
+    const upperWord = word.toUpperCase();
+    return acronyms.has(upperWord) ? upperWord : word.charAt(0).toUpperCase() + word.slice(1);
+  });
+}
+
+export function getTodayDateString() {
+  const now = new Date();
+  const tzOffset = 5.5 * 60;
+  const localTime = new Date(now.getTime() + (tzOffset + now.getTimezoneOffset()) * 60000);
+  const year = localTime.getFullYear();
+  const month = String(localTime.getMonth() + 1).padStart(2, '0');
+  const day = String(localTime.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getYesterdayDateString() {
+  const now = new Date();
+  const tzOffset = 5.5 * 60;
+  const localTime = new Date(now.getTime() + (tzOffset + now.getTimezoneOffset()) * 60000);
+  localTime.setDate(localTime.getDate() - 1);
+  const year = localTime.getFullYear();
+  const month = String(localTime.getMonth() + 1).padStart(2, '0');
+  const day = String(localTime.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getCurrentTimeString() {
+  const now = new Date();
+  const tzOffset = 5.5 * 60;
+  const localTime = new Date(now.getTime() + (tzOffset + now.getTimezoneOffset()) * 60000);
+  return localTime.toTimeString().split(' ')[0];
+}
+
+function escapeHTML(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+export function isServiceItem(item) {
+  if (!item) return false;
+  const marker = String(item.itemType || item.type || '').toLowerCase();
+  return marker.includes('service') || marker.includes('bill') || item.isServiceOrBill === true;
+}
+
+const RIPPLE_TARGETS = 'button, a, .dash-card, .quick-action-btn, .nav-tab-btn, .mobile-nav-btn, .mobile-menu-nav-btn, .settings-tab-btn, .preset-pill, .price-tier-card, .search-result-item, .log-row, tr, [role="button"], .catalog-price-tier-row button, .op-select-btn';
+
+function spawnRipple(el, event) {
+  if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (el.closest('input, textarea, select, option')) return;
+  const rect = el.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  const maxDistX = Math.max(x, rect.width - x);
+  const maxDistY = Math.max(y, rect.height - y);
+  const radius = Math.hypot(maxDistX, maxDistY) * 2.2;
+  const wave = document.createElement('span');
+  wave.className = 'tc-water-wave';
+  wave.style.setProperty('--ripple-x', x + 'px');
+  wave.style.setProperty('--ripple-y', y + 'px');
+  wave.style.setProperty('--ripple-radius', radius + 'px');
+  el.appendChild(wave);
+  const cleanup = () => wave.remove();
+  wave.addEventListener('animationend', cleanup, { once: true });
+  setTimeout(cleanup, 600);
+}
+
+export function attachRippleEffect(el) {
+  if (!el || el.dataset.rippleAttached === 'true') return;
+  if (['INPUT', 'TEXTAREA', 'SELECT', 'OPTION'].includes(el.tagName)) return;
+  el.dataset.rippleAttached = 'true';
+  el.classList.add('has-ripple');
+}
+
+document.addEventListener('pointerdown', (event) => {
+  const el = event.target instanceof Element ? event.target.closest(RIPPLE_TARGETS) : null;
+  if (!el) return;
+  if (!el.classList.contains('has-ripple')) attachRippleEffect(el);
+  spawnRipple(el, event);
+}, true);
+
+export function showDeleteConfirm(message) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('deleteConfirmModal');
+    const msgEl = document.getElementById('deleteConfirmMessage');
+    const okBtn = document.getElementById('deleteConfirmOkBtn');
+    const cancelBtn = document.getElementById('deleteConfirmCancelBtn');
+    if (!modal || !msgEl || !okBtn || !cancelBtn) {
+      resolve(window.confirm(message));
+      return;
     }
-  }, { passive: true });
+    msgEl.textContent = message;
+    modal.classList.remove('hidden');
+    const finish = (value) => {
+      modal.classList.add('hidden');
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      modal.onclick = null;
+      resolve(value);
+    };
+    okBtn.onclick = () => finish(true);
+    cancelBtn.onclick = () => finish(false);
+    modal.onclick = (e) => { if (e.target === modal) finish(false); };
+    okBtn.focus();
+  });
 }
 
-function attachRippleEffect() {
-  initRippleSystem();
-}
+async function removeTransaction(type, transactionRecord) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error('Sign in before deleting transactions.');
+  const currentUserId = currentUser.uid;
+  const isAdmin = APP_STATE.currentRole === 'admin';
 
-function finishModal(result) {
-  const modal = document.getElementById("glass-modal");
-  if (!modal || !modalResolver) return;
-  const resolve = modalResolver;
-  modalResolver = undefined;
-  modal.classList.remove("is-open");
-  modal.setAttribute("aria-hidden", "true");
-  modal.replaceChildren();
-  if (modalKeyHandler) document.removeEventListener("keydown", modalKeyHandler);
-  modalKeyHandler = undefined;
-  resolve(result);
-  modalReturnFocus?.focus?.();
-  modalReturnFocus = undefined;
-}
+  const collectionName = type === 'RELOAD' ? 'reload_transactions' : 'stationery_transactions';
+  const transactionRef = doc(db, collectionName, transactionRecord.id);
+  const stockRestored = await runTransaction(db, async firestoreTransaction => {
+    const transactionSnapshot = await firestoreTransaction.get(transactionRef);
+    if (!transactionSnapshot.exists()) throw new Error('This transaction no longer exists.');
 
-function closeGlassModal(result = "close") {
-  finishModal(result);
-}
+    const data = transactionSnapshot.data();
+    if (!isAdmin && data.createdBy !== currentUserId) {
+      throw new Error('You can delete only transactions recorded by your account.');
+    }
+    const isPhysicalSale = type !== 'RELOAD' && !isServiceItem(data);
+    let restored = false;
+    if (isPhysicalSale) {
+      const catalogItem = data.inventoryId
+        ? { id: data.inventoryId }
+        : APP_STATE.inventoryCatalog.find(item => item.code === data.itemCode);
 
-function openGlassModal({ title, body = "", actions = [] }) {
-  const modal = document.getElementById("glass-modal");
-  if (!modal) return Promise.reject(new Error("Glass modal container is missing."));
-  if (modalResolver) finishModal("replaced");
-  modalReturnFocus = document.activeElement;
-  const backdrop = document.createElement("div");
-  backdrop.className = "glass-modal__backdrop";
-  backdrop.addEventListener("click", () => finishModal("backdrop"));
-  const panel = document.createElement("section");
-  panel.className = "glass-modal__panel";
-  panel.setAttribute("role", "dialog");
-  panel.setAttribute("aria-modal", "true");
-  panel.setAttribute("aria-labelledby", "glass-modal-title");
-
-  const header = document.createElement("div");
-  header.className = "glass-modal__header";
-  const heading = document.createElement("h2");
-  heading.id = "glass-modal-title";
-  heading.textContent = String(title ?? "Thursday Cricket");
-  const close = document.createElement("button");
-  close.className = "glass-modal__close";
-  close.type = "button";
-  close.setAttribute("aria-label", "Close dialog");
-  close.textContent = "×";
-  close.addEventListener("click", () => finishModal("close"));
-  header.append(heading, close);
-
-  const content = document.createElement("div");
-  content.className = "glass-modal__body";
-  if (body instanceof Node) content.append(body);
-  else content.innerHTML = String(body);
-
-  const actionBar = document.createElement("div");
-  actionBar.className = "glass-modal__actions";
-  for (const action of actions) {
-    const button = document.createElement("button");
-    button.className = `glass-modal__action${action.primary ? " is-primary" : ""}`;
-    button.type = "button";
-    button.textContent = String(action.label ?? action.id);
-    button.addEventListener("click", async () => {
-      try {
-        if (typeof action.onClick === "function") {
-          const shouldClose = await action.onClick();
-          if (shouldClose === false) return;
+      if (catalogItem?.id) {
+        const inventoryRef = doc(db, 'inventory', catalogItem.id);
+        const inventorySnapshot = await firestoreTransaction.get(inventoryRef);
+        if (!inventorySnapshot.exists()) {
+          throw new Error('The original inventory item is missing; the transaction was not deleted.');
         }
-        finishModal(action.id);
-      } catch (error) {
-        let errorMessage = content.querySelector("[data-modal-error]");
-        if (!errorMessage) {
-          errorMessage = document.createElement("p");
-          errorMessage.dataset.modalError = "true";
-          errorMessage.className = "inline-error";
-          errorMessage.setAttribute("role", "alert");
-          content.append(errorMessage);
+        const quantity = Number(data.quantity ?? 1);
+        if (!Number.isFinite(quantity) || quantity <= 0) {
+          throw new Error('The transaction has an invalid quantity; the transaction was not deleted.');
         }
-        errorMessage.textContent = error instanceof Error ? error.message : String(error);
+        firestoreTransaction.update(inventoryRef, {
+          stockQuantity: increment(quantity),
+          updatedAt: serverTimestamp()
+        });
+        restored = true;
+      } else if (data.inventoryId) {
+        throw new Error('The original inventory item is missing; the transaction was not deleted.');
+      }
+    }
+
+    firestoreTransaction.delete(transactionRef);
+    return restored;
+  });
+  return stockRestored;
+}
+
+function logDebug(message, type = 'INFO') {
+  const time = getCurrentTimeString();
+  const entry = `[${time}] [${type}] ${message}`;
+  APP_STATE.devLogs.unshift(entry);
+  if (APP_STATE.devLogs.length > 100) APP_STATE.devLogs.pop();
+
+  const terminal = document.getElementById('dbgTerminalLogs');
+  if (terminal) {
+    const row = document.createElement('div');
+    row.className = type === 'ERROR' ? 'text-red-400' : type === 'WARN' ? 'text-amber-400' : 'text-emerald-400';
+    row.textContent = entry;
+    terminal.insertBefore(row, terminal.firstChild);
+    terminal.scrollTop = 0;
+  }
+}
+
+export function showToast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  const baseClasses = 'px-4 py-3 rounded-xl border text-xs font-semibold shadow-lg transition-all transform duration-200 pointer-events-auto flex items-center gap-2.5';
+
+  if (type === 'success') {
+    toast.className = `${baseClasses} bg-emerald-500/15 border-emerald-500/30 text-emerald-400`;
+  } else if (type === 'error') {
+    toast.className = `${baseClasses} bg-red-500/15 border-red-500/30 text-red-400`;
+  } else {
+    toast.className = `${baseClasses} bg-sky-500/15 border-sky-500/30 text-sky-400`;
+  }
+
+  toast.innerHTML = `
+    <span class="w-2 h-2 rounded-full ${type === 'success' ? 'bg-emerald-400' : type === 'error' ? 'bg-red-400' : 'bg-sky-400'}"></span>
+    <span>${escapeHTML(message)}</span>
+  `;
+
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(8px)';
+    setTimeout(() => toast.remove(), 250);
+  }, 3500);
+}
+
+export function applyTheme(themeName) {
+  const allowed = ['modern-slate', 'emerald-store', 'sapphire-blue', 'warm-amber'];
+  if (!allowed.includes(themeName)) themeName = 'modern-slate';
+
+  APP_STATE.activeTheme = themeName;
+  document.documentElement.setAttribute('data-theme', themeName);
+  localStorage.setItem('al_theme_preference', themeName);
+
+  if (themeName === 'emerald-store') {
+    document.body.classList.add('light-theme');
+  } else {
+    document.body.classList.remove('light-theme');
+  }
+
+  const sunIcon = document.getElementById('themeToggleIconSun');
+  const moonIcon = document.getElementById('themeToggleIconMoon');
+  if (sunIcon && moonIcon) {
+    if (themeName === 'emerald-store') {
+      sunIcon.classList.remove('hidden');
+      moonIcon.classList.add('hidden');
+    } else {
+      sunIcon.classList.add('hidden');
+      moonIcon.classList.remove('hidden');
+    }
+  }
+
+  document.querySelectorAll('.theme-choice-card').forEach(card => {
+    if (card.getAttribute('data-theme-choice') === themeName) {
+      card.classList.add('border-sky-500', 'ring-2', 'ring-sky-500/30');
+    } else {
+      card.classList.remove('border-sky-500', 'ring-2', 'ring-sky-500/30');
+    }
+  });
+
+  logDebug(`Theme active: ${themeName}`);
+}
+
+function initThemeSystem() {
+  applyTheme(APP_STATE.activeTheme);
+  setGradientBlurEnabled(APP_STATE.gradientBlurEnabled);
+
+  const quickToggle = document.getElementById('themeQuickToggleBtn');
+  if (quickToggle) {
+    quickToggle.addEventListener('click', () => {
+      const nextTheme = APP_STATE.activeTheme === 'emerald-store' ? 'modern-slate' : 'emerald-store';
+      applyTheme(nextTheme);
+      saveUserPreferences({ activeTheme: nextTheme });
+      showToast(`Switched to ${nextTheme === 'emerald-store' ? 'Light Mode' : 'Dark Mode'}`, 'info');
+    });
+  }
+
+  document.querySelectorAll('[data-theme-choice]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const chosen = btn.getAttribute('data-theme-choice');
+      applyTheme(chosen);
+      saveUserPreferences({ activeTheme: chosen });
+      showToast(`Theme applied: ${chosen}`, 'success');
+    });
+  });
+
+  const blurToggle = document.getElementById('gradientBlurToggle');
+  if (blurToggle) {
+    blurToggle.checked = APP_STATE.gradientBlurEnabled;
+    blurToggle.addEventListener('change', () => {
+      setGradientBlurEnabled(blurToggle.checked, true);
+    });
+  }
+
+  document.getElementById('resetDashboardLayoutBtn')?.addEventListener('click', resetDashboardLayout);
+}
+
+function setGradientBlurEnabled(enabled, persist = false) {
+  APP_STATE.gradientBlurEnabled = Boolean(enabled);
+  document.documentElement.dataset.gradientBlur = enabled ? 'on' : 'off';
+  localStorage.setItem('al_gradient_blur', String(Boolean(enabled)));
+  const toggle = document.getElementById('gradientBlurToggle');
+  const stateLabel = document.getElementById('gradientBlurState');
+  if (toggle) toggle.checked = Boolean(enabled);
+  if (stateLabel) stateLabel.textContent = enabled ? 'On' : 'Off';
+  const profileToggle = document.getElementById('profileBlurToggleBtn');
+  if (profileToggle) profileToggle.textContent = `Gradient Blur: ${enabled ? 'On' : 'Off'}`;
+  if (persist) saveUserPreferences({ gradientBlurEnabled: Boolean(enabled) });
+}
+
+function startLiveClock() {
+  const clockEl = document.getElementById('liveClock');
+  const dateEl = document.getElementById('liveDate');
+
+  function tick() {
+    const now = new Date();
+    const tzOffset = 5.5 * 60;
+    const local = new Date(now.getTime() + (tzOffset + now.getTimezoneOffset()) * 60000);
+
+    if (clockEl) {
+      const timeStr = local.toLocaleTimeString('en-US', { hour12: false });
+      clockEl.textContent = `${timeStr} LK`;
+    }
+    if (dateEl) {
+      const year = local.getFullYear();
+      const month = String(local.getMonth() + 1).padStart(2, '0');
+      const day = String(local.getDate()).padStart(2, '0');
+      dateEl.textContent = `${year}/${month}/${day}`;
+    }
+  }
+
+  tick();
+  setInterval(tick, 1000);
+}
+
+export function detectOperatorFromPrefix(phone) {
+  const clean = phone.replace(/[^0-9]/g, '');
+  let prefix = '';
+
+  if (clean.startsWith('94') && clean.length >= 4) {
+    prefix = '0' + clean.substring(2, 4);
+  } else if (clean.startsWith('0') && clean.length >= 3) {
+    prefix = clean.substring(0, 3);
+  } else if (clean.length >= 2) {
+    prefix = '0' + clean.substring(0, 2);
+  }
+
+  if (prefix === '077' || prefix === '076' || prefix === '074') return 'DIALOG';
+  if (prefix === '071' || prefix === '070') return 'MOBITEL';
+  if (prefix === '075') return 'AIRTEL';
+  if (prefix === '078' || prefix === '072') return 'HUTCH';
+  return null;
+}
+
+export function switchView(viewName) {
+  if (!auth.currentUser) {
+    showToast('Sign in before opening protected pages.', 'error');
+    return false;
+  }
+  const validViews = ['dashboard', 'stationery', 'reloads', 'stock', 'logs', 'profile'];
+  if (!validViews.includes(viewName)) viewName = 'dashboard';
+
+  if (viewName !== 'profile') APP_STATE.previousView = viewName;
+  APP_STATE.activeView = viewName;
+
+  document.querySelectorAll('.app-view').forEach(viewEl => {
+    viewEl.classList.add('hidden');
+  });
+
+  const targetView = document.getElementById(`view${viewName.charAt(0).toUpperCase() + viewName.slice(1)}`);
+  if (targetView) {
+    targetView.classList.remove('hidden');
+  }
+
+  document.querySelectorAll('.nav-tab-btn').forEach(btn => {
+    if (btn.getAttribute('data-view') === viewName) {
+      btn.className = 'nav-tab-btn active px-3.5 py-1.5 rounded-lg transition';
+    } else {
+      btn.className = 'nav-tab-btn px-3.5 py-1.5 rounded-lg theme-text-muted hover:theme-text-main transition';
+    }
+  });
+
+  document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+    if (btn.getAttribute('data-view') === viewName) {
+      btn.className = 'mobile-nav-btn active flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-accent';
+    } else {
+      btn.className = 'mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted';
+    }
+  });
+  document.getElementById('openProfileBtn')?.classList.toggle('active', viewName === 'profile');
+  document.getElementById('mobileMenuDrawer')?.classList.add('hidden');
+  document.getElementById('mobileMenuToggleBtn')?.setAttribute('aria-expanded', 'false');
+  document.getElementById('mobileMenuDrawer')?.setAttribute('aria-hidden', 'true');
+
+  if (viewName === 'stock') {
+    renderStockTable();
+  } else if (viewName === 'logs') {
+    applyMasterLogFilters();
+  } else if (viewName === 'dashboard') {
+    updateDashboardMetrics();
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  logDebug(`Switched active view to: ${viewName}`);
+  return true;
+}
+
+function initNavigation() {
+
+  document.querySelectorAll('.nav-tab-btn').forEach(btn => {
+    const target = btn.getAttribute('data-view');
+    if (target) {
+      btn.addEventListener('click', () => switchView(target));
+    }
+  });
+
+  document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+    const target = btn.getAttribute('data-view');
+    if (target) {
+      btn.addEventListener('click', () => switchView(target));
+    }
+  });
+
+  document.querySelectorAll('.mobile-menu-nav-btn[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
+  });
+
+  const menuToggle = document.getElementById('mobileMenuToggleBtn');
+  const menuDrawer = document.getElementById('mobileMenuDrawer');
+  menuToggle?.addEventListener('click', () => {
+    const opening = menuDrawer?.classList.contains('hidden');
+    menuDrawer?.classList.toggle('hidden', !opening);
+    menuDrawer?.setAttribute('aria-hidden', String(!opening));
+    menuToggle.setAttribute('aria-expanded', String(Boolean(opening)));
+  });
+  document.getElementById('mobileMenuProfileBtn')?.addEventListener('click', () => switchView('profile'));
+  document.getElementById('desktopSettingsNavBtn')?.addEventListener('click', openSettingsModal);
+  document.getElementById('mobileMenuSettingsBtn')?.addEventListener('click', () => {
+    menuDrawer?.classList.add('hidden');
+    menuToggle?.setAttribute('aria-expanded', 'false');
+    menuDrawer?.setAttribute('aria-hidden', 'true');
+    openSettingsModal();
+  });
+
+  const headerHomeBtn = document.getElementById('headerHomeBtn');
+  if (headerHomeBtn) {
+    headerHomeBtn.addEventListener('click', () => switchView('dashboard'));
+  }
+  document.querySelectorAll('#headerHomeBtn img, #settingsModal img[alt="AL Communication"]').forEach(image => {
+    image.addEventListener('error', () => image.classList.add('hidden'), { once: true });
+  });
+
+  const dashTileStationery = document.getElementById('dashTileStationery');
+  if (dashTileStationery) {
+    dashTileStationery.addEventListener('click', () => switchView('stationery'));
+  }
+
+  const dashTileReloads = document.getElementById('dashTileReloads');
+  if (dashTileReloads) {
+    dashTileReloads.addEventListener('click', () => switchView('reloads'));
+  }
+
+  const dashTileStock = document.getElementById('dashTileStock');
+  if (dashTileStock) {
+    dashTileStock.addEventListener('click', () => switchView('stock'));
+  }
+
+  const dashTileLogs = document.getElementById('dashTileLogs');
+  if (dashTileLogs) {
+    dashTileLogs.addEventListener('click', () => switchView('logs'));
+  }
+  document.getElementById('dashTileSettings')?.addEventListener('click', openSettingsModal);
+  document.getElementById('dashTileProfile')?.addEventListener('click', () => switchView('profile'));
+
+  const mainHeader = document.getElementById('mainHeader');
+  if (mainHeader) {
+    const handleScroll = () => {
+      if (window.scrollY > 10) {
+        mainHeader.classList.add('header-scrolled');
+      } else {
+        mainHeader.classList.remove('header-scrolled');
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+  }
+
+  const stockOpenCatalogSettingsBtn = document.getElementById('stockOpenCatalogSettingsBtn');
+  if (stockOpenCatalogSettingsBtn) {
+    stockOpenCatalogSettingsBtn.addEventListener('click', () => {
+      openSettingsModal();
+      switchSettingsTab('catalog');
+    });
+  }
+
+  const openPresetConfigBtn = document.getElementById('openPresetConfigBtn');
+  if (openPresetConfigBtn) {
+    openPresetConfigBtn.addEventListener('click', () => {
+      openSettingsModal();
+      switchSettingsTab('presets');
+    });
+  }
+
+  const openSettingsBtn = document.getElementById('openSettingsBtn');
+  const mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
+  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+
+  if (openSettingsBtn) openSettingsBtn.addEventListener('click', openSettingsModal);
+  if (mobileSettingsBtn) mobileSettingsBtn.addEventListener('click', openSettingsModal);
+  if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettingsModal);
+
+  document.querySelectorAll('[data-settings-tab]').forEach(tabBtn => {
+    tabBtn.addEventListener('click', () => {
+      switchSettingsTab(tabBtn.getAttribute('data-settings-tab'));
+    });
+  });
+
+  const settingsModal = document.getElementById('settingsModal');
+  if (settingsModal) {
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) closeSettingsModal();
+    });
+  }
+}
+
+export function openSettingsModal() {
+  const modal = document.getElementById('settingsModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    document.getElementById('desktopSettingsNavBtn')?.classList.add('active');
+    updateBackupStatusDisplay();
+  }
+}
+
+export function closeSettingsModal() {
+  const modal = document.getElementById('settingsModal');
+  if (modal) modal.classList.add('hidden');
+  document.getElementById('desktopSettingsNavBtn')?.classList.remove('active');
+}
+
+export function switchSettingsTab(tabId) {
+  const validTabs = ['catalog', 'presets', 'rates', 'backup', 'themes', 'security', 'developer'];
+  if (!validTabs.includes(tabId)) tabId = 'catalog';
+
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('[data-settings-tab]').forEach(b => {
+    b.className = 'settings-tab-btn px-2.5 py-1 rounded-md border theme-border transition whitespace-nowrap font-rounded';
+  });
+
+  const targetPanel = document.getElementById(`settingsPanel${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
+  const targetBtn = document.querySelector(`[data-settings-tab="${tabId}"]`);
+
+  if (targetPanel) targetPanel.classList.remove('hidden');
+  if (targetBtn) {
+    targetBtn.className = 'settings-tab-btn active px-2.5 py-1 rounded-md border theme-border transition whitespace-nowrap theme-bg-accent text-white font-bold font-rounded shadow-sm';
+  }
+
+  if (tabId === 'catalog') {
+    renderCatalogTable();
+  } else if (tabId === 'backup') {
+    updateBackupStatusDisplay();
+  }
+}
+
+function initGlobalSearch() {
+  const input = document.getElementById('globalSearchInput');
+  const results = document.getElementById('globalSearchResults');
+  const toggleBtn = document.getElementById('headerSearchToggleBtn');
+  const closeBtn = document.getElementById('searchCloseBtn');
+  const header = document.getElementById('mainHeader');
+  const headerSearchWrapper = document.getElementById('headerSearchWrapper');
+
+  function openSearch() {
+    if (!header) return;
+    header.classList.add('search-active');
+    if (toggleBtn) toggleBtn.classList.add('hidden');
+    if (input) {
+      input.focus();
+      input.select();
+      if (input.value.trim() && results) {
+        performSearch(input.value.trim().toLowerCase(), results);
+      }
+    }
+  }
+
+  function closeSearch() {
+    if (!header) return;
+    header.classList.remove('search-active');
+    if (toggleBtn) toggleBtn.classList.remove('hidden');
+    if (results) {
+      results.classList.add('hidden');
+      results.innerHTML = '';
+    }
+  }
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (header && header.classList.contains('search-active')) {
+        closeSearch();
+      } else {
+        openSearch();
       }
     });
-    actionBar.append(button);
   }
-  panel.append(header, content, actionBar);
-  modal.replaceChildren(backdrop, panel);
-  modalResolver = undefined;
-  const resultPromise = new Promise((resolve) => { modalResolver = resolve; });
-  modalKeyHandler = (event) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      finishModal("escape");
-      return;
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeSearch();
+    });
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey && e.key.toLowerCase() === 'k') || (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA')) {
+      e.preventDefault();
+      openSearch();
+    } else if (e.key === 'Escape') {
+      closeSearch();
     }
-    if (event.key !== "Tab") return;
-    const focusable = [...panel.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')];
-    if (!focusable.length) {
-      event.preventDefault();
-      panel.focus();
-      return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
-  document.addEventListener("keydown", modalKeyHandler);
-  modal.setAttribute("aria-hidden", "false");
-  requestAnimationFrame(() => {
-    modal.classList.add("is-open");
-    (panel.querySelector("button") ?? panel).focus();
   });
-  return resultPromise;
-}
 
-
-// Consolidated from firebase-config.js
-// ⚠️ SECURITY: Do not commit this file to a public repository.
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCaA5DXo3JkWGqGdjFBMPnKj5PlwAbCT-Y",
-  authDomain: "thursday-cricket.firebaseapp.com",
-  projectId: "thursday-cricket",
-  storageBucket: "thursday-cricket.appspot.com",
-  messagingSenderId: "752945537542",
-  appId: "1:752945537542:web:84be60617247fc045fd987"
-};
-
-
-// Consolidated from seed.js
-const SQUAD_TEAMS = {
-  whiteTigers: {
-    id: "white-tigers",
-    name: "White Tigers",
-    code: "White@tiger",
-    domain: "whitetigers.cricket",
-    color: "#f5f5f5",
-    accent: "#e8e8e8",
-    players: ["Dilusha", "Isala", "Anuk"]
-  },
-  blackPanthers: {
-    id: "black-panthers",
-    name: "Black Panthers",
-    code: "Black@panthers",
-    domain: "blackpanthers.cricket",
-    color: "#1a1a1a",
-    accent: "#2d2d2d",
-    players: ["Jevon", "Lasas", "Shenal"]
-  }
-};
-
-const SEED_PLAYERS = [
-  { username: "Dilusha", teamKey: "whiteTigers", role: "Batter", tags: ["Captain", "Opener"] },
-  { username: "Isala", teamKey: "whiteTigers", role: "All-Rounder", tags: ["Vice-Captain"] },
-  { username: "Anuk", teamKey: "whiteTigers", role: "Bowler", tags: ["Death Specialist"] },
-  { username: "Jevon", teamKey: "blackPanthers", role: "All-Rounder", tags: ["Captain", "Finisher"] },
-  { username: "Lasas", teamKey: "blackPanthers", role: "Batter", tags: ["Opener"] },
-  { username: "Shenal", teamKey: "blackPanthers", role: "Bowler", tags: ["Spinner"] }
-];
-
-function resolveEmail(username, teamKey) {
-  const team = SQUAD_TEAMS[teamKey];
-  if (!team) throw new Error("Unknown team");
-  return `${String(username).toLowerCase()}@${team.domain}`;
-}
-
-function resolvePassword(teamKey) {
-  const team = SQUAD_TEAMS[teamKey];
-  if (!team) throw new Error("Unknown team");
-  return team.code;
-}
-
-function findSeedPlayer(username) {
-  return SEED_PLAYERS.find((player) => player.username === username) ?? null;
-}
-
-function seedTeamsAsAppTeams() {
-  return Object.values(SQUAD_TEAMS).map((team) => ({
-    id: team.id,
-    name: team.name,
-    tag: team.id === "white-tigers" ? "WT" : "BP",
-    code: team.code,
-    secretCode: team.code,
-    domain: team.domain,
-    color: team.color,
-    accent: team.accent,
-    roster: SEED_PLAYERS.filter((player) => player.teamKey === Object.keys(SQUAD_TEAMS).find((key) => SQUAD_TEAMS[key].id === team.id)).map((player) => ({
-      id: player.username.toLowerCase(),
-      name: player.username,
-      role: player.role,
-      tags: [...player.tags]
-    }))
-  }));
-}
-
-
-// Consolidated from state.js
-
-const STORAGE_KEY = "tc_state_v1";
-
-const DEFAULT_TEAMS = seedTeamsAsAppTeams().map((team) => ({
-  ...team,
-  roster: team.roster.map((player) => ({ ...player }))
-}));
-/*
-const LEGACY_DEFAULT_TEAMS = [
-  { id: "white-tigers", name: "White Tigers", tag: "WT", color: "#e8f4f2", secretCode: "White@tiger", roster: [
-    { id: "wt-aryan", name: "Aryan Sharma", role: "Batter" }, { id: "wt-kabir", name: "Kabir Singh", role: "All-rounder" },
-    { id: "wt-dev", name: "Dev Patel", role: "Bowler" }, { id: "wt-arjun", name: "Arjun Rao", role: "Wicket-keeper" }
-  ] },
-  { id: "black-panthers", name: "Black Panthers", tag: "BP", color: "#8eb8ff", secretCode: "Black@panthers", roster: [
-    { id: "bp-rohan", name: "Rohan Mehta", role: "Batter" }, { id: "bp-zain", name: "Zain Khan", role: "All-rounder" },
-    { id: "bp-vihaan", name: "Vihaan Das", role: "Bowler" }, { id: "bp-neil", name: "Neil Joseph", role: "Wicket-keeper" }
-  ] }
-];
-*/
-
-function createInitialState() {
-  return {
-    currentUser: null,
-    currentPage: "dashboard",
-    teams: DEFAULT_TEAMS.map((team) => ({ ...team, roster: team.roster.map((player) => ({ ...player })) })),
-    players: [],
-    matches: [],
-    activeMatchId: null
-  };
-}
-
-function createStore(initialState = createInitialState()) {
-  let state = initialState;
-  const listeners = new Set();
-  return {
-    getState() { return state; },
-    subscribe(listener) {
-      if (typeof listener !== "function") throw new TypeError("A state listener must be a function.");
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    update(updater) {
-      const nextState = typeof updater === "function" ? updater(state) : { ...state, ...updater };
-      if (!nextState || typeof nextState !== "object" || Array.isArray(nextState)) {
-        throw new TypeError("A store update must produce a state object.");
+  if (input && results) {
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        results.querySelector('.search-result-item')?.click();
+        closeSearch();
       }
-      state = nextState;
-      for (const listener of listeners) listener(state);
-      return state;
-    },
-    persist() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      return state;
-    },
-    load() {
-      const serialized = localStorage.getItem(STORAGE_KEY);
-      if (serialized === null) return state;
-      let parsed;
+    });
+    input.addEventListener('input', () => {
+      const queryStr = input.value.trim().toLowerCase();
+      if (!queryStr) {
+        closeSearch();
+        return;
+      }
+      performSearch(queryStr, results);
+    });
+
+    input.addEventListener('blur', () => {
+      setTimeout(() => {
+        const active = document.activeElement;
+        const focusInside = active === input || (results && results.contains(active)) || (headerSearchWrapper && headerSearchWrapper.contains(active));
+        if (!focusInside && header && header.classList.contains('search-active')) {
+          closeSearch();
+        }
+      }, 200);
+    });
+
+    input.addEventListener('focus', () => {
+      const queryStr = input.value.trim().toLowerCase();
+      if (queryStr) performSearch(queryStr, results);
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (results && !results.contains(e.target) && e.target !== input) {
+      results.classList.add('hidden');
+    }
+    if (headerSearchWrapper && !headerSearchWrapper.contains(e.target) && header && header.classList.contains('search-active')) {
+      closeSearch();
+    }
+  });
+  function performSearch(q, container) {
+    container.innerHTML = '';
+    container.classList.remove('hidden');
+
+    const navigationTargets = [
+      { label: 'Dashboard', terms: 'home metrics cards', view: 'dashboard' },
+      { label: 'Stationery Entry', terms: 'stationery point of sale bills', view: 'stationery' },
+      { label: 'Mobile Reloads', terms: 'reload top up mobile', view: 'reloads' },
+      { label: 'Stock Inventory', terms: 'stock inventory catalog', view: 'stock' },
+      { label: 'Master Logs', terms: 'logs ledger transactions report', view: 'logs' },
+      { label: 'Account Profile', terms: 'profile account password security', view: 'profile' },
+      { label: 'Settings: Inventory Catalog', terms: 'settings catalog inventory items', tab: 'catalog' },
+      { label: 'Settings: Reload Presets', terms: 'settings reload presets amounts', tab: 'presets' },
+      { label: 'Settings: Commission Rates', terms: 'settings commission rate operator', tab: 'rates' },
+      { label: 'Settings: Backup & Restore', terms: 'settings backup restore export import', tab: 'backup' },
+      { label: 'Settings: Themes & Header Blur', terms: 'settings theme gradient blur ui', tab: 'themes' },
+      { label: 'Settings: Account Security', terms: 'settings password security account', tab: 'security' },
+      { label: 'Settings: Debug Console', terms: 'settings debug developer diagnostics', tab: 'developer' }
+    ];
+    const matchedNavigation = navigationTargets.filter(target =>
+      `${target.label} ${target.terms}`.toLowerCase().includes(q)
+    );
+    const dashboardCards = [...document.querySelectorAll('#dashboardGrid > [data-card-id]')]
+      .map(card => ({
+        label: card.querySelector('span')?.textContent?.trim() || card.textContent.trim().split('\n')[0],
+        card
+      }))
+      .filter(target => target.label && target.label.toLowerCase().includes(q))
+      .slice(0, 5);
+
+    const matchedCatalog = APP_STATE.inventoryCatalog.filter(item => {
+      return (item.code || '').toLowerCase().includes(q) ||
+             (item.name || '').toLowerCase().includes(q) ||
+             (item.category || '').toLowerCase().includes(q);
+    }).slice(0, 5);
+
+    const combinedReloads = [...APP_STATE.todayReloadTransactions, ...APP_STATE.masterReloadRecords];
+    const uniqueReloads = [];
+    const seenRIds = new Set();
+    for (const r of combinedReloads) {
+      if (!seenRIds.has(r.id)) {
+        seenRIds.add(r.id);
+        if ((r.phone || '').includes(q) || (r.operator || '').toLowerCase().includes(q) || String(r.amount).includes(q)) {
+          uniqueReloads.push(r);
+          if (uniqueReloads.length >= 4) break;
+        }
+      }
+    }
+
+    const combinedStats = [...APP_STATE.todayStationeryTransactions, ...APP_STATE.masterStationeryRecords];
+    const uniqueStats = [];
+    const seenSIds = new Set();
+    for (const s of combinedStats) {
+      if (!seenSIds.has(s.id)) {
+        seenSIds.add(s.id);
+        if ((s.itemName || '').toLowerCase().includes(q) || (s.itemCode || '').toLowerCase().includes(q) || String(s.totalAmount).includes(q)) {
+          uniqueStats.push(s);
+          if (uniqueStats.length >= 4) break;
+        }
+      }
+    }
+
+    const totalMatches = matchedNavigation.length + dashboardCards.length + matchedCatalog.length + uniqueReloads.length + uniqueStats.length;
+
+    if (totalMatches === 0) {
+      container.innerHTML = `
+        <div class="p-4 text-center text-xs theme-text-dim">
+          No records or transactions matching "<span class="font-semibold theme-text-main">${escapeHTML(q)}</span>"
+        </div>
+      `;
+      return;
+    }
+
+    if (matchedNavigation.length || dashboardCards.length) {
+      const header = document.createElement('div');
+      header.className = 'search-section-header flex items-center justify-between';
+      header.innerHTML = `<span>Pages, Settings &amp; Dashboard</span><span>${matchedNavigation.length + dashboardCards.length}</span>`;
+      container.appendChild(header);
+      [...matchedNavigation, ...dashboardCards.map(target => ({ ...target, card: target.card }))].forEach(target => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'search-result-item w-full text-left';
+        row.innerHTML = `<div class="min-w-0"><div class="font-bold text-xs theme-text-main">${escapeHTML(target.label)}</div><div class="text-[11px] theme-text-dim">${target.tab ? 'Open settings section' : target.view ? 'Navigate to page' : 'Open dashboard card'}</div></div><span class="theme-text-dim">→</span>`;
+        row.addEventListener('click', () => {
+          container.classList.add('hidden');
+          if (target.card) {
+            const action = target.card.querySelector('button') || target.card;
+            if (target.card.closest('#dashboardActionsGrid')) {
+              action.click();
+            } else {
+              switchView('dashboard');
+              requestAnimationFrame(() => target.card.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+            }
+          } else if (target.tab) {
+            openSettingsModal();
+            switchSettingsTab(target.tab);
+          } else {
+            switchView(target.view);
+          }
+        });
+        container.appendChild(row);
+      });
+    }
+
+    if (matchedCatalog.length > 0) {
+      const header = document.createElement('div');
+      header.className = 'search-section-header flex items-center justify-between';
+      header.innerHTML = `<span>Catalog & Stock Inventory</span><span>${matchedCatalog.length}</span>`;
+      container.appendChild(header);
+
+      matchedCatalog.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'search-result-item';
+        const isService = item.itemType === 'service';
+        const stockBadge = isService
+          ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service/Bill</span>`
+          : item.stockQuantity <= 5
+          ? `<span class="badge-stock-low px-2 py-0.5 rounded text-[10px] font-bold">${escapeHTML(item.stockQuantity)} Left</span>`
+          : `<span class="badge-stock-in px-2 py-0.5 rounded text-[10px] font-bold">${escapeHTML(item.stockQuantity)} in stock</span>`;
+
+        row.innerHTML = `
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="px-2 py-0.5 rounded text-[11px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">${escapeHTML(item.code)}</span>
+            <div class="truncate">
+              <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(toTitleCase(item.name))}</div>
+              <div class="text-[11px] theme-text-dim">${escapeHTML(item.category || 'General')}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0 text-right">
+            <div>
+              <div class="font-bold text-xs theme-text-main font-mono">${formatLKR(item.sellingPrice)}</div>
+              ${stockBadge}
+            </div>
+            <button type="button" class="px-2 py-1 rounded bg-sky-500/15 text-sky-400 hover:bg-sky-500 text-[10px] font-bold hover:text-white transition">POS</button>
+          </div>
+        `;
+
+        row.addEventListener('click', (e) => {
+          container.classList.add('hidden');
+          if (e.target.tagName === 'BUTTON' || isService) {
+
+            switchView('stationery');
+            selectCatalogItemForPOS(item);
+          } else {
+
+            switchView('stock');
+            const stockInput = document.getElementById('stockSearchInput');
+            if (stockInput) {
+              stockInput.value = item.code;
+              renderStockTable();
+            }
+          }
+        });
+
+        container.appendChild(row);
+      });
+    }
+
+    if (uniqueReloads.length > 0) {
+      const header = document.createElement('div');
+      header.className = 'search-section-header flex items-center justify-between';
+      header.innerHTML = `<span>Mobile Reload Ledger</span><span>${uniqueReloads.length}</span>`;
+      container.appendChild(header);
+
+      uniqueReloads.forEach(r => {
+        const row = document.createElement('div');
+        row.className = 'search-result-item';
+        row.innerHTML = `
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${r.operator === 'DIALOG' ? 'text-orange-400 border-orange-500/30' : r.operator === 'MOBITEL' ? 'text-blue-400 border-blue-500/30' : r.operator === 'AIRTEL' ? 'text-red-400 border-red-500/30' : 'text-amber-300 border-amber-500/30'}">${escapeHTML(r.operator)}</span>
+            <div class="truncate">
+              <div class="font-bold text-xs font-mono theme-text-main">${escapeHTML(r.phone || 'Walk-in')}</div>
+              <div class="text-[10px] theme-text-dim">${escapeHTML(r.date || '')} ${escapeHTML(r.time || '')}</div>
+            </div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <div class="font-bold text-xs text-emerald-400 font-mono">${formatLKR(r.amount)}</div>
+            <div class="text-[10px] theme-text-dim font-mono">${formatSignedLKR(r.commissionAmount)}</div>
+          </div>
+        `;
+
+        row.addEventListener('click', () => {
+          container.classList.add('hidden');
+          switchView('logs');
+          setMasterLogCategoryTab('reloads');
+          const filterInput = document.getElementById('logSearchFilter');
+          if (filterInput) {
+            filterInput.value = r.phone || r.operator;
+            applyMasterLogFilters();
+          }
+        });
+
+        container.appendChild(row);
+      });
+    }
+
+    if (uniqueStats.length > 0) {
+      const header = document.createElement('div');
+      header.className = 'search-section-header flex items-center justify-between';
+      header.innerHTML = `<span>Stationery & Bill Ledger</span><span>${uniqueStats.length}</span>`;
+      container.appendChild(header);
+
+      uniqueStats.forEach(s => {
+        const row = document.createElement('div');
+        row.className = 'search-result-item';
+        row.innerHTML = `
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(s.itemCode || 'ST')}</span>
+            <div class="truncate">
+              <div class="font-bold text-xs theme-text-main truncate">${escapeHTML(toTitleCase(s.itemName))}</div>
+              <div class="text-[10px] theme-text-dim">${escapeHTML(s.date || '')} &bull; Qty: ${escapeHTML(s.quantity || 1)}</div>
+            </div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <div class="font-bold text-xs theme-text-main font-mono">${formatLKR(s.totalAmount)}</div>
+            <div class="text-[10px] text-sky-400 font-mono">Profit: ${formatSignedLKR(s.profit ?? ((Number(s.sellingPrice || 0) - Number(s.costPrice || 0)) * Number(s.quantity || 1)))}</div>
+          </div>
+        `;
+
+        row.addEventListener('click', () => {
+          container.classList.add('hidden');
+          switchView('logs');
+          setMasterLogCategoryTab('stationery');
+          const filterInput = document.getElementById('logSearchFilter');
+          if (filterInput) {
+            filterInput.value = s.itemName;
+            applyMasterLogFilters();
+          }
+        });
+
+        container.appendChild(row);
+      });
+    }
+  }
+}
+
+export function sortCatalogList(items, sortKey) {
+  const list = [...items];
+  const compareName = (a, b) => toTitleCase(a.name).localeCompare(toTitleCase(b.name), undefined, { numeric: true, sensitivity: 'base' });
+  const addedAt = item => {
+    const value = item.createdAt;
+    if (value?.toMillis) return value.toMillis();
+    const parsed = value ? new Date(value).getTime() : 0;
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const tierPrice = (item, key) => {
+    if (Array.isArray(item.prices) && item.prices.length > 0) {
+      const value = Number(item.prices[0]?.[key]);
+      if (Number.isFinite(value)) return value;
+    }
+    return Number(item[key]) || 0;
+  };
+  switch (sortKey) {
+    case 'code-asc':
+      return list.sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
+    case 'code-desc':
+      return list.sort((a, b) => String(b.code || '').localeCompare(String(a.code || ''), undefined, { numeric: true, sensitivity: 'base' }));
+    case 'selling-asc':
+    case 'price-asc':
+      return list.sort((a, b) => tierPrice(a, 'sellingPrice') - tierPrice(b, 'sellingPrice'));
+    case 'selling-desc':
+    case 'price-desc':
+      return list.sort((a, b) => tierPrice(b, 'sellingPrice') - tierPrice(a, 'sellingPrice'));
+    case 'cost-asc':
+      return list.sort((a, b) => tierPrice(a, 'costPrice') - tierPrice(b, 'costPrice'));
+    case 'cost-desc':
+      return list.sort((a, b) => tierPrice(b, 'costPrice') - tierPrice(a, 'costPrice'));
+    case 'stock-asc':
+      return list.sort((a, b) => {
+        if (a.itemType === 'service' || b.itemType === 'service') {
+          return a.itemType === b.itemType ? 0 : a.itemType === 'service' ? 1 : -1;
+        }
+        return (Number(a.stockQuantity) || 0) - (Number(b.stockQuantity) || 0);
+      });
+    case 'stock-desc':
+      return list.sort((a, b) => {
+        if (a.itemType === 'service' || b.itemType === 'service') {
+          return a.itemType === b.itemType ? 0 : a.itemType === 'service' ? 1 : -1;
+        }
+        return (Number(b.stockQuantity) || 0) - (Number(a.stockQuantity) || 0);
+      });
+    case 'name-asc':
+      return list.sort(compareName);
+    case 'name-desc':
+      return list.sort((a, b) => compareName(b, a));
+    case 'newest':
+      return list.sort((a, b) => addedAt(b) - addedAt(a));
+    case 'oldest':
+      return list.sort((a, b) => addedAt(a) - addedAt(b));
+    default:
+      return list.sort(compareName);
+  }
+}
+
+export function updateDashboardMetrics() {
+
+  let statSales = 0;
+  let statUnits = 0;
+  let statProfitToday = 0;
+
+  APP_STATE.todayStationeryTransactions.forEach(t => {
+    const total = Number(t.totalAmount || t.sellingPrice || 0);
+    const qty = Number(t.quantity || 1);
+    statSales += total;
+    statUnits += qty;
+
+    if (t.profit !== undefined) {
+      statProfitToday += Number(t.profit);
+    } else {
+      const cost = Number(t.costPrice || 0);
+      const sell = Number(t.sellingPrice || 0);
+      statProfitToday += (sell - cost) * qty;
+    }
+  });
+
+  let reloadVolume = 0;
+  let reloadCommission = 0;
+
+  APP_STATE.todayReloadTransactions.forEach(r => {
+    reloadVolume += Number(r.amount || 0);
+    reloadCommission += Number(r.commissionAmount || 0);
+  });
+
+  const lifetimeReloadCommission = roundCurrency(APP_STATE.masterReloadRecords
+    .reduce((sum, record) => sum + Number(record.commissionAmount || 0), 0));
+  const lifetimeStationeryProfit = roundCurrency(APP_STATE.masterStationeryRecords
+    .reduce((sum, record) => sum + Number(
+      record.profit !== undefined
+        ? record.profit
+        : (Number(record.sellingPrice || 0) - Number(record.costPrice || 0)) * Number(record.quantity || 1)
+    ), 0));
+
+  const elStatSales = document.getElementById('dashStationerySales');
+  const elStatUnits = document.getElementById('dashStationeryUnits');
+  const elReloadVol = document.getElementById('dashReloadVolume');
+  const elReloadComm = document.getElementById('dashReloadCommission');
+  const elStatProfit = document.getElementById('dashStationeryProfit');
+  const elCatalogCount = document.getElementById('dashCatalogCount');
+  const elLifetimeReloadCommission = document.getElementById('dashReloadCommissionTotal');
+  const elLifetimeStationeryProfit = document.getElementById('dashStationeryProfitTotal');
+  if (elStatSales) elStatSales.textContent = formatLKR(statSales);
+  if (elStatUnits) elStatUnits.textContent = String(statUnits);
+  if (elReloadVol) elReloadVol.textContent = formatLKR(reloadVolume);
+  if (elReloadComm) elReloadComm.textContent = formatSignedLKR(reloadCommission);
+  if (elStatProfit) elStatProfit.textContent = formatSignedLKR(statProfitToday);
+  if (elCatalogCount) elCatalogCount.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
+  if (elLifetimeReloadCommission) elLifetimeReloadCommission.textContent = formatSignedLKR(lifetimeReloadCommission);
+  if (elLifetimeStationeryProfit) elLifetimeStationeryProfit.textContent = formatSignedLKR(lifetimeStationeryProfit);
+
+  updateMasterLogsPairedCards();
+}
+
+export function updateMasterLogsPairedCards() {
+  applyMasterLogFilters();
+}
+
+function initMasterLogs() {
+  const specificDateInput = document.getElementById('logSpecificDate');
+  const toggleMoreFiltersBtn = document.getElementById('toggleMoreFiltersBtn');
+  const moreFiltersDrawer = document.getElementById('moreFiltersDrawer');
+  const moreFiltersChevron = document.getElementById('moreFiltersChevron');
+  const fromInput = document.getElementById('logDateFrom');
+  const toInput = document.getElementById('logDateTo');
+  const applyCustomDateBtn = document.getElementById('applyCustomDateBtn');
+  const resetLogFiltersBtn = document.getElementById('resetLogFiltersBtn');
+
+  if (specificDateInput) {
+    specificDateInput.value = getTodayDateString();
+    specificDateInput.addEventListener('change', () => {
+      const val = specificDateInput.value;
+      if (val) {
+        APP_STATE.logDateScope = 'specific';
+        APP_STATE.logDateFrom = val;
+        APP_STATE.logDateTo = val;
+        if (fromInput) fromInput.value = '';
+        if (toInput) toInput.value = '';
+        document.querySelectorAll('[data-log-date]').forEach(b => {
+          b.className = 'log-date-btn px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border transition font-rounded text-xs';
+        });
+        applyMasterLogFilters();
+      }
+    });
+  }
+
+  if (toggleMoreFiltersBtn && moreFiltersDrawer) {
+    toggleMoreFiltersBtn.addEventListener('click', () => {
+      const isOpen = !moreFiltersDrawer.classList.contains('is-open');
+      moreFiltersDrawer.classList.toggle('is-open', isOpen);
+      moreFiltersDrawer.setAttribute('aria-hidden', String(!isOpen));
+      toggleMoreFiltersBtn.setAttribute('aria-expanded', String(isOpen));
+      if (moreFiltersChevron) moreFiltersChevron.classList.toggle('rotate-180', isOpen);
+    });
+  }
+
+  document.querySelectorAll('[data-log-date]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-log-date]').forEach(b => {
+        b.className = 'log-date-btn px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border transition font-rounded text-xs';
+      });
+      btn.className = 'log-date-btn active px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border theme-bg-subtle transition font-bold theme-text-main font-rounded text-xs';
+
+      const scope = btn.getAttribute('data-log-date');
+      APP_STATE.logDateScope = scope;
+      if (fromInput) fromInput.value = '';
+      if (toInput) toInput.value = '';
+
+      if (scope === 'today') {
+        APP_STATE.logDateFrom = getTodayDateString();
+        APP_STATE.logDateTo = getTodayDateString();
+        if (specificDateInput) specificDateInput.value = getTodayDateString();
+      } else if (scope === 'all-time') {
+        APP_STATE.logDateFrom = '1970-01-01';
+        APP_STATE.logDateTo = '2099-12-31';
+        if (specificDateInput) specificDateInput.value = '';
+      } else if (scope === 'yesterday') {
+        APP_STATE.logDateFrom = getYesterdayDateString();
+        APP_STATE.logDateTo = getYesterdayDateString();
+        if (specificDateInput) specificDateInput.value = getYesterdayDateString();
+      } else if (scope === 'this-month') {
+        const today = getTodayDateString();
+        APP_STATE.logDateFrom = today.substring(0, 8) + '01';
+        APP_STATE.logDateTo = today;
+        if (specificDateInput) specificDateInput.value = '';
+      }
+      applyMasterLogFilters();
+    });
+  });
+
+  if (applyCustomDateBtn) {
+    applyCustomDateBtn.addEventListener('click', () => {
+      if (fromInput && fromInput.value) {
+        const rangeEnd = (toInput && toInput.value) ? toInput.value : fromInput.value;
+        if (rangeEnd < fromInput.value) {
+          showToast('The end date must be on or after the start date.', 'error');
+          return;
+        }
+        APP_STATE.logDateScope = 'custom';
+        APP_STATE.logDateFrom = fromInput.value;
+        APP_STATE.logDateTo = rangeEnd;
+        if (specificDateInput) specificDateInput.value = '';
+        document.querySelectorAll('[data-log-date]').forEach(b => {
+          b.className = 'log-date-btn px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border transition font-rounded text-xs';
+        });
+        applyMasterLogFilters();
+      }
+    });
+  }
+
+  if (resetLogFiltersBtn) {
+    resetLogFiltersBtn.addEventListener('click', () => {
+      APP_STATE.logDateScope = 'today';
+      APP_STATE.logDateFrom = getTodayDateString();
+      APP_STATE.logDateTo = getTodayDateString();
+      APP_STATE.logSearchQuery = '';
+      if (specificDateInput) specificDateInput.value = getTodayDateString();
+      if (fromInput) fromInput.value = '';
+      if (toInput) toInput.value = '';
+      const searchInput = document.getElementById('logSearchFilter');
+      if (searchInput) searchInput.value = '';
+      document.querySelectorAll('[data-log-date]').forEach(b => {
+        if (b.getAttribute('data-log-date') === 'today') {
+          b.className = 'log-date-btn active px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border theme-bg-subtle transition font-bold theme-text-main font-rounded text-xs';
+        } else {
+          b.className = 'log-date-btn px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border theme-border transition font-rounded text-xs';
+        }
+      });
+      applyMasterLogFilters();
+    });
+  }
+
+  document.querySelectorAll('[data-log-tab]').forEach(tabBtn => {
+    tabBtn.addEventListener('click', () => {
+      setMasterLogCategoryTab(tabBtn.getAttribute('data-log-tab'));
+    });
+  });
+
+  const searchInput = document.getElementById('logSearchFilter');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      APP_STATE.logSearchQuery = searchInput.value.trim().toLowerCase();
+      applyMasterLogFilters();
+    });
+  }
+
+  const pdfBtn = document.getElementById('downloadPdfReportBtn');
+  if (pdfBtn) {
+    pdfBtn.addEventListener('click', generateProfessionalPdfReport);
+  }
+}
+
+function setMasterLogCategoryTab(tabId) {
+  APP_STATE.logTab = tabId;
+  document.querySelectorAll('[data-log-tab]').forEach(btn => {
+    if (btn.getAttribute('data-log-tab') === tabId) {
+      btn.className = 'log-tab-btn active pb-2 border-b-2 border-sky-400 theme-text-main font-bold transition font-rounded';
+    } else {
+      btn.className = 'log-tab-btn pb-2 border-b-2 border-transparent theme-text-muted hover:theme-text-main transition font-rounded';
+    }
+  });
+  applyMasterLogFilters();
+}
+
+export function applyMasterLogFilters() {
+  const fromDate = APP_STATE.logDateFrom || getTodayDateString();
+  const toDate = APP_STATE.logDateTo || fromDate;
+  const isAllTime = fromDate === '1970-01-01' || APP_STATE.logDateScope === 'all-time';
+  const q = APP_STATE.logSearchQuery || '';
+
+  const filteredStationery = APP_STATE.masterStationeryRecords.filter(s => {
+    const d = s.date || '';
+    if (!isAllTime) {
+      if (fromDate && d < fromDate) return false;
+      if (toDate && d > toDate) return false;
+    }
+    if (!q) return true;
+    return (s.itemName || '').toLowerCase().includes(q) ||
+           (s.itemCode || '').toLowerCase().includes(q) ||
+           String(s.totalAmount).includes(q);
+  });
+
+  const filteredReloads = APP_STATE.masterReloadRecords.filter(r => {
+    const d = r.date || '';
+    if (!isAllTime) {
+      if (fromDate && d < fromDate) return false;
+      if (toDate && d > toDate) return false;
+    }
+    if (!q) return true;
+    return (r.phone || '').includes(q) ||
+           (r.operator || '').toLowerCase().includes(q) ||
+           String(r.amount).includes(q);
+  });
+
+  let filteredStatSales = 0;
+  let filteredStatProfit = 0;
+  let filteredStatUnits = 0;
+  let filteredStatCount = filteredStationery.length;
+
+  filteredStationery.forEach(s => {
+    const total = Number(s.totalAmount || s.sellingPrice || 0);
+    const qty = Number(s.quantity || 1);
+    filteredStatSales += total;
+    filteredStatUnits += qty;
+
+    if (s.profit !== undefined) {
+      filteredStatProfit += Number(s.profit);
+    } else {
+      const cost = Number(s.costPrice || 0);
+      const sell = Number(s.sellingPrice || 0);
+      filteredStatProfit += (sell - cost) * qty;
+    }
+  });
+
+  let filteredReloadVol = 0;
+  let filteredReloadComm = 0;
+  let filteredReloadCount = filteredReloads.length;
+
+  filteredReloads.forEach(r => {
+    filteredReloadVol += Number(r.amount || 0);
+    filteredReloadComm += Number(r.commissionAmount || 0);
+  });
+
+  const filteredTotalProfit = roundCurrency(filteredStatProfit + filteredReloadComm);
+
+  const elLogReloadVol = document.getElementById('logPairedReloadVol');
+  const elLogReloadComm = document.getElementById('logPairedReloadComm');
+  const elLogReloadStats = document.getElementById('logPairedReloadStats');
+
+  if (elLogReloadVol) elLogReloadVol.textContent = formatLKR(filteredReloadVol);
+
+  if (elLogReloadComm) elLogReloadComm.textContent = formatSignedLKR(filteredReloadComm);
+  if (elLogReloadStats) elLogReloadStats.textContent = `${filteredReloadCount} reload transactions`;
+
+  const elLogStatSales = document.getElementById('logPairedStatSales');
+  const elLogStatProfit = document.getElementById('logPairedStatProfit');
+  const elLogStatStats = document.getElementById('logPairedStatStats');
+
+  if (elLogStatSales) elLogStatSales.textContent = formatLKR(filteredStatSales);
+  if (elLogStatProfit) elLogStatProfit.textContent = formatSignedLKR(filteredStatProfit);
+  if (elLogStatStats) elLogStatStats.textContent = `${filteredStatUnits} units sold | ${filteredStatCount} txs`;
+
+  const elLogCombinedTotalProfit = document.getElementById('logCombinedTotalProfit');
+  const elLogCombinedProfitStats = document.getElementById('logCombinedProfitStats');
+
+  if (elLogCombinedTotalProfit) elLogCombinedTotalProfit.textContent = formatSignedLKR(filteredTotalProfit);
+  if (elLogCombinedProfitStats) elLogCombinedProfitStats.textContent = `Reloads (${formatSignedLKR(filteredReloadComm)}) + Stationery (${formatSignedLKR(filteredStatProfit)})`;
+
+  const scopeLabel = document.getElementById('masterLogsDateScopeLabel');
+  if (scopeLabel) {
+    if (isAllTime) {
+      scopeLabel.textContent = 'Showing: All Time';
+    } else if (fromDate === toDate) {
+      scopeLabel.textContent = fromDate === getTodayDateString() ? `Showing: Today (${fromDate})` : `Showing: ${fromDate}`;
+    } else {
+      scopeLabel.textContent = `Showing: ${fromDate} → ${toDate}`;
+    }
+  }
+  const specificDateWrap = document.getElementById('logSpecificDateWrap');
+  specificDateWrap?.classList.toggle('filter-active', APP_STATE.logDateScope === 'specific');
+  const rangeDrawer = document.getElementById('moreFiltersDrawer');
+  rangeDrawer?.classList.toggle('range-active', APP_STATE.logDateScope === 'custom');
+  document.querySelectorAll('[data-log-date]').forEach(button => {
+    button.classList.toggle('active', button.getAttribute('data-log-date') === APP_STATE.logDateScope);
+  });
+
+  const countAll = document.getElementById('countLogAll');
+  const countStat = document.getElementById('countLogStat');
+  const countReloads = document.getElementById('countLogReloads');
+
+  if (countAll) countAll.textContent = String(filteredStationery.length + filteredReloads.length);
+  if (countStat) countStat.textContent = String(filteredStationery.length);
+  if (countReloads) countReloads.textContent = String(filteredReloads.length);
+
+  let displayRows = [];
+
+  if (APP_STATE.logTab === 'all' || APP_STATE.logTab === 'stationery') {
+    filteredStationery.forEach(s => {
+      displayRows.push({
+        type: isServiceItem(s) ? 'SERVICE' : 'STATIONERY',
+        date: s.date || '',
+        time: s.time || '',
+        title: s.itemName,
+        code: s.itemCode,
+        ref: `Qty: ${s.quantity || 1}`,
+        amount: Number(s.totalAmount || s.sellingPrice || 0),
+        profit: Number(s.profit || 0),
+        raw: s
+      });
+    });
+  }
+
+  if (APP_STATE.logTab === 'all' || APP_STATE.logTab === 'reloads') {
+    filteredReloads.forEach(r => {
+      displayRows.push({
+        type: 'RELOAD',
+        date: r.date || '',
+        time: r.time || '',
+        title: `${r.operator} Reload`,
+        code: r.operator,
+        ref: r.phone || 'Walk-in Customer',
+        amount: Number(r.amount || 0),
+        profit: Number(r.commissionAmount || 0),
+        raw: r
+      });
+    });
+  }
+
+  displayRows.sort((a, b) => (b.date + ' ' + b.time).localeCompare(a.date + ' ' + a.time));
+
+  renderMasterLogsTable(displayRows);
+}
+function renderMasterLogsTable(rows) {
+  const tbody = document.getElementById('masterLogsTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (rows.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="py-10 text-center theme-text-dim text-xs">
+          No transaction records found for the selected period.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  rows.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:theme-bg-subtle transition';
+
+    let typeBadge = '';
+    if (item.type === 'RELOAD') {
+      typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold border ${item.code === 'DIALOG' ? 'text-orange-400 border-orange-500/30' : item.code === 'MOBITEL' ? 'text-blue-400 border-blue-500/30' : item.code === 'AIRTEL' ? 'text-red-400 border-red-500/30' : 'text-amber-300 border-amber-500/30'}">${escapeHTML(item.code)}</span>`;
+    } else if (item.type === 'SERVICE') {
+      typeBadge = `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service / Bill</span>`;
+    } else {
+      typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(item.code || 'ST')}</span>`;
+    }
+
+    const tierBadge = item.raw?.priceTier
+      ? `<span class="badge-price-tiers ml-1.5 px-1.5 py-0.2 rounded text-[9px] font-bold">${escapeHTML(item.raw.priceTier)}</span>`
+      : '';
+
+    tr.innerHTML = `
+      <td data-label="Time / Date" class="py-2.5 px-3 font-mono text-xs whitespace-nowrap">
+        <div class="font-bold theme-text-main">${escapeHTML(item.time || '--:--')}</div>
+        <div class="text-[10px] theme-text-dim">${escapeHTML(item.date || '')}</div>
+      </td>
+      <td data-label="Category / Item" class="py-2.5 px-3">
+        <div class="flex items-center gap-2">
+          ${typeBadge}
+          <span class="font-semibold text-xs theme-text-main">${escapeHTML(item.type === 'RELOAD' ? item.title : toTitleCase(item.title))}${tierBadge}</span>
+        </div>
+      </td>
+      <td data-label="Reference / Number" class="py-2.5 px-3 font-mono text-xs theme-text-dim">
+        ${escapeHTML(item.ref)}
+      </td>
+      <td data-label="Amount" class="py-2.5 px-3 text-right font-mono font-bold text-xs theme-text-main currency-lkr">
+        ${formatLKR(item.amount)}
+      </td>
+      <td data-label="Profit" class="py-2.5 px-3 text-right font-mono font-bold text-xs ${item.type === 'RELOAD' ? 'text-emerald-400' : 'text-sky-400'} currency-lkr">
+        ${formatSignedLKR(item.profit)}
+      </td>
+      <td data-label="Action" class="py-2.5 px-3 text-center">
+        <button type="button" class="delete-tx-btn min-h-11 min-w-11 p-1 text-red-400 hover:text-red-300 transition" title="Delete record" aria-label="Delete transaction">
+          <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </td>
+    `;
+
+    const deleteBtn = tr.querySelector('.delete-tx-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async () => {
+        if (!(await showDeleteConfirm(`Delete transaction for "${item.title}" (${formatLKR(item.amount)})?`))) return;
+        try {
+          const restored = await removeTransaction(item.type, item.raw);
+          showToast(restored
+            ? 'Transaction deleted, stock restored'
+            : 'Transaction deleted', 'success');
+        } catch (err) {
+          showToast(`Delete failed: ${err.message}`, 'error');
+        }
+      });
+    }
+
+    tbody.appendChild(tr);
+  });
+}
+
+function getLogoDataUrl() {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
       try {
-        parsed = JSON.parse(serialized);
-      } catch (error) {
-        throw new Error(`Saved scoreboard data is invalid: ${error.message}`);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || 140;
+        canvas.height = img.naturalHeight || 140;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (e) {
+        resolve(null);
       }
-      if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.matches)) {
-        throw new TypeError("Saved scoreboard data has an unsupported shape.");
-      }
-      if (parsed.players !== undefined && !Array.isArray(parsed.players)) {
-        throw new TypeError("Saved player data has an unsupported shape.");
-      }
-      state = { ...createInitialState(), ...parsed };
-      for (const listener of listeners) listener(state);
-      return state;
-    }
-  };
-}
-
-
-// Consolidated from analysis.js
-const asNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
-const teamFor = (match, id) => [match?.teamA, match?.teamB].find((team) => team?.id === id);
-
-function mergePlayer(target, id, stats) {
-  if (!id) return;
-  const key = String(id);
-  if (!target[key]) target[key] = { playerId: key, runs: 0, balls: 0, fours: 0, sixes: 0, wickets: 0, conceded: 0, bowlingBalls: 0 };
-  for (const field of ["runs", "balls", "fours", "sixes", "wickets", "conceded", "bowlingBalls"]) {
-    target[key][field] += asNumber(stats?.[field]);
-  }
-}
-
-function matchStats(match) {
-  const teams = {};
-  const players = {};
-  for (const team of [match?.teamA, match?.teamB]) {
-    if (team?.id) teams[team.id] = { id: team.id, name: team.name || team.id, runs: 0, wickets: 0, matches: 0 };
-  }
-  for (const innings of match?.innings ?? []) {
-    const team = teams[innings.battingTeamId] ?? { id: innings.battingTeamId, name: teamFor(match, innings.battingTeamId)?.name ?? innings.battingTeamId, runs: 0, wickets: 0, matches: 0 };
-    team.runs += asNumber(innings.score);
-    team.wickets += asNumber(innings.wickets);
-    team.matches += 1;
-    teams[team.id] = team;
-    for (const [id, stats] of Object.entries(innings.batsmen ?? {})) mergePlayer(players, id, stats);
-    for (const [id, stats] of Object.entries(innings.bowlers ?? {})) mergePlayer(players, id, stats);
-  }
-  for (const [id, stats] of Object.entries(match?.retrospectiveStats ?? {})) mergePlayer(players, id, stats);
-  return { teams: Object.values(teams), players: Object.values(players) };
-}
-
-function aggregate(matches = []) {
-  const teamMap = new Map();
-  const playerMap = new Map();
-  for (const match of matches.filter(Boolean)) {
-    const current = matchStats(match);
-    for (const team of current.teams) {
-      const previous = teamMap.get(team.id) ?? { ...team, runs: 0, wickets: 0, matches: 0 };
-      previous.runs += team.runs;
-      previous.wickets += team.wickets;
-      previous.matches += team.matches;
-      teamMap.set(team.id, previous);
-    }
-    for (const player of current.players) {
-      const previous = playerMap.get(player.playerId) ?? { ...player, runs: 0, balls: 0, fours: 0, sixes: 0, wickets: 0, conceded: 0, bowlingBalls: 0 };
-      for (const key of ["runs", "balls", "fours", "sixes", "wickets", "conceded", "bowlingBalls"]) previous[key] += player[key];
-      playerMap.set(player.playerId, previous);
-    }
-  }
-  return { matches, teams: [...teamMap.values()], players: [...playerMap.values()] };
-}
-
-function buildSeriesTotals(matches = []) {
-  return aggregate(matches);
-}
-
-function buildThisWeekMatch(matches = []) {
-  const start = new Date();
-  start.setDate(start.getDate() - 7);
-  return aggregate(matches.filter((match) => {
-    const date = new Date(match.createdAt);
-    return Number.isFinite(date.getTime()) && date >= start;
-  }));
-}
-
-function buildLastMatch(matches = []) {
-  return aggregate(matches.length ? [matches.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0]] : []);
-}
-
-function buildPerMatch(matchId, matches = []) {
-  return aggregate(matches.filter((match) => match.id === matchId));
-}
-
-function computeAwards(matchOrSeries) {
-  const series = Array.isArray(matchOrSeries)
-    ? aggregate(matchOrSeries)
-    : matchOrSeries?.players && matchOrSeries?.teams
-      ? matchOrSeries
-      : matchStats(matchOrSeries);
-  const players = series.players ?? [];
-  const names = new Map();
-  for (const match of series.matches ?? (Array.isArray(matchOrSeries) ? matchOrSeries : [matchOrSeries])) {
-    for (const team of [match?.teamA, match?.teamB]) {
-      for (const player of team?.roster ?? []) names.set(String(player.id ?? player.playerId ?? player), player.name ?? player.displayName ?? String(player.id ?? player));
-    }
-  }
-  const ranked = (selector, sort) => players.slice().sort(sort).find((player) => selector(player)) ?? null;
-  const byRuns = (a, b) => b.runs - a.runs || a.playerId.localeCompare(b.playerId);
-  const byWickets = (a, b) => b.wickets - a.wickets || a.conceded - b.conceded || a.playerId.localeCompare(b.playerId);
-  const batter = ranked((player) => player.runs > 0, byRuns);
-  const bowler = ranked((player) => player.wickets > 0 || player.bowlingBalls > 0, byWickets);
-  const wicketTaker = ranked((player) => player.wickets > 0, byWickets);
-  const strikeRate = ranked((player) => player.balls > 0, (a, b) => (b.runs / b.balls) - (a.runs / a.balls) || byRuns(a, b));
-  const economy = ranked((player) => player.bowlingBalls > 0, (a, b) => (a.conceded / a.bowlingBalls) - (b.conceded / b.bowlingBalls) || b.wickets - a.wickets);
-  const playerOfMatch = ranked((player) => player.runs > 0 || player.wickets > 0,
-    (a, b) => (b.runs + b.wickets * 25) - (a.runs + a.wickets * 25) || byRuns(a, b));
-  const show = (player, value) => ({ player: player ? names.get(player.playerId) ?? player.playerId : "—", value: player ? value : "No stats yet", playerId: player?.playerId ?? null });
-  return [
-    { title: "Best Batter", ...show(batter, `${batter?.runs ?? 0} runs`) },
-    { title: "Best Bowler", ...show(bowler, `${bowler?.wickets ?? 0} wickets · ${bowler?.conceded ?? 0} runs`) },
-    { title: "Best Wicket-Taker", ...show(wicketTaker, `${wicketTaker?.wickets ?? 0} wickets`) },
-    { title: "Player of the Match", ...show(playerOfMatch, `${playerOfMatch?.runs ?? 0} runs · ${playerOfMatch?.wickets ?? 0} wickets`) },
-    { title: "Highest Strike Rate", ...show(strikeRate, `${((strikeRate?.runs ?? 0) / Math.max(1, strikeRate?.balls ?? 0) * 100).toFixed(1)} SR`) },
-    { title: "Best Economy", ...show(economy, `${((economy?.conceded ?? 0) / Math.max(1, (economy?.bowlingBalls ?? 0) / 6)).toFixed(2)} runs/over`) }
-  ];
-}
-
-
-// Consolidated from scoring.js
-
-class ScoringError extends Error {
-  constructor(message, code = "INVALID_MATCH") {
-    super(message);
-    this.name = "ScoringError";
-    this.code = code;
-  }
-}
-
-const clone = (value) => JSON.parse(JSON.stringify(value));
-const teamInfo = (team) => {
-  if (typeof team === "string" && team.trim()) return { id: team.trim(), name: team.trim(), roster: [] };
-  if (!team || typeof team !== "object" || !team.id || !team.name) {
-    throw new ScoringError("Both teams need an id and name.", "INVALID_TEAM");
-  }
-  return { id: String(team.id), name: String(team.name), roster: Array.isArray(team.roster) ? team.roster : [] };
-};
-const ensureMatch = (match) => {
-  if (!match || typeof match !== "object" || !Array.isArray(match.innings) || match.innings.length === 0) {
-    throw new ScoringError("A valid match with at least one innings is required.", "INVALID_MATCH");
-  }
-};
-const currentInnings = (match) => match.innings[match.activeInnings];
-const playerStats = (record, playerId) => {
-  const key = String(playerId);
-  if (!record[key]) record[key] = { playerId: key, runs: 0, balls: 0, fours: 0, sixes: 0, wickets: 0, conceded: 0, bowlingBalls: 0 };
-  return record[key];
-};
-const ballsToOvers = (balls) => `${Math.floor(balls / 6)}.${balls % 6}`;
-
-function createMatch({ teamA, teamB, overs, toss, mode, format = "limited-overs", days = 1, maxInnings } = {}) {
-  const a = teamInfo(teamA);
-  const b = teamInfo(teamB);
-  if (a.id === b.id) throw new ScoringError("Choose two different teams.", "DUPLICATE_TEAM");
-  if (!["limited-overs", "multi-day"].includes(format)) throw new ScoringError("Choose a supported match format.", "INVALID_FORMAT");
-  const limit = format === "multi-day" ? null : Number(overs);
-  if (format === "limited-overs" && (!Number.isInteger(limit) || limit < 1 || limit > 50)) {
-    throw new ScoringError("Overs must be a whole number from 1 to 50.", "INVALID_OVERS");
-  }
-  const matchDays = Number(days);
-  if (!Number.isInteger(matchDays) || matchDays < 1 || matchDays > 5) throw new ScoringError("Match days must be a whole number from 1 to 5.", "INVALID_DAYS");
-  const inningsLimit = Number(maxInnings ?? (format === "multi-day" ? 4 : 2));
-  if (!Number.isInteger(inningsLimit) || inningsLimit < 2 || inningsLimit > (format === "multi-day" ? 4 : 2)) {
-    throw new ScoringError("The maximum innings is invalid for this match format.", "INVALID_INNINGS_LIMIT");
-  }
-  const validModes = ["quick", "live", "retrospective", "multi-innings"];
-  if (!validModes.includes(mode)) throw new ScoringError("Choose a supported match mode.", "INVALID_MODE");
-  const tossInfo = typeof toss === "object" && toss ? { ...toss } : { winnerId: a.id, decision: "bat" };
-  if (!["bat", "bowl"].includes(tossInfo.decision ?? "bat")) throw new ScoringError("Toss decision must be bat or bowl.", "INVALID_TOSS");
-  if (tossInfo.winnerId && ![a.id, b.id].includes(String(tossInfo.winnerId))) throw new ScoringError("Toss winner must be one of the selected teams.", "INVALID_TOSS");
-  const tossWinner = tossInfo.winnerId === b.id ? b : a;
-  const firstBats = tossInfo.decision === "bowl" ? (tossWinner.id === a.id ? b : a) : tossWinner;
-  const firstBowl = firstBats.id === a.id ? b : a;
-  const makeInnings = (batting, bowling, target = null, targetType = null) => ({
-    battingTeamId: batting.id, bowlingTeamId: bowling.id, target, targetType, score: 0, wickets: 0,
-    legalBalls: 0, closed: false, endReason: null, strikerId: null, nonStrikerId: null, bowlerId: null,
-    batsmen: {}, bowlers: {}, balls: [], history: []
+    };
+    img.onerror = () => resolve(null);
+    img.src = './images/logo.png';
   });
-  return {
-    id: crypto.randomUUID?.() ?? `match-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    teamA: a, teamB: b, overs: limit, format, days: matchDays, maxInnings: inningsLimit,
-    followOnEnforced: false, followOnOffered: false, toss: tossInfo, tossWinner: tossWinner.id,
-    tossDecision: tossInfo.decision ?? "bat", mode,
-    venue: "", createdAt: new Date().toISOString(), finishedAt: null, completed: false,
-    activeInnings: 0, innings: [makeInnings(firstBats, firstBowl)], result: null, retrospectiveStats: {}
-  };
 }
 
-function wicketsToAllOut(match, innings) {
-  const battingTeam = [match.teamA, match.teamB].find((team) => team.id === innings.battingTeamId);
-  const playerCount = Array.isArray(battingTeam?.roster) && battingTeam.roster.length
-    ? battingTeam.roster.length
-    : 11;
-  return Math.max(1, playerCount - 1);
-}
-
-function closeInningsIfNeeded(match, innings) {
-  if (innings.wickets >= wicketsToAllOut(match, innings)) innings.endReason = "all-out";
-  else if (innings.targetType === "chase" && innings.target !== null && innings.score >= innings.target) innings.endReason = "target";
-  else if (match.format !== "multi-day" && Number.isInteger(match.overs) && innings.legalBalls >= match.overs * 6) innings.endReason = "overs";
-  if (innings.endReason) innings.closed = true;
-}
-
-function addBall(match, { runs = 0, wicket = false, extra = null, strikerId, nonStrikerId, bowlerId } = {}) {
-  ensureMatch(match);
-  const innings = currentInnings(match);
-  if (!innings || innings.closed || match.completed) throw new ScoringError("This innings is already closed.", "INNINGS_CLOSED");
-  if (!Number.isInteger(runs) || runs < 0 || runs > 6) throw new ScoringError("Runs must be a whole number from 0 to 6.", "INVALID_RUNS");
-  if (typeof wicket !== "boolean") throw new ScoringError("Wicket must be true or false.", "INVALID_WICKET");
-  if (extra !== null && extra !== "wide" && extra !== "no-ball") throw new ScoringError("Extra must be wide, no-ball, or empty.", "INVALID_EXTRA");
-  if (extra === "wide" && runs !== 0) throw new ScoringError("Wide deliveries cannot score batter runs in this scorer.", "INVALID_EXTRA_RUNS");
-  const batter = strikerId ?? innings.strikerId;
-  const bowler = bowlerId ?? innings.bowlerId;
-  const partner = nonStrikerId ?? innings.nonStrikerId;
-  if (!batter || !bowler) throw new ScoringError("Choose a striker and bowler before recording a ball.", "MISSING_PLAYERS");
-  if (String(batter) === String(partner)) throw new ScoringError("Striker and non-striker must be different players.", "DUPLICATE_BATTER");
-  if (match.format !== "multi-day" && Number.isInteger(match.overs) && innings.legalBalls >= match.overs * 6) {
-    innings.closed = true;
-    innings.endReason = "overs";
-    throw new ScoringError("The over limit has been reached. The innings has ended.", "OVERS_COMPLETE");
+export async function generateProfessionalPdfReport() {
+  if (typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF === 'undefined') {
+    showToast('PDF generator library is initializing. Please try again.', 'error');
+    return;
   }
 
-  innings.strikerId = String(batter);
-  innings.nonStrikerId = partner ? String(partner) : null;
-  innings.bowlerId = String(bowler);
-  const legal = extra === null;
-  const extraRuns = extra ? 1 : 0;
-  const total = runs + extraRuns;
-  const strikerStats = playerStats(innings.batsmen, batter);
-  const bowlerStats = playerStats(innings.bowlers, bowler);
-  const snapshot = {
-    score: innings.score, wickets: innings.wickets, legalBalls: innings.legalBalls,
-    batsmen: clone(innings.batsmen), bowlers: clone(innings.bowlers), ballsLength: innings.balls.length,
-    strikerId: innings.strikerId, nonStrikerId: innings.nonStrikerId, bowlerId: innings.bowlerId
-  };
-  innings.history.push(snapshot);
-  innings.score += total;
-  if (legal) innings.legalBalls += 1;
-  strikerStats.runs += runs;
-  if (legal) strikerStats.balls += 1;
-  if (runs === 4) strikerStats.fours += 1;
-  if (runs === 6) strikerStats.sixes += 1;
-  bowlerStats.conceded += total;
-  if (legal) bowlerStats.bowlingBalls += 1;
-  if (wicket) {
-    innings.wickets += 1;
-    bowlerStats.wickets += 1;
-  }
-  innings.balls.push({ runs, wicket, extra, total, legal, batterId: String(batter), bowlerId: String(bowler), at: new Date().toISOString() });
-  if (innings.nonStrikerId && runs % 2 === 1 && !extra) [innings.strikerId, innings.nonStrikerId] = [innings.nonStrikerId, innings.strikerId];
-  if (legal && innings.legalBalls % 6 === 0 && innings.nonStrikerId) [innings.strikerId, innings.nonStrikerId] = [innings.nonStrikerId, innings.strikerId];
-  closeInningsIfNeeded(match, innings);
-  return match;
-}
-
-function undoLastBall(match) {
-  ensureMatch(match);
-  if (match.completed) throw new ScoringError("A completed match cannot be changed.", "MATCH_COMPLETE");
-  const innings = currentInnings(match);
-  if (!innings?.history?.length) throw new ScoringError("There is no ball to undo.", "NOTHING_TO_UNDO");
-  const previous = innings.history.pop();
-  innings.score = previous.score;
-  innings.wickets = previous.wickets;
-  innings.legalBalls = previous.legalBalls;
-  innings.batsmen = previous.batsmen;
-  innings.bowlers = previous.bowlers;
-  innings.balls.length = previous.ballsLength;
-  innings.strikerId = previous.strikerId;
-  innings.nonStrikerId = previous.nonStrikerId;
-  innings.bowlerId = previous.bowlerId;
-  innings.closed = false;
-  innings.endReason = null;
-  return match;
-}
-
-function swapStrike(match) {
-  ensureMatch(match);
-  const innings = currentInnings(match);
-  if (innings.closed) throw new ScoringError("Strike cannot be changed after the innings ends.", "INNINGS_CLOSED");
-  if (!innings.strikerId || !innings.nonStrikerId) throw new ScoringError("Choose both batters before swapping strike.", "MISSING_PLAYERS");
-  [innings.strikerId, innings.nonStrikerId] = [innings.nonStrikerId, innings.strikerId];
-  return match;
-}
-
-function endInnings(match, reason = "declared") {
-  ensureMatch(match);
-  const innings = currentInnings(match);
-  if (innings.closed) throw new ScoringError("This innings is already closed.", "INNINGS_CLOSED");
-  if (!["declared", "all-out", "overs", "target"].includes(reason)) throw new ScoringError("Unknown innings end reason.", "INVALID_END_REASON");
-  innings.closed = true;
-  innings.endReason = reason;
-  return match;
-}
-
-function computeTarget(innings1) {
-  if (!innings1 || !Number.isInteger(innings1.score) || innings1.score < 0) {
-    throw new ScoringError("First-innings score is missing or invalid.", "INVALID_INNINGS");
-  }
-  return innings1.score + 1;
-}
-
-function startSecondInnings(match) {
-  return startNextInnings(match);
-}
-
-function aggregateScore(match, teamId) {
-  return match.innings.reduce((total, innings) => total + (innings.battingTeamId === teamId ? innings.score : 0), 0);
-}
-
-function startNextInnings(match) {
-  ensureMatch(match);
-  const previous = currentInnings(match);
-  const inningsIndex = match.innings.length;
-  const inningsLimit = match.maxInnings ?? (match.format === "multi-day" ? 4 : 2);
-  if (!previous?.closed) throw new ScoringError("Finish the active innings before starting the next one.", "INNINGS_ACTIVE");
-  if (previous.endReason === "target") throw new ScoringError("The target has been reached; the match is decided.", "TARGET_REACHED");
-  if (inningsIndex >= inningsLimit || match.completed) {
-    throw new ScoringError("The match has reached its maximum number of innings.", "INNINGS_LIMIT");
-  }
-  const battingId = inningsIndex === 2 && match.followOnEnforced
-    ? match.innings[1].battingTeamId
-    : previous.bowlingTeamId;
-  const batting = [match.teamA, match.teamB].find((team) => team.id === battingId);
-  const bowling = batting.id === match.teamA.id ? match.teamB : match.teamA;
-  const target = Math.max(0, aggregateScore(match, bowling.id) - aggregateScore(match, batting.id) + 1);
-  const targetType = inningsIndex === 1 || inningsIndex === 3 ? "chase" : "lead";
-  match.innings.push({
-    battingTeamId: batting.id, bowlingTeamId: bowling.id, target, targetType, score: 0, wickets: 0,
-    legalBalls: 0, closed: false, endReason: null, strikerId: null, nonStrikerId: null, bowlerId: null,
-    batsmen: {}, bowlers: {}, balls: [], history: []
+  const { jsPDF } = window.jspdf;
+  const pdfDoc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
   });
-  match.activeInnings = inningsIndex;
-  return match;
+
+  const fromDate = APP_STATE.logDateFrom || getTodayDateString();
+  const toDate = APP_STATE.logDateTo || fromDate;
+  const isAllTime = fromDate === '1970-01-01' || APP_STATE.logDateScope === 'all-time';
+  const dateRangeStr = isAllTime ? 'All Time Transaction Records' : (fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`);
+  const searchQuery = APP_STATE.logSearchQuery || '';
+  const matchesActiveSearch = record => !searchQuery ||
+    (record.itemName || '').toLowerCase().includes(searchQuery) ||
+    (record.itemCode || '').toLowerCase().includes(searchQuery) ||
+    (record.phone || '').toLowerCase().includes(searchQuery) ||
+    (record.operator || '').toLowerCase().includes(searchQuery) ||
+    String(record.totalAmount ?? record.amount ?? '').includes(searchQuery);
+
+  const stationeryList = APP_STATE.masterStationeryRecords
+    .filter(s => (isAllTime || (s.date >= fromDate && s.date <= toDate)) && matchesActiveSearch(s))
+    .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+
+  const reloadList = APP_STATE.masterReloadRecords
+    .filter(r => (isAllTime || (r.date >= fromDate && r.date <= toDate)) && matchesActiveSearch(r))
+    .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+
+  let totalStatSales = 0;
+  let totalUnitsSold = 0;
+  let totalStatProfit = 0;
+
+  stationeryList.forEach(s => {
+    const total = Number(s.totalAmount || s.sellingPrice || 0);
+    const qty = Number(s.quantity || 1);
+    totalStatSales += total;
+    totalUnitsSold += qty;
+    if (s.profit !== undefined) {
+      totalStatProfit += Number(s.profit);
+    } else {
+      const cost = Number(s.costPrice || 0);
+      const sell = Number(s.sellingPrice || 0);
+      totalStatProfit += (sell - cost) * qty;
+    }
+  });
+
+  let totalReloadVol = 0;
+  let totalReloadComm = 0;
+  reloadList.forEach(r => {
+    totalReloadVol += Number(r.amount || 0);
+    totalReloadComm += Number(r.commissionAmount || 0);
+  });
+
+  const totalStoreRevenue = roundCurrency(totalStatSales + totalReloadVol);
+  const totalNetProfit = roundCurrency(totalStatProfit + totalReloadComm);
+
+  pdfDoc.setFillColor(11, 17, 32);
+  pdfDoc.rect(0, 0, 210, 36, 'F');
+
+  const logoDataUri = await getLogoDataUrl();
+  if (logoDataUri) {
+    try {
+      pdfDoc.addImage(logoDataUri, 'PNG', 168, 5, 26, 26);
+    } catch (e) {
+      console.warn('PDF logo stamp error:', e);
+    }
+  }
+
+  pdfDoc.setTextColor(255, 255, 255);
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(18);
+  pdfDoc.text('AL Communication', 14, 15);
+
+  pdfDoc.setFont('helvetica', 'normal');
+  pdfDoc.setFontSize(8.5);
+  pdfDoc.setTextColor(148, 163, 184);
+  pdfDoc.text('Retail Store Management & Counter Ledger • Official Transaction Audit Report', 14, 21);
+  pdfDoc.text(`Generated: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Colombo' })} (Sri Lanka Time) • Period: ${dateRangeStr}`, 14, 26);
+
+  const boxY = 42;
+  const boxW = 58;
+  const boxH = 20;
+
+  pdfDoc.setFillColor(248, 250, 252);
+  pdfDoc.setDrawColor(226, 232, 240);
+  pdfDoc.roundedRect(14, boxY, boxW, boxH, 2, 2, 'FD');
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(7.5);
+  pdfDoc.setTextColor(100, 116, 139);
+  pdfDoc.text('FILTERED RELOADS', 17, boxY + 5);
+  pdfDoc.setFontSize(12);
+  pdfDoc.setTextColor(15, 23, 42);
+  pdfDoc.text(formatLKR(totalReloadVol), 17, boxY + 12);
+  pdfDoc.setFontSize(7);
+  pdfDoc.setTextColor(2, 132, 199);
+  pdfDoc.text(`Profit: ${formatSignedLKR(totalReloadComm)} (${reloadList.length} txs)`, 17, boxY + 17);
+
+  pdfDoc.setFillColor(248, 250, 252);
+  pdfDoc.roundedRect(76, boxY, boxW, boxH, 2, 2, 'FD');
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(7.5);
+  pdfDoc.setTextColor(100, 116, 139);
+  pdfDoc.text('FILTERED STATIONERY & BILLS', 79, boxY + 5);
+  pdfDoc.setFontSize(12);
+  pdfDoc.setTextColor(15, 23, 42);
+  pdfDoc.text(formatLKR(totalStatSales), 79, boxY + 12);
+  pdfDoc.setFontSize(7);
+  pdfDoc.setTextColor(16, 185, 129);
+  pdfDoc.text(`Profit: ${formatSignedLKR(totalStatProfit)} (${totalUnitsSold} units)`, 79, boxY + 17);
+
+  pdfDoc.setFillColor(240, 253, 244);
+  pdfDoc.setDrawColor(187, 247, 208);
+  pdfDoc.roundedRect(138, boxY, boxW, boxH, 2, 2, 'FD');
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(7.5);
+  pdfDoc.setTextColor(22, 101, 52);
+  pdfDoc.text('TOTAL PROFIT', 141, boxY + 5);
+  pdfDoc.setFontSize(12);
+  pdfDoc.setTextColor(21, 128, 61);
+  pdfDoc.text(formatSignedLKR(totalNetProfit), 141, boxY + 12);
+  pdfDoc.setFontSize(7);
+  pdfDoc.setTextColor(71, 85, 105);
+  pdfDoc.text(`Total Turnover: ${formatLKR(totalStoreRevenue)}`, 141, boxY + 17);
+
+  const tableData = [];
+
+  stationeryList.forEach(s => {
+    tableData.push([
+      `${s.date || ''} ${s.time || ''}`,
+      isServiceItem(s) ? 'Service/Bill' : 'Stationery',
+      toTitleCase(s.itemName || '-'),
+      s.itemCode || '-',
+      String(s.quantity || 1),
+      formatLKR(Number(s.totalAmount || s.sellingPrice || 0)),
+      formatSignedLKR(Number(s.profit ?? (isServiceItem(s) ? Number(s.sellingPrice || 0) : (Number(s.sellingPrice || 0) - Number(s.costPrice || 0))) * Number(s.quantity || 1)))
+    ]);
+  });
+
+  reloadList.forEach(r => {
+    tableData.push([
+      `${r.date || ''} ${r.time || ''}`,
+      'Mobile Reload',
+      `${r.operator} Top-up`,
+      r.phone || 'Walk-in',
+      '1',
+      formatLKR(Number(r.amount || 0)),
+      formatSignedLKR(Number(r.commissionAmount || 0))
+    ]);
+  });
+
+  tableData.sort((a, b) => b[0].localeCompare(a[0]));
+
+  if (typeof pdfDoc.autoTable === 'function') {
+    pdfDoc.autoTable({
+      startY: boxY + boxH + 6,
+      head: [['Date / Time', 'Type', 'Description / Operator', 'Reference / Code', 'Qty', 'Amount (LKR)', 'Profit (LKR)']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [15, 23, 42],
+        textColor: [255, 255, 255],
+        fontSize: 7.5,
+        fontStyle: 'bold',
+        halign: 'left'
+      },
+      columnStyles: {
+        0: { cellWidth: 26, fontSize: 7 },
+        1: { cellWidth: 22, fontSize: 7 },
+        2: { cellWidth: 44, fontSize: 7 },
+        3: { cellWidth: 26, fontSize: 7 },
+        4: { cellWidth: 12, halign: 'center', fontSize: 7 },
+        5: { cellWidth: 25, halign: 'right', fontSize: 7, fontStyle: 'bold' },
+        6: { cellWidth: 25, halign: 'right', fontSize: 7, fontStyle: 'bold', textColor: [16, 185, 129] }
+      },
+      styles: {
+        overflow: 'linebreak',
+        cellPadding: 2,
+        textColor: [30, 41, 59]
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
+      margin: { left: 14, right: 14, bottom: 18 },
+      didDrawPage: function(data) {
+
+        pdfDoc.setFont('helvetica', 'normal');
+        pdfDoc.setFontSize(7.5);
+        pdfDoc.setTextColor(148, 163, 184);
+        pdfDoc.text('AL Communication Retail Management System • Confirmed Operational Record', 14, 290);
+        pdfDoc.text(`Page ${data.pageNumber} of ${pdfDoc.internal.getNumberOfPages()}`, 180, 290);
+      }
+    });
+  }
+
+  pdfDoc.save(`AL_Communication_Ledger_${dateRangeStr.replace(/\s+/g, '_')}.pdf`);
+  showToast('Stamped PDF report downloaded successfully', 'success');
 }
 
-function addRetrospectiveStats(match, { playerId, bowlerId = playerId, runs, balls, fours = 0, sixes = 0, wickets = 0, bowlingBalls = 0, conceded = 0, inningsIndex = match?.activeInnings } = {}) {
-  ensureMatch(match);
-  if (!playerId) throw new ScoringError("Choose a player for the scorecard.", "MISSING_PLAYER");
-  const values = { runs, balls, fours, sixes, wickets, bowlingBalls, conceded };
-  for (const [key, value] of Object.entries(values)) {
-    if (!Number.isInteger(value) || value < 0) throw new ScoringError(`${key} must be a non-negative whole number.`, "INVALID_STATS");
+function initStockInventory() {
+  const searchInput = document.getElementById('stockSearchInput');
+  const sortSelect = document.getElementById('stockSortSelect');
+
+  if (searchInput) {
+    searchInput.addEventListener('input', renderStockTable);
   }
-  const innings = match.innings[inningsIndex];
-  if (!innings || match.completed) throw new ScoringError("Choose an innings in an unfinished match.", "INNINGS_CLOSED");
-  const batting = playerStats(innings.batsmen, playerId);
-  const bowling = playerStats(innings.bowlers, bowlerId);
-  for (const key of ["runs", "balls", "fours", "sixes"]) batting[key] += values[key];
-  for (const key of ["wickets", "conceded", "bowlingBalls"]) bowling[key] += values[key];
-  innings.score += runs;
-  innings.wickets += wickets;
-  innings.legalBalls = Math.max(
-    Object.values(innings.batsmen).reduce((sum, player) => sum + player.balls, 0),
-    Object.values(innings.bowlers).reduce((sum, player) => sum + player.bowlingBalls, 0)
-  );
-  closeInningsIfNeeded(match, innings);
-  return match;
+
+  if (sortSelect) {
+    sortSelect.value = APP_STATE.stockSortOrder;
+    sortSelect.addEventListener('change', () => {
+      APP_STATE.stockSortOrder = sortSelect.value;
+      localStorage.setItem('al_stock_sort_order', APP_STATE.stockSortOrder);
+      renderStockTable();
+    });
+  }
+
+  document.querySelectorAll('.stock-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.stock-filter-btn').forEach(b => {
+        b.className = 'stock-filter-btn px-3 py-1.5 rounded-lg border theme-border transition';
+      });
+      btn.className = 'stock-filter-btn active px-3 py-1.5 rounded-lg border theme-border theme-bg-subtle transition font-bold theme-text-main';
+      APP_STATE.stockFilter = btn.getAttribute('data-stock-filter');
+      renderStockTable();
+    });
+  });
 }
 
-function finalizeMatch(match) {
-  ensureMatch(match);
-  if (match.completed) throw new ScoringError("This match has already been finalized.", "MATCH_COMPLETE");
-  const innings = currentInnings(match);
-  if (!innings.closed) innings.closed = true;
-  let winner;
-  let margin;
-  if (match.innings.length < 2) {
-    throw new ScoringError("Start and complete the second innings before finalizing.", "SECOND_INNINGS_REQUIRED");
+export function renderStockTable() {
+  const tbody = document.getElementById('stockTableBody');
+  const searchInput = document.getElementById('stockSearchInput');
+  const queryStr = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  let items = APP_STATE.inventoryCatalog.filter(item => {
+
+    if (queryStr) {
+      const match = (item.code || '').toLowerCase().includes(queryStr) ||
+                    (item.name || '').toLowerCase().includes(queryStr) ||
+                    (item.category || '').toLowerCase().includes(queryStr);
+      if (!match) return false;
+    }
+
+    if (APP_STATE.stockFilter === 'LOW') {
+      return item.itemType !== 'service' && item.stockQuantity > 0 && item.stockQuantity <= (item.lowStockThreshold || 5);
+    }
+    if (APP_STATE.stockFilter === 'OUT') {
+      return item.itemType !== 'service' && item.stockQuantity <= 0;
+    }
+    if (APP_STATE.stockFilter === 'SERVICE') {
+      return item.itemType === 'service';
+    }
+    return true;
+  });
+
+  items = sortCatalogList(items, APP_STATE.stockSortOrder);
+
+  if (items.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="py-10 text-center theme-text-dim text-xs">
+          No inventory products found matching the active criteria.
+        </td>
+      </tr>
+    `;
+    return;
   }
-  const totals = new Map([
-    [match.teamA.id, aggregateScore(match, match.teamA.id)],
-    [match.teamB.id, aggregateScore(match, match.teamB.id)]
-  ]);
-  const difference = Math.abs(totals.get(match.teamA.id) - totals.get(match.teamB.id));
-  const decisiveChase = [...match.innings].reverse().find((item) => item.endReason === "target");
-  if (decisiveChase) {
-    const winningTeam = [match.teamA, match.teamB].find((team) => team.id === decisiveChase.battingTeamId);
-    winner = winningTeam.name;
-    margin = `${Math.max(0, wicketsToAllOut(match, decisiveChase) - decisiveChase.wickets)} wickets`;
-  } else if (difference === 0) {
-    winner = match.innings.length >= (match.maxInnings ?? 2) ? "Tie" : "Draw";
-    margin = winner === "Tie" ? "scores level" : "match drawn";
+
+  items.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:theme-bg-subtle transition';
+
+    const isService = item.itemType === 'service';
+
+    let typeCol = isService
+      ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service / Bill</span>`
+      : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">Physical</span>`;
+
+    let stockCol = '';
+    if (isService) {
+      stockCol = `<span class="badge-service-bill px-2.5 py-1 rounded-full text-xs font-bold">Service / Bill</span>`;
+    } else if (item.stockQuantity <= 0) {
+      stockCol = `<span class="badge-stock-out px-2.5 py-1 rounded-full text-xs font-bold">Out of Stock (0)</span>`;
+    } else if (item.stockQuantity <= (item.lowStockThreshold || 5)) {
+      stockCol = `<span class="badge-stock-low px-2.5 py-1 rounded-full text-xs font-bold">${escapeHTML(item.stockQuantity)} Left (Low)</span>`;
+    } else {
+      stockCol = `<span class="badge-stock-in px-2.5 py-1 rounded-full text-xs font-bold">${escapeHTML(item.stockQuantity)} in stock</span>`;
+    }
+
+    tr.innerHTML = `
+      <td class="py-3 px-3 sm:px-4 font-mono font-bold text-xs theme-text-main">${escapeHTML(item.code)}</td>
+      <td class="py-3 px-3 sm:px-4">
+        <div class="font-bold text-xs theme-text-main">${escapeHTML(toTitleCase(item.name))}</div>
+        <div class="text-[11px] theme-text-dim">${escapeHTML(item.category || 'General')}</div>
+      </td>
+      <td class="py-3 px-3 sm:px-4">${typeCol}</td>
+      <td class="py-3 px-3 sm:px-4 text-right font-mono font-bold text-xs theme-text-main currency-lkr">
+        ${formatLKR(item.sellingPrice)}
+        ${Array.isArray(item.prices) && item.prices.length > 1 ? `<div class="mt-0.5"><span class="badge-price-tiers inline-block px-1.5 py-0.5 rounded text-[10px] font-bold">${item.prices.length} Tiers</span></div>` : ''}
+      </td>
+      <td class="py-3 px-3 sm:px-4 text-center">${stockCol}</td>
+      <td class="py-3 px-3 sm:px-4 text-center">
+        <button type="button" class="quick-pos-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-500/15 text-sky-400 hover:bg-sky-500 hover:text-white transition">
+          ${isService ? 'Pay Bill' : 'Sell at POS'}
+        </button>
+      </td>
+    `;
+
+    const posBtn = tr.querySelector('.quick-pos-btn');
+    if (posBtn) {
+      posBtn.addEventListener('click', () => {
+        switchView('stationery');
+        selectCatalogItemForPOS(item);
+      });
+    }
+
+    tbody.appendChild(tr);
+  });
+}
+
+function selectCatalogItemForPOS(item) {
+  APP_STATE.selectedCatalogItem = item;
+  const input = document.getElementById('posItemInput');
+  const codeBadge = document.getElementById('posItemBadge');
+  const stockBadge = document.getElementById('posStockStatusBadge');
+  const priceInput = document.getElementById('posSellingPrice');
+  const priceLabel = document.getElementById('posSellingPriceLabel');
+  const qtyInput = document.getElementById('posQuantity');
+  const qtyContainer = document.getElementById('posQtyContainer');
+  const submitBtnText = document.getElementById('posSubmitBtnText');
+  const tierBadge = document.getElementById('posSelectedTierBadge');
+  const changeTierBtn = document.getElementById('posChangeTierBtn');
+
+  if (input) input.value = toTitleCase(item.name);
+  if (codeBadge) {
+    codeBadge.textContent = item.code;
+    codeBadge.classList.remove('hidden');
+  }
+
+  const isService = item.itemType === 'service';
+
+  if (stockBadge) {
+    stockBadge.classList.remove('hidden');
+    if (isService) {
+      stockBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-service-bill';
+      stockBadge.textContent = 'Service / Utility Bill (No Stock Count)';
+    } else if (item.stockQuantity <= 0) {
+      stockBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-out';
+      stockBadge.textContent = 'Out of Stock (0)';
+    } else if (item.stockQuantity <= (item.lowStockThreshold || 5)) {
+      stockBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-low';
+      stockBadge.textContent = `Low Stock: ${item.stockQuantity} Left`;
+    } else {
+      stockBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full badge-stock-in';
+      stockBadge.textContent = `In Stock: ${item.stockQuantity}`;
+    }
+  }
+
+  if (priceLabel) {
+    priceLabel.textContent = isService ? 'Bill Amount [Rs.] *' : 'Selling Price [Rs.]';
+  }
+
+  const hasMultipleTiers = Array.isArray(item.prices) && item.prices.length >= 2;
+  if (hasMultipleTiers) {
+    if (changeTierBtn) changeTierBtn.classList.remove('hidden');
+    const firstTier = item.prices[0];
+    APP_STATE.posSelectedTierName = firstTier.name;
+    APP_STATE.posSelectedCostPrice = firstTier.costPrice;
+    if (tierBadge) {
+      tierBadge.textContent = `${firstTier.name} (${formatLKR(firstTier.sellingPrice)})`;
+      tierBadge.classList.remove('hidden');
+    }
+    if (priceInput) priceInput.value = Number(firstTier.sellingPrice).toFixed(2);
+    openPriceSelectorModal(item);
   } else {
-    winner = totals.get(match.teamA.id) > totals.get(match.teamB.id) ? match.teamA.name : match.teamB.name;
-    margin = `${difference} runs`;
-  }
-  match.completed = true;
-  match.finishedAt = new Date().toISOString();
-  match.result = { winner, margin };
-  const awards = computeAwards(match);
-  return { winner, margin, potm: awards.find((award) => award.title === "Player of the Match")?.player ?? "—", awards };
-}
+    const singleTier = Array.isArray(item.prices) && item.prices.length === 1 ? item.prices[0] : null;
+    const effectiveCost = singleTier ? singleTier.costPrice : (item.costPrice || 0);
+    const effectiveSelling = singleTier ? singleTier.sellingPrice : item.sellingPrice;
+    APP_STATE.posSelectedTierName = singleTier ? singleTier.name : null;
+    APP_STATE.posSelectedCostPrice = effectiveCost || 0;
+    if (tierBadge) {
+      if (singleTier) {
+        tierBadge.textContent = singleTier.name;
+        tierBadge.classList.remove('hidden');
+      } else {
+        tierBadge.classList.add('hidden');
+      }
+    }
+    if (changeTierBtn) changeTierBtn.classList.add('hidden');
 
-
-
-
-// Consolidated from voting.js
-const VOTE_STORAGE_KEY = "tc_votes_v1";
-
-function readVotes() {
-  const raw = localStorage.getItem(VOTE_STORAGE_KEY);
-  if (!raw) return { captain: {}, codes: [] };
-  const value = JSON.parse(raw);
-  return { captain: value.captain ?? {}, codes: Array.isArray(value.codes) ? value.codes : [] };
-}
-
-function saveVotes(value) {
-  localStorage.setItem(VOTE_STORAGE_KEY, JSON.stringify(value));
-}
-
-function castCaptainVote({ voterId, teamId, candidateId } = {}) {
-  if (!voterId || !teamId || !candidateId) throw new TypeError("Voter, team and candidate are required.");
-  const votes = readVotes();
-  const teamVotes = votes.captain[teamId] ?? [];
-  const vote = { id: String(voterId), voterId: String(voterId), teamId: String(teamId), candidateId: String(candidateId), at: new Date().toISOString() };
-  votes.captain[teamId] = [...teamVotes.filter((item) => item.voterId !== vote.voterId), vote];
-  saveVotes(votes);
-  return vote;
-}
-
-function tallyCaptainVotes(teamId, votes = readVotes().captain[teamId] ?? []) {
-  const counts = {};
-  for (const vote of votes) {
-    if (vote.teamId === teamId && vote.candidateId) counts[vote.candidateId] = (counts[vote.candidateId] ?? 0) + 1;
-  }
-  const winner = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] ?? null;
-  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
-  return { teamId, counts, winner: winner && winner[1] > total / 2 ? winner[0] : null, votes: total };
-}
-
-function castCodeVote({ voterId, teamId = "general", code } = {}) {
-  if (!voterId || !teamId || typeof code !== "string" || !code.trim()) throw new TypeError("Voter, team and secret code are required.");
-  const votes = readVotes();
-  const vote = { id: `${Date.now()}-${String(voterId)}`, voterId: String(voterId), teamId: String(teamId), code: code.trim(), at: new Date().toISOString() };
-  votes.codes = [...votes.codes.filter((item) => item.voterId !== vote.voterId || item.teamId !== vote.teamId), vote];
-  saveVotes(votes);
-  return vote;
-}
-
-function tallyCodeVotes(votes = readVotes().codes, secretCode) {
-  const records = Array.isArray(votes) ? votes : [];
-  const total = records.length;
-  const matching = records.filter((vote) => vote.code === secretCode).length;
-  return { total, matching, majority: total > 0 && matching > total / 2, counts: records.reduce((counts, vote) => {
-    const key = String(vote.code);
-    counts[key] = (counts[key] ?? 0) + 1;
-    return counts;
-  }, {}) };
-}
-
-function getVotes() {
-  return readVotes();
-}
-
-function mergeRemoteVotes(records = []) {
-  if (!Array.isArray(records)) throw new TypeError("Remote votes must be a list.");
-  const votes = readVotes();
-  for (const record of records) {
-    if (record.kind === "captain" && record.teamId && record.voterId && record.candidateId) {
-      const current = votes.captain[record.teamId] ?? [];
-      votes.captain[record.teamId] = [
-        ...current.filter((vote) => vote.voterId !== record.voterId),
-        { ...record, id: String(record.voterId) }
-      ];
-    } else if (record.kind === "code" && record.teamId && record.voterId && record.code) {
-      votes.codes = [
-        ...votes.codes.filter((vote) => !(vote.voterId === record.voterId && vote.teamId === record.teamId)),
-        record
-      ];
+    if (priceInput) {
+      const sellValue = Number(effectiveSelling || 0);
+      if (isService) {
+        priceInput.value = sellValue > 0 ? sellValue.toFixed(2) : '';
+        priceInput.placeholder = 'Enter Bill Amount...';
+        priceInput.focus();
+      } else {
+        priceInput.value = sellValue > 0 ? sellValue.toFixed(2) : '0.00';
+      }
     }
   }
-  saveVotes(votes);
-  return votes;
+
+  if (qtyInput) {
+    qtyInput.value = '1';
+    qtyInput.required = !isService;
+  }
+  qtyContainer?.classList.toggle('hidden', isService);
+
+  if (submitBtnText) {
+    submitBtnText.textContent = isService ? 'Log Bill Payment' : 'Log Stationery Sale';
+  }
+
+  updatePOSTotalPreview();
 }
 
+function updatePOSTotalPreview() {
+  const priceInput = document.getElementById('posSellingPrice');
+  const qtyInput = document.getElementById('posQuantity');
+  const totalPreview = document.getElementById('posTotalAmountPreview');
 
-// Consolidated from report.js
+  const price = Number(priceInput?.value) || 0;
+  const qty = Math.max(1, parseInt(qtyInput?.value, 10) || 1);
+  const total = roundCurrency(price * qty);
 
-const escapeReportHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
-const overs = (balls) => `${Math.floor((balls ?? 0) / 6)}.${(balls ?? 0) % 6}`;
+  if (totalPreview) {
+    totalPreview.textContent = formatLKR(total);
+  }
+}
 
-function buildPrintReport(match) {
-  if (!match || !Array.isArray(match.innings)) throw new TypeError("A match scorecard is required to build a report.");
-  const teamName = (id) => [match.teamA, match.teamB].find((team) => team.id === id)?.name ?? id ?? "Team";
-  const playerName = new Map();
-  for (const team of [match.teamA, match.teamB]) {
-    for (const player of team?.roster ?? []) {
-      const id = String(player.id ?? player.playerId ?? player);
-      playerName.set(id, player.name ?? player.displayName ?? id);
+export function openPriceSelectorModal(item) {
+  const modal = document.getElementById('priceSelectorModal');
+  const codeEl = document.getElementById('priceSelectorItemCode');
+  const nameEl = document.getElementById('priceSelectorItemName');
+  const listEl = document.getElementById('priceSelectorTiersList');
+  if (!modal || !listEl) return;
+
+  if (codeEl) codeEl.textContent = item.code || '';
+  if (nameEl) nameEl.textContent = toTitleCase(item.name || '');
+
+  listEl.innerHTML = '';
+
+  const prices = Array.isArray(item.prices) && item.prices.length > 0 ? item.prices : [
+    { name: 'Standard', costPrice: item.costPrice || 0, sellingPrice: item.sellingPrice || 0 }
+  ];
+
+  prices.forEach((tier, index) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    const isSelected = APP_STATE.posSelectedTierName === tier.name || (!APP_STATE.posSelectedTierName && index === 0);
+    card.className = `price-tier-card ${isSelected ? 'selected' : ''}`;
+
+    const margin = roundCurrency(tier.sellingPrice - tier.costPrice);
+    const marginClass = margin >= 0 ? 'text-sky-400' : 'text-red-400';
+    const marginSign = margin >= 0 ? '+' : '';
+    const isAdminViewer = APP_STATE.currentRole === 'admin';
+
+    card.innerHTML = `
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="font-bold text-xs uppercase tracking-wider theme-text-main font-rounded">${escapeHTML(tier.name)}</span>
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">Tier ${index + 1}</span>
+      </div>
+      <div class="text-lg font-mono font-bold text-emerald-400 mb-1">
+        ${formatLKR(tier.sellingPrice)}
+      </div>
+      ${isAdminViewer ? `
+      <div class="flex items-center justify-between text-[11px] theme-text-dim border-t theme-border pt-1.5 mt-1 font-mono">
+        <span>Cost: <span class="text-amber-400 font-bold">${formatLKR(tier.costPrice)}</span></span>
+        <span class="font-bold ${marginClass}">Margin: ${marginSign}${formatLKR(margin)}</span>
+      </div>` : ''}
+    `;
+    card.setAttribute('aria-pressed', String(isSelected));
+
+    card.addEventListener('click', () => {
+      APP_STATE.posSelectedTierName = tier.name;
+      APP_STATE.posSelectedCostPrice = tier.costPrice;
+
+      const priceInput = document.getElementById('posSellingPrice');
+      if (priceInput) {
+        priceInput.value = Number(tier.sellingPrice).toFixed(2);
+      }
+
+      const tierBadge = document.getElementById('posSelectedTierBadge');
+      if (tierBadge) {
+        tierBadge.textContent = `${tier.name} (${formatLKR(tier.sellingPrice)})`;
+        tierBadge.classList.remove('hidden');
+      }
+
+      updatePOSTotalPreview();
+      closePriceSelectorModal();
+    });
+
+    listEl.appendChild(card);
+  });
+
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  listEl.querySelector('.price-tier-card')?.focus();
+}
+
+export function closePriceSelectorModal() {
+  const modal = document.getElementById('priceSelectorModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function initStationeryPOS() {
+  const itemInput = document.getElementById('posItemInput');
+  const autocompleteList = document.getElementById('posAutocompleteList');
+  const priceInput = document.getElementById('posSellingPrice');
+  const qtyInput = document.getElementById('posQuantity');
+  const form = document.getElementById('stationeryEntryForm');
+
+  if (itemInput) {
+    itemInput.addEventListener('blur', () => {
+      if (!APP_STATE.selectedCatalogItem) {
+        itemInput.value = toTitleCase(itemInput.value);
+      }
+    });
+
+    itemInput.addEventListener('input', () => {
+      const q = itemInput.value.trim().toLowerCase();
+      if (!q) {
+        if (autocompleteList) autocompleteList.classList.add('hidden');
+        APP_STATE.selectedCatalogItem = null;
+        APP_STATE.posSelectedTierName = null;
+        APP_STATE.posSelectedCostPrice = null;
+        const codeBadge = document.getElementById('posItemBadge');
+        const stockBadge = document.getElementById('posStockStatusBadge');
+        const tierBadge = document.getElementById('posSelectedTierBadge');
+        const changeTierBtn = document.getElementById('posChangeTierBtn');
+        if (codeBadge) codeBadge.classList.add('hidden');
+        if (stockBadge) stockBadge.classList.add('hidden');
+        if (tierBadge) tierBadge.classList.add('hidden');
+        if (changeTierBtn) changeTierBtn.classList.add('hidden');
+        return;
+      }
+
+      const matches = APP_STATE.inventoryCatalog.filter(i => {
+        return (i.code || '').toLowerCase().includes(q) || (i.name || '').toLowerCase().includes(q);
+      }).slice(0, 6);
+
+      if (matches.length > 0 && autocompleteList) {
+        autocompleteList.innerHTML = '';
+        autocompleteList.classList.remove('hidden');
+
+        matches.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'autocomplete-item';
+          const isService = item.itemType === 'service';
+          const tierInfo = Array.isArray(item.prices) && item.prices.length > 1
+            ? `<span class="badge-price-tiers px-1.5 py-0.2 rounded text-[9px] font-bold ml-1">${item.prices.length} Tiers</span>`
+            : '';
+          div.innerHTML = `
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(item.code)}</span>
+              <span class="font-bold text-xs theme-text-main">${escapeHTML(toTitleCase(item.name))}${tierInfo}</span>
+            </div>
+            <div class="text-right">
+              <div class="font-bold text-xs theme-text-main font-mono">${formatLKR(item.sellingPrice)}</div>
+              <div class="text-[10px] theme-text-dim">${isService ? 'Service/Bill' : `${escapeHTML(item.stockQuantity)} left`}</div>
+            </div>
+          `;
+          div.addEventListener('click', () => {
+            selectCatalogItemForPOS(item);
+            autocompleteList.classList.add('hidden');
+          });
+          autocompleteList.appendChild(div);
+        });
+      } else if (autocompleteList) {
+        autocompleteList.classList.add('hidden');
+      }
+    });
+  }
+
+  const decBtn = document.getElementById('posQtyDecBtn');
+  const incBtn = document.getElementById('posQtyIncBtn');
+
+  if (decBtn && qtyInput) {
+    decBtn.addEventListener('click', () => {
+      const cur = parseInt(qtyInput.value, 10) || 1;
+      if (cur > 1) {
+        qtyInput.value = cur - 1;
+        updatePOSTotalPreview();
+      }
+    });
+  }
+
+  if (incBtn && qtyInput) {
+    incBtn.addEventListener('click', () => {
+      const cur = parseInt(qtyInput.value, 10) || 1;
+      qtyInput.value = cur + 1;
+      updatePOSTotalPreview();
+    });
+  }
+
+  document.querySelectorAll('[data-qty-pill]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      if (qtyInput) {
+        qtyInput.value = pill.getAttribute('data-qty-pill');
+        updatePOSTotalPreview();
+      }
+    });
+  });
+
+  if (priceInput) priceInput.addEventListener('input', updatePOSTotalPreview);
+  if (qtyInput) qtyInput.addEventListener('input', updatePOSTotalPreview);
+
+  const posSelectedTierBadge = document.getElementById('posSelectedTierBadge');
+  const posChangeTierBtn = document.getElementById('posChangeTierBtn');
+  const closePriceSelectorBtn = document.getElementById('closePriceSelectorBtn');
+  const cancelPriceSelectorBtn = document.getElementById('cancelPriceSelectorBtn');
+
+  const openTierModalIfEligible = () => {
+    if (APP_STATE.selectedCatalogItem && Array.isArray(APP_STATE.selectedCatalogItem.prices) && APP_STATE.selectedCatalogItem.prices.length >= 2) {
+      openPriceSelectorModal(APP_STATE.selectedCatalogItem);
+    }
+  };
+
+  posSelectedTierBadge?.addEventListener('click', openTierModalIfEligible);
+  posChangeTierBtn?.addEventListener('click', openTierModalIfEligible);
+  closePriceSelectorBtn?.addEventListener('click', closePriceSelectorModal);
+  cancelPriceSelectorBtn?.addEventListener('click', closePriceSelectorModal);
+
+  const priceSelectorModalEl = document.getElementById('priceSelectorModal');
+  document.addEventListener('keydown', (e) => {
+    if (!priceSelectorModalEl || priceSelectorModalEl.classList.contains('hidden')) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      const item = APP_STATE.selectedCatalogItem;
+      APP_STATE.posSelectedTierName = null;
+      APP_STATE.posSelectedCostPrice = item ? roundCurrency(item.costPrice || 0) : null;
+      const priceField = document.getElementById('posSellingPrice');
+      if (item && priceField) priceField.value = Number(item.sellingPrice || 0).toFixed(2);
+      document.getElementById('posSelectedTierBadge')?.classList.add('hidden');
+      document.getElementById('posChangeTierBtn')?.classList.add('hidden');
+      updatePOSTotalPreview();
+      closePriceSelectorModal();
+      return;
+    }
+    if (/^[1-5]$/.test(e.key)) {
+      const tierCards = document.querySelectorAll('#priceSelectorTiersList .price-tier-card');
+      const targetCard = tierCards[parseInt(e.key, 10) - 1];
+      if (targetCard) {
+        e.preventDefault();
+        targetCard.click();
+      }
+    }
+  });
+
+  document.getElementById('posOpenCatalogBtn')?.addEventListener('click', () => {
+    if (APP_STATE.currentRole !== 'admin') {
+      showToast('Catalog management requires an admin account.', 'error');
+      return;
+    }
+    openSettingsModal();
+    switchSettingsTab('catalog');
+  });
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const rawName = itemInput.value.trim();
+      const itemName = toTitleCase(rawName);
+      const sellingPrice = roundCurrency(priceInput.value);
+      const quantity = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+      const totalAmount = roundCurrency(sellingPrice * quantity);
+
+      const matchedItem = APP_STATE.selectedCatalogItem;
+      const isService = matchedItem && isServiceItem(matchedItem);
+      const itemCode = matchedItem ? matchedItem.code : 'CUSTOM';
+      const category = matchedItem ? (matchedItem.category || (isService ? 'Utility Bills' : 'General')) : 'Custom';
+
+      const selectedTierName = APP_STATE.posSelectedTierName || null;
+      let costPrice = 0;
+      if (APP_STATE.posSelectedCostPrice !== null && APP_STATE.posSelectedCostPrice !== undefined) {
+        costPrice = roundCurrency(APP_STATE.posSelectedCostPrice);
+      } else if (matchedItem) {
+        costPrice = roundCurrency(matchedItem.costPrice || 0);
+      }
+      const unitProfit = isService ? sellingPrice : roundCurrency(sellingPrice - costPrice);
+      const lineProfit = roundCurrency(unitProfit * quantity);
+
+      if (!itemName) {
+        showToast('Please specify an item name or code', 'error');
+        return;
+      }
+      if (sellingPrice <= 0) {
+        showToast('Please enter a valid amount / selling price', 'error');
+        return;
+      }
+
+      if (!isService && matchedItem && Number(matchedItem.stockQuantity || 0) < quantity) {
+        showToast(`Insufficient stock for "${matchedItem.name}". Available: ${matchedItem.stockQuantity || 0}.`, 'error');
+        return;
+      }
+
+      const transactionPayload = {
+        date: getTodayDateString(),
+        time: getCurrentTimeString(),
+        createdBy: auth.currentUser.uid,
+        itemCode,
+        itemName,
+        ...(matchedItem?.id && !isService ? { inventoryId: matchedItem.id } : {}),
+        category,
+        itemType: isService ? 'service' : 'product',
+        ...(selectedTierName ? { priceTier: selectedTierName } : {}),
+        costPrice,
+        sellingPrice,
+        unitProfit,
+        profit: lineProfit,
+        quantity,
+        totalAmount,
+        timestamp: serverTimestamp()
+      };
+
+      try {
+        if (!isService && matchedItem && matchedItem.id) {
+          const itemDocRef = doc(db, 'inventory', matchedItem.id);
+          const transactionRef = doc(collection(db, 'stationery_transactions'));
+          await runTransaction(db, async firestoreTransaction => {
+            const inventorySnapshot = await firestoreTransaction.get(itemDocRef);
+            if (!inventorySnapshot.exists()) {
+              throw new Error('The selected inventory item no longer exists.');
+            }
+            const availableStock = Number(inventorySnapshot.data().stockQuantity || 0);
+            if (availableStock < quantity) {
+              throw new Error(`Insufficient stock. Only ${availableStock} units are currently available.`);
+            }
+            firestoreTransaction.update(itemDocRef, {
+              stockQuantity: increment(-quantity),
+              updatedAt: serverTimestamp()
+            });
+            firestoreTransaction.set(transactionRef, transactionPayload);
+          });
+          const remainingStock = Math.max(0, matchedItem.stockQuantity - quantity);
+          showToast(`Logged sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)}) | Stock left: ${remainingStock}`, 'success');
+        } else {
+          await addDoc(collection(db, 'stationery_transactions'), transactionPayload);
+        }
+
+        if (isService) {
+          showToast(`Recorded utility bill: ${itemName} (${formatLKR(totalAmount)}) [No stock deduction]`, 'success');
+        } else if (!matchedItem) {
+          showToast(`Logged custom sale: ${quantity}x ${itemName} (${formatLKR(totalAmount)})`, 'success');
+        }
+
+        form.reset();
+        APP_STATE.selectedCatalogItem = null;
+        APP_STATE.posSelectedTierName = null;
+        APP_STATE.posSelectedCostPrice = null;
+        const codeBadge = document.getElementById('posItemBadge');
+        const stockBadge = document.getElementById('posStockStatusBadge');
+        const tierBadge = document.getElementById('posSelectedTierBadge');
+        const changeTierBtn = document.getElementById('posChangeTierBtn');
+        const submitBtnText = document.getElementById('posSubmitBtnText');
+        const priceLabel = document.getElementById('posSellingPriceLabel');
+
+        if (codeBadge) codeBadge.classList.add('hidden');
+        if (stockBadge) stockBadge.classList.add('hidden');
+        if (tierBadge) tierBadge.classList.add('hidden');
+        if (changeTierBtn) changeTierBtn.classList.add('hidden');
+        if (priceLabel) priceLabel.textContent = 'Selling Price / Amount [Rs.]';
+        if (submitBtnText) submitBtnText.textContent = 'Log Stationery Sale';
+        if (qtyInput) qtyInput.value = '1';
+        if (qtyInput) qtyInput.required = true;
+        document.getElementById('posQtyContainer')?.classList.remove('hidden');
+        updatePOSTotalPreview();
+        itemInput.focus();
+      } catch (err) {
+        logDebug(`Error recording sale: ${err.message}`, 'ERROR');
+        showToast(`Failed to log sale: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  setupEditStationeryModal();
+}
+
+function renderRecentStationeryFeed() {
+  const feed = document.getElementById('statRecentFeed');
+  if (!feed) return;
+  feed.innerHTML = '';
+
+  const recent = [...APP_STATE.todayStationeryTransactions].slice(0, 5);
+
+  if (recent.length === 0) {
+    feed.innerHTML = `
+      <div class="p-3 text-xs text-center theme-text-dim rounded-xl border theme-border">
+        No sales or utility bills recorded yet today.
+      </div>
+    `;
+    return;
+  }
+
+  recent.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'p-3 rounded-xl border theme-border theme-bg-subtle flex items-center justify-between text-xs';
+    const isService = item.itemType === 'service';
+    const badge = isService
+      ? `<span class="badge-service-bill px-1.5 py-0.5 rounded text-[10px] font-bold">Bill</span>`
+      : `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/10 text-sky-400 border border-sky-500/20">${escapeHTML(item.itemCode || 'ST')}</span>`;
+    const tierBadge = item.priceTier
+      ? `<span class="badge-price-tiers ml-1.5 px-1.5 py-0.2 rounded text-[9px] font-bold">${escapeHTML(item.priceTier)}</span>`
+      : '';
+
+    div.innerHTML = `
+      <div class="flex items-center gap-2">
+        ${badge}
+        <div>
+          <span class="font-bold theme-text-main">${escapeHTML(toTitleCase(item.itemName))}</span>${tierBadge}
+          <span class="text-[11px] theme-text-dim"> &times; ${escapeHTML(item.quantity || 1)} &bull; ${escapeHTML(item.time || '')}</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="text-right">
+          <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.totalAmount)}</span>
+          <span class="text-[10px] theme-text-dim block">${formatSignedLKR(item.profit ?? ((Number(item.sellingPrice || 0) - Number(item.costPrice || 0)) * Number(item.quantity || 1)))} margin</span>
+        </div>
+        <button type="button" class="recent-delete-btn min-h-11 min-w-11 text-red-400 hover:text-red-300" aria-label="Delete transaction" title="Delete transaction">
+          <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </div>
+    `;
+    div.querySelector('.recent-delete-btn')?.addEventListener('click', async () => {
+      if (!(await showDeleteConfirm(`Delete transaction for "${item.itemName}"?`))) return;
+      try {
+        const restored = await removeTransaction('STATIONERY', item);
+        showToast(restored ? 'Transaction deleted, stock restored' : 'Transaction deleted', 'success');
+      } catch (err) {
+        showToast(`Delete failed: ${err.message}`, 'error');
+      }
+    });
+    feed.appendChild(div);
+  });
+}
+
+function setupEditStationeryModal() {
+  const modal = document.getElementById('editStationeryModal');
+  const closeBtn = document.getElementById('closeEditStatModalBtn');
+  const cancelBtn = document.getElementById('cancelEditStatBtn');
+  const form = document.getElementById('editStationeryForm');
+
+  if (closeBtn && modal) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  if (cancelBtn && modal) cancelBtn.addEventListener('click', () => modal.classList.add('hidden'));
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const docId = document.getElementById('editStatDocId')?.value;
+      const rawName = document.getElementById('editStatName')?.value.trim();
+      const name = toTitleCase(rawName);
+      const cost = roundCurrency(document.getElementById('editStatCost')?.value);
+      const sell = roundCurrency(document.getElementById('editStatSell')?.value);
+      const qty = parseInt(document.getElementById('editStatQty')?.value, 10) || 1;
+      const editedRecord = APP_STATE.masterStationeryRecords.find(r => r.id === docId);
+      const isServiceEdit = isServiceItem(editedRecord);
+      const unitProfitEdit = isServiceEdit ? sell : roundCurrency(sell - cost);
+      const profit = roundCurrency(unitProfitEdit * qty);
+      const total = roundCurrency(sell * qty);
+
+      if (!docId) return;
+
+      try {
+        await updateDoc(doc(db, 'stationery_transactions', docId), {
+          itemName: name,
+          costPrice: cost,
+          sellingPrice: sell,
+          quantity: qty,
+          profit,
+          totalAmount: total,
+          unitProfit: unitProfitEdit,
+          updatedAt: serverTimestamp()
+        });
+        showToast('Stationery record updated', 'success');
+        if (modal) modal.classList.add('hidden');
+      } catch (err) {
+        showToast(`Update failed: ${err.message}`, 'error');
+      }
+    });
+  }
+}
+
+function selectOperator(operator) {
+  APP_STATE.selectedOperator = operator;
+  document.querySelectorAll('.op-select-btn').forEach(btn => {
+    if (btn.getAttribute('data-operator') === operator) {
+      btn.className = 'op-select-btn p-3 rounded-xl border border-sky-400 theme-bg-elevated ring-2 ring-sky-500/30 flex flex-col items-center justify-center gap-1 transition text-center';
+    } else {
+      btn.className = 'op-select-btn p-3 rounded-xl border theme-border flex flex-col items-center justify-center gap-1 transition text-center hover:theme-bg-elevated';
+    }
+  });
+  updateReloadCommissionPreview();
+}
+
+function updateReloadCommissionPreview() {
+  const amountInput = document.getElementById('reloadAmount');
+  const commPreview = document.getElementById('reloadCommissionPreview');
+  const totalPreview = document.getElementById('reloadTotalPreview');
+
+  const amount = Number(amountInput?.value) || 0;
+  const rate = APP_STATE.commissionRates[APP_STATE.selectedOperator] || 0;
+  const commission = roundCurrency((amount * rate) / 100);
+
+  if (commPreview) {
+    commPreview.textContent = formatSignedLKR(commission);
+  }
+  if (totalPreview) {
+    totalPreview.textContent = formatLKR(amount);
+  }
+}
+
+function renderPresetPills() {
+  const container = document.getElementById('quickPresetsContainer');
+  if (!container) return;
+  container.innerHTML = '';
+
+  APP_STATE.reloadPresets.sort((a, b) => a - b).forEach(val => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'preset-pill';
+    btn.textContent = `Rs. ${val}`;
+    btn.addEventListener('click', () => {
+      const amountInput = document.getElementById('reloadAmount');
+      if (amountInput) {
+        amountInput.value = val;
+        updateReloadCommissionPreview();
+      }
+    });
+    container.appendChild(btn);
+  });
+}
+
+function initMobileReloads() {
+
+  document.querySelectorAll('.op-select-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectOperator(btn.getAttribute('data-operator'));
+    });
+  });
+
+  selectOperator('DIALOG');
+
+  const phoneInput = document.getElementById('reloadPhone');
+  const detectedBadge = document.getElementById('detectedOperatorBadge');
+
+  if (phoneInput) {
+    phoneInput.addEventListener('input', () => {
+      const detected = detectOperatorFromPrefix(phoneInput.value);
+      if (detected) {
+        selectOperator(detected);
+        if (detectedBadge) {
+          detectedBadge.textContent = detected;
+          detectedBadge.className = `absolute right-3 top-2.5 px-2 py-0.5 rounded text-xs font-bold border ${detected === 'DIALOG' ? 'text-orange-400 border-orange-500/30' : detected === 'MOBITEL' ? 'text-blue-400 border-blue-500/30' : detected === 'AIRTEL' ? 'text-red-400 border-red-500/30' : 'text-amber-300 border-amber-500/30'}`;
+          detectedBadge.classList.remove('hidden');
+        }
+      } else if (detectedBadge) {
+        detectedBadge.classList.add('hidden');
+      }
+    });
+  }
+
+  const amountInput = document.getElementById('reloadAmount');
+  if (amountInput) amountInput.addEventListener('input', updateReloadCommissionPreview);
+
+  renderPresetPills();
+
+  const form = document.getElementById('reloadEntryForm');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const phone = phoneInput ? phoneInput.value.trim() : '';
+      const amount = roundCurrency(amountInput ? amountInput.value : 0);
+      const operator = APP_STATE.selectedOperator;
+      const rate = APP_STATE.commissionRates[operator] || 0;
+      const commissionAmount = roundCurrency((amount * rate) / 100);
+
+      if (amount < 10) {
+        showToast('Minimum reload amount is Rs. 10.00', 'error');
+        return;
+      }
+
+      const payload = {
+        date: getTodayDateString(),
+        time: getCurrentTimeString(),
+        createdBy: auth.currentUser.uid,
+        operator,
+        phone: phone || 'Walk-in Customer',
+        amount,
+        commissionRate: rate,
+        commissionAmount,
+        timestamp: serverTimestamp()
+      };
+
+      try {
+        await addDoc(collection(db, 'reload_transactions'), payload);
+        showToast(`Recorded ${operator} reload of ${formatLKR(amount)} (${formatSignedLKR(commissionAmount)} commission)`, 'success');
+        form.reset();
+        if (detectedBadge) detectedBadge.classList.add('hidden');
+        selectOperator(operator);
+        updateReloadCommissionPreview();
+      } catch (err) {
+        logDebug(`Error recording reload: ${err.message}`, 'ERROR');
+        showToast(`Failed to log reload: ${err.message}`, 'error');
+      }
+    });
+  }
+}
+
+function renderRecentReloadsFeed() {
+  const feed = document.getElementById('reloadRecentFeed');
+  if (!feed) return;
+  feed.innerHTML = '';
+
+  const recent = [...APP_STATE.todayReloadTransactions].slice(0, 5);
+
+  if (recent.length === 0) {
+    feed.innerHTML = `
+      <div class="p-3 text-xs text-center theme-text-dim rounded-xl border theme-border">
+        No mobile reloads recorded yet today.
+      </div>
+    `;
+    return;
+  }
+
+  recent.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'p-3 rounded-xl border theme-border theme-bg-subtle flex items-center justify-between text-xs';
+    div.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${item.operator === 'DIALOG' ? 'text-orange-400 border-orange-500/30' : item.operator === 'MOBITEL' ? 'text-blue-400 border-blue-500/30' : item.operator === 'AIRTEL' ? 'text-red-400 border-red-500/30' : 'text-amber-300 border-amber-500/30'}">${escapeHTML(item.operator)}</span>
+        <div>
+          <span class="font-bold font-mono theme-text-main">${escapeHTML(item.phone || 'Walk-in')}</span>
+          <span class="text-[11px] theme-text-dim block">${escapeHTML(item.time || '')}</span>
+        </div>
+      </div>
+        <div class="flex items-center gap-2">
+          <div class="text-right">
+            <span class="font-mono font-bold text-emerald-400 currency-lkr">${formatLKR(item.amount)}</span>
+            <span class="text-[10px] theme-text-dim block font-mono">${formatSignedLKR(item.commissionAmount)} commission</span>
+          </div>
+          <button type="button" class="recent-delete-btn min-h-11 min-w-11 text-red-400 hover:text-red-300" aria-label="Delete transaction" title="Delete transaction">
+            <svg class="icon-svg-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+      </div>
+    `;
+      div.querySelector('.recent-delete-btn')?.addEventListener('click', async () => {
+        if (!(await showDeleteConfirm(`Delete ${item.operator} reload for ${item.phone || 'Walk-in'}?`))) return;
+        try {
+          await removeTransaction('RELOAD', item);
+          showToast('Transaction record deleted', 'success');
+        } catch (err) {
+          showToast(`Delete failed: ${err.message}`, 'error');
+        }
+      });
+    feed.appendChild(div);
+  });
+}
+
+function addCatalogPriceTierRow(tierData = { name: '', costPrice: '', sellingPrice: '' }) {
+  const container = document.getElementById('catalogPriceTiersList');
+  if (!container) return;
+
+  const row = document.createElement('div');
+  row.className = 'catalog-price-tier-row';
+  row.innerHTML = `
+    <div>
+      <input type="text" placeholder="Tier Name (e.g. Wholesale, Bulk)" value="${escapeHTML(tierData.name || '')}" class="form-input text-xs font-rounded tier-name-input" required>
+    </div>
+    <div>
+      <input type="number" step="0.01" min="0" placeholder="Cost [Rs.]" value="${tierData.costPrice !== undefined && tierData.costPrice !== '' ? Number(tierData.costPrice).toFixed(2) : ''}" class="form-input text-xs font-mono font-bold text-amber-400 tier-cost-input" required>
+    </div>
+    <div>
+      <input type="number" step="0.01" min="0" placeholder="Selling [Rs.]" value="${tierData.sellingPrice !== undefined && tierData.sellingPrice !== '' ? Number(tierData.sellingPrice).toFixed(2) : ''}" class="form-input text-xs font-mono font-bold text-emerald-400 tier-selling-input" required>
+    </div>
+    <div class="tier-remove-col">
+      <button type="button" class="tier-remove-btn min-h-9 px-2.5 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-xs font-bold transition font-rounded" title="Remove price tier">✕</button>
+    </div>
+  `;
+
+  row.querySelector('.tier-remove-btn').addEventListener('click', () => {
+    row.remove();
+    updateCatalogTierRemoveButtons();
+  });
+
+  container.appendChild(row);
+  updateCatalogTierRemoveButtons();
+}
+
+function updateCatalogTierRemoveButtons() {
+  const rows = document.querySelectorAll('#catalogPriceTiersList .catalog-price-tier-row');
+  rows.forEach(tierRow => {
+    const btn = tierRow.querySelector('.tier-remove-btn');
+    if (!btn) return;
+    const isLast = rows.length <= 1;
+    btn.disabled = isLast;
+    btn.classList.toggle('opacity-40', isLast);
+    btn.classList.toggle('cursor-not-allowed', isLast);
+    btn.title = isLast ? 'At least one price tier is required' : 'Remove price tier';
+  });
+}
+
+function initSettingsCatalog() {
+  const form = document.getElementById('catalogItemForm');
+  const docIdInput = document.getElementById('catalogDocId');
+  const codeInput = document.getElementById('catalogCode');
+  const nameInput = document.getElementById('catalogName');
+  const categoryInput = document.getElementById('catalogCategory');
+  const costPriceInput = document.getElementById('catalogCostPrice');
+  const sellingPriceInput = document.getElementById('catalogSellingPrice');
+  const stockInput = document.getElementById('catalogStockQuantity');
+  const thresholdInput = document.getElementById('catalogLowStockThreshold');
+  const formTitle = document.getElementById('catalogFormTitle');
+  const saveBtn = document.getElementById('catalogSaveBtn');
+  const resetBtn = document.getElementById('catalogResetFormBtn');
+  const searchInput = document.getElementById('catalogSearchInput');
+  const sortSelect = document.getElementById('catalogSortSelect');
+  const seedBtn = document.getElementById('seedCatalogBtn');
+  const addPriceTierBtn = document.getElementById('addPriceTierBtn');
+
+  const stockQtyContainer = document.getElementById('catalogStockQtyContainer');
+  const thresholdContainer = document.getElementById('catalogThresholdContainer');
+  const costPriceContainer = document.getElementById('catalogCostPriceContainer');
+  const sellingPriceLabel = document.getElementById('catalogSellingPriceLabel');
+
+  const itemTypeRadios = form?.querySelectorAll('input[name="catalogItemType"]');
+  function handleItemTypeChange() {
+    const isService = form?.querySelector('input[name="catalogItemType"]:checked')?.value === 'service';
+    if (isService) {
+      if (stockQtyContainer) stockQtyContainer.classList.add('hidden');
+      if (thresholdContainer) thresholdContainer.classList.add('hidden');
+      if (costPriceContainer) costPriceContainer.classList.remove('hidden');
+      if (sellingPriceLabel) sellingPriceLabel.textContent = 'Default Base Fee / Amount [Rs.]';
+      if (costPriceInput) costPriceInput.required = true;
+      if (stockInput) {
+        stockInput.required = false;
+        stockInput.value = '0';
+      }
+      if (thresholdInput) {
+        thresholdInput.required = false;
+        thresholdInput.value = '0';
+      }
+    } else {
+      if (stockQtyContainer) stockQtyContainer.classList.remove('hidden');
+      if (thresholdContainer) thresholdContainer.classList.remove('hidden');
+      if (costPriceContainer) costPriceContainer.classList.remove('hidden');
+      if (sellingPriceLabel) sellingPriceLabel.textContent = 'Selling Price [Rs.] *';
+      if (costPriceInput) costPriceInput.required = true;
+      if (stockInput) {
+        stockInput.required = true;
+        if (!stockInput.value || stockInput.value === '0') stockInput.value = '50';
+      }
+      if (thresholdInput) {
+        thresholdInput.required = true;
+        if (!thresholdInput.value || thresholdInput.value === '0') thresholdInput.value = '5';
+      }
     }
   }
-  const innings = match.innings.map((inn, index) => {
-    const batterRows = Object.values(inn.batsmen ?? {}).map((player) => `<tr><td>${escapeReportHTML(playerName.get(player.playerId) ?? player.playerId)}</td><td>${player.runs}</td><td>${player.balls}</td><td>${player.fours}</td><td>${player.sixes}</td></tr>`).join("");
-    const bowlerRows = Object.values(inn.bowlers ?? {}).map((player) => `<tr><td>${escapeReportHTML(playerName.get(player.playerId) ?? player.playerId)}</td><td>${overs(player.bowlingBalls)}</td><td>${player.conceded}</td><td>${player.wickets}</td></tr>`).join("");
-    return `<section class="report-innings"><h2>Innings ${index + 1} · ${escapeReportHTML(teamName(inn.battingTeamId))}</h2><p><strong>${inn.score}/${inn.wickets}</strong> in ${overs(inn.legalBalls)} overs${inn.target ? ` · target ${inn.target}` : ""}</p>
-      <h3>Batting</h3><table><thead><tr><th>Player</th><th>Runs</th><th>Balls</th><th>4s</th><th>6s</th></tr></thead><tbody>${batterRows || "<tr><td colspan='5'>No batting entries</td></tr>"}</tbody></table>
-      <h3>Bowling</h3><table><thead><tr><th>Player</th><th>Overs</th><th>Runs</th><th>Wickets</th></tr></thead><tbody>${bowlerRows || "<tr><td colspan='4'>No bowling entries</td></tr>"}</tbody></table></section>`;
-  }).join("");
-  const awards = computeAwards(match).map((award) => `<li><strong>${escapeReportHTML(award.title)}:</strong> ${escapeReportHTML(award.player)} — ${escapeReportHTML(award.value)}</li>`).join("");
-  return `<article class="print-report"><p>THURSDAY CRICKET · MATCH REPORT</p><h1>${escapeReportHTML(match.teamA.name)} vs ${escapeReportHTML(match.teamB.name)}</h1>
-    <p>${escapeReportHTML(match.venue || "Venue not recorded")} · ${new Date(match.createdAt).toLocaleDateString()}</p>
-    ${match.result ? `<h2>${escapeReportHTML(match.result.winner)} · ${escapeReportHTML(match.result.margin)}</h2>` : ""}
-    ${innings}<section><h2>Match awards</h2><ul>${awards}</ul></section></article>`;
-}
 
-function triggerPrint() {
-  window.print();
-}
-
-
-// Consolidated from teams.js
-
-const TEAM_KEY = "tc_custom_teams_v1";
-const PLAYER_KEY = "tc_players_v1";
-
-function readArray(key, label) {
-  const value = JSON.parse(localStorage.getItem(key) ?? "[]");
-  if (!Array.isArray(value)) throw new TypeError(`Saved ${label} data is invalid.`);
-  return value;
-}
-
-function createCustomTeam({ name, tag, color, roster = [] } = {}) {
-  const teamName = String(name ?? "").trim();
-  const shortTag = String(tag ?? "").trim().toUpperCase();
-  if (teamName.length < 2 || teamName.length > 40) throw new TypeError("Team name must be between 2 and 40 characters.");
-  if (!/^[A-Z0-9]{2,5}$/.test(shortTag)) throw new TypeError("Team tag must contain 2–5 letters or numbers.");
-  if (!/^#[0-9a-f]{6}$/i.test(String(color))) throw new TypeError("Choose a valid six-digit hex color.");
-  if (!Array.isArray(roster)) throw new TypeError("Team roster must be a list of players.");
-  const teams = readArray(TEAM_KEY, "team");
-  if (teams.some((team) => team.name.toLowerCase() === teamName.toLowerCase() || team.tag === shortTag)) {
-    throw new TypeError("A team with that name or tag already exists.");
+  if (itemTypeRadios) {
+    itemTypeRadios.forEach(radio => radio.addEventListener('change', handleItemTypeChange));
   }
-  const team = { id: `custom-${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}`, name: teamName, tag: shortTag, color: String(color), roster: roster.map((player) => typeof player === "string" ? { id: player, name: player } : player) };
-  teams.push(team);
-  localStorage.setItem(TEAM_KEY, JSON.stringify(teams));
-  return team;
-}
 
-function updatePlayerProfile(playerId, { name, tags = [], role, teamId } = {}) {
-  if (!playerId) throw new TypeError("A player id is required.");
-  const playerName = String(name ?? "").trim();
-  const rawRole = String(role ?? "").trim();
-  const selectedRole = rawRole === "All-Rounder" ? "All-rounder" : rawRole;
-  if (!playerName || playerName.length > 40) throw new TypeError("Player name must be between 1 and 40 characters.");
-  if (!["Batter", "Bowler", "All-rounder", "Wicket-keeper"].includes(selectedRole)) throw new TypeError("Choose a valid player role.");
-  const cleanTags = (Array.isArray(tags) ? tags : String(tags).split(",")).map((tag) => String(tag).trim()).filter(Boolean).slice(0, 10);
-  const players = readArray(PLAYER_KEY, "player");
-  const profile = { id: String(playerId), name: playerName, tags: cleanTags, role: selectedRole, teamId: String(teamId ?? ""), updatedAt: new Date().toISOString() };
-  const index = players.findIndex((player) => player.id === profile.id);
-  if (index < 0) players.push(profile);
-  else players[index] = { ...players[index], ...profile };
-  localStorage.setItem(PLAYER_KEY, JSON.stringify(players));
-  return profile;
-}
+  if (addPriceTierBtn) {
+    addPriceTierBtn.addEventListener('click', () => {
+      const currentCost = costPriceInput ? costPriceInput.value : '';
+      const currentSelling = sellingPriceInput ? sellingPriceInput.value : '';
+      const existingCount = document.querySelectorAll('.catalog-price-tier-row').length;
+      if (existingCount >= 5) {
+        showToast('Maximum of 5 price tiers per item.', 'error');
+        return;
+      }
+      const defaultName = existingCount === 0 ? 'Wholesale' : existingCount === 1 ? 'Special / Bulk' : `Tier ${existingCount + 1}`;
+      addCatalogPriceTierRow({ name: defaultName, costPrice: currentCost, sellingPrice: currentSelling });
+    });
+  }
 
-function listPlayers(teamId) {
-  const customTeams = readArray(TEAM_KEY, "team");
-  const players = readArray(PLAYER_KEY, "player");
-  const roster = customTeams.find((team) => team.id === teamId)?.roster ?? [];
-  const ids = new Set(roster.map((player) => String(player.id ?? player)));
-  return players.filter((player) => player.teamId === teamId || ids.has(player.id));
-}
+  if (nameInput) {
+    nameInput.addEventListener('blur', () => {
+      nameInput.value = toTitleCase(nameInput.value);
+    });
+  }
 
-function listCustomTeams() {
-  return readArray(TEAM_KEY, "team");
-}
+  function resetCatalogForm() {
+    form.reset();
+    docIdInput.value = '';
+    const productRadio = form.querySelector('input[name="catalogItemType"][value="product"]');
+    if (productRadio) productRadio.checked = true;
+    handleItemTypeChange();
+    const tiersContainer = document.getElementById('catalogPriceTiersList');
+    if (tiersContainer) tiersContainer.innerHTML = '';
+    if (formTitle) formTitle.textContent = 'Add New Catalog Item / Service';
+    if (saveBtn) saveBtn.textContent = 'Save Item to Catalog';
+    if (resetBtn) resetBtn.classList.add('hidden');
+  }
 
-async function openCustomTeamBuilder() {
-  let created;
-  const body = `<p>Create a side for your next match. Roster names are optional and comma-separated.</p>
-    <label class="modal-field">Team name<input id="modal-team-name" maxlength="40" type="text" required></label>
-    <label class="modal-field">Short tag<input id="modal-team-tag" maxlength="5" type="text" required></label>
-    <label class="modal-field">Team color<input id="modal-team-color" type="color" value="#70e1c0"></label>
-    <label class="modal-field">Roster names<input id="modal-team-roster" type="text" maxlength="400"></label>
-    <p id="modal-team-error" class="inline-error" role="status"></p>`;
-  const result = await openGlassModal({
-    title: "Create custom team",
-    body,
-    actions: [
-      { id: "cancel", label: "Cancel" },
-      {
-        id: "save", label: "Create team", primary: true,
-        onClick: () => {
+  if (resetBtn) resetBtn.addEventListener('click', resetCatalogForm);
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (APP_STATE.currentRole !== 'admin') {
+        showToast('Only an admin can edit the master catalog.', 'error');
+        return;
+      }
+      const code = codeInput.value.trim().toUpperCase();
+      const rawName = nameInput.value.trim();
+      const name = toTitleCase(rawName);
+      const category = categoryInput ? categoryInput.value.trim() || 'General' : 'General';
+      const isService = form.querySelector('input[name="catalogItemType"]:checked')?.value === 'service';
+      const itemType = isService ? 'service' : 'product';
+
+      const costPrice = roundCurrency(costPriceInput.value);
+      const sellingPrice = roundCurrency(sellingPriceInput.value);
+      const stockQuantity = isService ? 0 : Math.max(0, parseInt(stockInput.value, 10) || 0);
+      const lowStockThreshold = isService ? 0 : Math.max(0, parseInt(thresholdInput.value, 10) || 5);
+      const editDocId = docIdInput.value;
+
+      if (!code || !name) {
+        showToast('Please provide both item code and name', 'error');
+        return;
+      }
+
+      const duplicate = APP_STATE.inventoryCatalog.find(i => i.code === code && i.id !== editDocId);
+      if (duplicate) {
+        showToast(`Item Code "${code}" is already in use by "${duplicate.name}"`, 'error');
+        return;
+      }
+
+      const tiersList = [];
+      const tierRows = document.querySelectorAll('.catalog-price-tier-row');
+      let tierError = '';
+      tierRows.forEach(row => {
+        const tName = row.querySelector('.tier-name-input')?.value.trim();
+        const tCostRaw = row.querySelector('.tier-cost-input')?.value;
+        const tSellingRaw = row.querySelector('.tier-selling-input')?.value;
+        const tCost = roundCurrency(tCostRaw || 0);
+        const tSelling = roundCurrency(tSellingRaw || 0);
+        if (!tName) {
+          tierError = 'Every price tier needs a label (e.g. Retail, Wholesale).';
+        } else if (tCostRaw === '' || tSellingRaw === '' || !Number.isFinite(tCost) || !Number.isFinite(tSelling) || tCost < 0 || tSelling < 0) {
+          tierError = `Price tier "${tName}" needs valid non-negative selling and getting prices.`;
+        } else {
+          tiersList.push({ name: tName, costPrice: tCost, sellingPrice: tSelling });
+        }
+      });
+      if (tierError) {
+        showToast(tierError, 'error');
+        return;
+      }
+
+      try {
+        const itemPayload = {
+          code,
+          name,
+          category,
+          itemType,
+          costPrice,
+          sellingPrice,
+          stockQuantity,
+          lowStockThreshold,
+          updatedAt: serverTimestamp()
+        };
+
+        if (tiersList.length > 0) {
+          itemPayload.prices = tiersList;
+          itemPayload.sellingPrice = tiersList[0].sellingPrice;
+          itemPayload.costPrice = tiersList[0].costPrice;
+        }
+
+        if (editDocId) {
+          await updateDoc(doc(db, 'inventory', editDocId), itemPayload);
+          showToast(`Updated: ${name}`, 'success');
+        } else {
+          itemPayload.createdAt = serverTimestamp();
+          await addDoc(collection(db, 'inventory'), itemPayload);
+          showToast(`Added: ${name} (${isService ? 'Service/Bill' : 'Product'})`, 'success');
+        }
+        resetCatalogForm();
+      } catch (err) {
+        showToast(`Failed to save item: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  if (searchInput) searchInput.addEventListener('input', renderCatalogTable);
+
+  if (sortSelect) {
+    sortSelect.value = APP_STATE.catalogSortOrder;
+    sortSelect.addEventListener('change', () => {
+      APP_STATE.catalogSortOrder = sortSelect.value;
+      localStorage.setItem('al_catalog_sort_order', APP_STATE.catalogSortOrder);
+      renderCatalogTable();
+    });
+  }
+
+  if (seedBtn) {
+    seedBtn.addEventListener('click', async () => {
+      if (APP_STATE.currentRole !== 'admin') {
+        showToast('Only an admin can add catalog items.', 'error');
+        return;
+      }
+      if (!(await showDeleteConfirm('Seed standard Sri Lankan retail stationery and utility bills into your catalog? Existing codes will not be overwritten.'))) return;
+
+      let addedCount = 0;
+      for (const item of SAMPLE_SRI_LANKAN_CATALOG) {
+        const exists = APP_STATE.inventoryCatalog.some(i => i.code === item.code);
+        if (!exists) {
           try {
-            const name = document.getElementById("modal-team-name").value;
-            const tag = document.getElementById("modal-team-tag").value;
-            const color = document.getElementById("modal-team-color").value;
-            const roster = document.getElementById("modal-team-roster").value.split(",").map((player) => player.trim()).filter(Boolean);
-            created = createCustomTeam({ name, tag, color, roster });
-            return true;
-          } catch (error) {
-            document.getElementById("modal-team-error").textContent = error.message;
-            return false;
+            await addDoc(collection(db, 'inventory'), {
+              ...item,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            });
+            addedCount++;
+          } catch (e) {
+            console.error('Seed item error', e);
           }
         }
       }
-    ]
+
+      if (addedCount > 0) {
+        showToast(`Seeded ${addedCount} standard catalog products & utility bills`, 'success');
+      } else {
+        showToast('Standard items are already present in catalog', 'info');
+      }
+    });
+  }
+}
+
+export function renderCatalogTable() {
+  const tbody = document.getElementById('catalogTableBody');
+  const searchInput = document.getElementById('catalogSearchInput');
+  const queryStr = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  let filtered = APP_STATE.inventoryCatalog.filter(item => {
+    if (!queryStr) return true;
+    return (item.code || '').toLowerCase().includes(queryStr) ||
+           (item.name || '').toLowerCase().includes(queryStr) ||
+           (item.category || '').toLowerCase().includes(queryStr);
   });
-  return result === "save" ? created : null;
+
+  filtered = sortCatalogList(filtered, APP_STATE.catalogSortOrder);
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" class="py-8 text-center theme-text-dim text-xs">
+          No catalog records found.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  filtered.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:theme-bg-subtle transition';
+
+    const isService = item.itemType === 'service';
+    const typeBadge = isService
+      ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service/Bill</span>`
+      : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">Product</span>`;
+
+    const costDisplay = `<span class="font-mono font-bold text-amber-400">${formatLKR(item.costPrice)}</span>`;
+    const profitDisplay = `<span class="font-mono font-bold text-sky-400">${formatSignedLKR(item.sellingPrice - item.costPrice)}</span>`;
+    const stockDisplay = isService ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[11px] font-bold">No Qty</span>` : `<span class="font-mono font-bold ${item.stockQuantity <= 5 ? 'text-red-400' : 'theme-text-main'}">${escapeHTML(item.stockQuantity)}</span>`;
+    const actions = APP_STATE.currentRole === 'admin'
+      ? `<div class="flex items-center justify-center gap-1.5">
+          <button type="button" class="edit-cat-btn min-h-11 px-2 py-1 rounded bg-sky-500/15 text-sky-400 hover:bg-sky-500 hover:text-white text-[11px] font-bold transition">Edit</button>
+          <button type="button" class="del-cat-btn min-h-11 px-2 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-[11px] font-bold transition">Delete</button>
+        </div>`
+      : '<span class="text-xs theme-text-dim">Read only</span>';
+
+    const multiTierBadge = Array.isArray(item.prices) && item.prices.length > 1
+      ? `<div class="mt-0.5"><span class="badge-price-tiers inline-block px-1.5 py-0.5 rounded text-[10px] font-bold">${item.prices.length} Tiers</span></div>`
+      : '';
+
+    tr.innerHTML = `
+      <td class="py-2.5 px-3 font-mono font-bold text-xs theme-text-main">${escapeHTML(item.code)}</td>
+      <td class="py-2.5 px-3">
+        <div class="font-bold text-xs theme-text-main">${escapeHTML(toTitleCase(item.name))}</div>
+        <div class="text-[10px] theme-text-dim">${escapeHTML(item.category || 'General')}</div>
+      </td>
+      <td class="py-2.5 px-3">${typeBadge}</td>
+      <td class="py-2.5 px-3 text-right text-xs">${costDisplay}</td>
+      <td class="py-2.5 px-3 text-right text-xs font-mono font-bold text-emerald-400">${formatLKR(item.sellingPrice)}${multiTierBadge}</td>
+      <td class="py-2.5 px-3 text-right text-xs">${profitDisplay}</td>
+      <td class="py-2.5 px-3 text-center text-xs">${stockDisplay}</td>
+      <td class="py-2.5 px-3 text-center">
+        ${actions}
+      </td>
+    `;
+
+    const editBtn = tr.querySelector('.edit-cat-btn');
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        if (APP_STATE.currentRole !== 'admin') return;
+        document.getElementById('catalogDocId').value = item.id;
+        document.getElementById('catalogCode').value = item.code;
+        document.getElementById('catalogName').value = toTitleCase(item.name);
+        document.getElementById('catalogCategory').value = item.category || '';
+        document.getElementById('catalogCostPrice').value = item.costPrice || 0;
+        document.getElementById('catalogSellingPrice').value = item.sellingPrice || 0;
+        document.getElementById('catalogStockQuantity').value = item.stockQuantity || 0;
+        document.getElementById('catalogLowStockThreshold').value = item.lowStockThreshold || 5;
+
+        const tiersContainer = document.getElementById('catalogPriceTiersList');
+        if (tiersContainer) {
+          tiersContainer.innerHTML = '';
+          if (Array.isArray(item.prices) && item.prices.length > 0) {
+            item.prices.forEach(tier => addCatalogPriceTierRow(tier));
+          }
+        }
+
+        const isServ = item.itemType === 'service';
+        const typeRadio = document.querySelector(`input[name="catalogItemType"][value="${isServ ? 'service' : 'product'}"]`);
+        if (typeRadio) {
+          typeRadio.checked = true;
+          typeRadio.dispatchEvent(new Event('change'));
+        }
+
+        document.getElementById('catalogFormTitle').textContent = `Edit Catalog Item: ${item.code}`;
+        document.getElementById('catalogSaveBtn').textContent = 'Update Item';
+        document.getElementById('catalogResetFormBtn').classList.remove('hidden');
+        document.getElementById('catalogCode').focus();
+      });
+    }
+
+    const delBtn = tr.querySelector('.del-cat-btn');
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        if (APP_STATE.currentRole !== 'admin') {
+          showToast('Only an admin can delete catalog items.', 'error');
+          return;
+        }
+        if (!(await showDeleteConfirm(`Delete "${item.name}" (${item.code}) from master inventory catalog?`))) return;
+        try {
+          await deleteDoc(doc(db, 'inventory', item.id));
+          showToast(`Deleted ${item.name}`, 'success');
+        } catch (err) {
+          showToast(`Delete failed: ${err.message}`, 'error');
+        }
+      });
+    }
+
+    tbody.appendChild(tr);
+  });
 }
 
+function updateBackupStatusDisplay() {
+  const statCatalog = document.getElementById('backupStatCatalogCount');
+  const statPresets = document.getElementById('backupStatPresetCount');
+  const statLastSaved = document.getElementById('backupStatLastSaved');
+  const badge = document.getElementById('backupStatusBadge');
 
-// Consolidated from ui.js
-function escapeHTML(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+  if (statCatalog) statCatalog.textContent = `${APP_STATE.inventoryCatalog.length} Items`;
+  if (statPresets) statPresets.textContent = `${APP_STATE.reloadPresets.length} Presets`;
+
+  const savedRaw = localStorage.getItem(backupSnapshotKey());
+  if (savedRaw) {
+    try {
+      const snap = JSON.parse(savedRaw);
+      if (statLastSaved) statLastSaved.textContent = snap.formattedDate || snap.timestamp?.substring(0, 16) || 'Saved';
+      if (badge) {
+        badge.textContent = `Snapshot Ready (${snap.catalog?.length || 0} items)`;
+        badge.className = 'text-xs px-2.5 py-1 rounded-full font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+      }
+    } catch (e) {
+      if (statLastSaved) statLastSaved.textContent = 'Invalid snapshot';
+    }
+  } else {
+    if (statLastSaved) statLastSaved.textContent = 'None saved yet';
+    if (badge) {
+      badge.textContent = 'No Snapshot Stored';
+      badge.className = 'text-xs px-2.5 py-1 rounded-full font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20';
+    }
+  }
 }
 
-function setInlineStatus(element, message = "", kind = "info") {
-  if (!element) return;
-  element.textContent = message;
-  element.classList.toggle("inline-error", kind === "error");
-  element.setAttribute("role", kind === "error" ? "alert" : "status");
+function backupSnapshotKey() {
+  return `al_settings_backup_snapshot_${auth.currentUser?.uid || 'signed-out'}`;
 }
 
-function renderRouter(page) {
-  const pageIds = {
-    dashboard: "dashboard-section",
-    "match-setup": "match-setup-section",
-    "live-scoring": "scoreboard-section",
-    analysis: "analysis-section",
-    settings: "settings-section"
+function createConfigurationSnapshot() {
+  return {
+    version: '6.1',
+    appName: 'AL Communication',
+    timestamp: new Date().toISOString(),
+    formattedDate: new Date().toLocaleString(),
+    catalog: APP_STATE.inventoryCatalog.map(item => ({
+      code: item.code,
+      name: toTitleCase(item.name),
+      category: item.category || 'General',
+      itemType: item.itemType || 'product',
+      costPrice: Number(item.costPrice) || 0,
+      sellingPrice: Number(item.sellingPrice) || 0,
+      stockQuantity: Number(item.stockQuantity) || 0,
+      lowStockThreshold: Number(item.lowStockThreshold) || 5,
+      ...(Array.isArray(item.prices) && item.prices.length > 0 ? {
+        prices: item.prices.map(tier => ({
+          name: String(tier.name || ''),
+          costPrice: Number(tier.costPrice) || 0,
+          sellingPrice: Number(tier.sellingPrice) || 0
+        }))
+      } : {})
+    })),
+    commissionRates: { ...APP_STATE.commissionRates },
+    reloadPresets: [...APP_STATE.reloadPresets],
+    activeTheme: APP_STATE.activeTheme,
+    preferences: {
+      activeTheme: APP_STATE.activeTheme,
+      gradientBlurEnabled: APP_STATE.gradientBlurEnabled,
+      dashboardOrder: APP_STATE.dashboardOrder,
+      hiddenDashboardCards: [...APP_STATE.hiddenDashboardCards],
+      stockSortOrder: APP_STATE.stockSortOrder,
+      catalogSortOrder: APP_STATE.catalogSortOrder
+    }
   };
-  const targetId = pageIds[page] ?? page;
-  const sections = [...document.querySelectorAll(".page-section")];
-  const target = sections.find((section) => section.id === targetId);
-  if (!target) throw new TypeError(`Unknown app page: ${page}`);
-  for (const section of sections) section.classList.toggle("hidden", section !== target);
-  for (const tab of document.querySelectorAll("#main-nav [data-page]")) {
-    const active = tab.dataset.page === target.id;
-    tab.classList.toggle("is-active", active);
-    tab.setAttribute("aria-current", active ? "page" : "false");
-  }
-  window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
 }
 
+export async function applyConfigurationBackup(snapshot) {
+  if (!APP_STATE.currentUser) {
+    showToast('Sign in before restoring a backup.', 'error');
+    return false;
+  }
+  if (!snapshot || typeof snapshot !== 'object') {
+    showToast('Invalid backup file or snapshot structure', 'error');
+    return false;
+  }
 
-// Consolidated from firebase.js
-// Firebase is loaded dynamically so the app can still start in local-only mode offline.
-const FIREBASE_PROJECT_ID = "thursday-cricket";
-
-const services = {
-  app: null,
-  auth: null,
-  db: null,
-  modules: null,
-  online: navigator.onLine,
-  configured: false,
-  configurationError: null,
-  ready: Promise.resolve(false)
-};
-
-function readConfig(configOverride) {
-  if (configOverride) return configOverride;
-  if (window.__TC_FIREBASE_CONFIG__) return window.__TC_FIREBASE_CONFIG__;
+  let preferencesSynced = true;
   try {
-    return JSON.parse(localStorage.getItem("tc_firebase_config") ?? "null");
-  } catch (error) {
-    console.warn("The stored Firebase configuration is invalid.", error);
-    return null;
-  }
-}
 
-function updateOnlineStatus() {
-  services.online = navigator.onLine;
-}
+    if (snapshot.commissionRates && APP_STATE.currentRole === 'admin') {
+      APP_STATE.commissionRates = { ...snapshot.commissionRates };
+      await setDoc(doc(db, 'settings', 'rates'), APP_STATE.commissionRates, { merge: true });
+    }
 
-function initFirebase(configOverride, loadModules) {
-  const config = readConfig(configOverride);
-  if (!config) {
-    services.configured = false;
-    services.configurationError = null;
-    services.ready = Promise.resolve(false);
-    return services;
-  }
-  if (config.projectId !== FIREBASE_PROJECT_ID) {
-    const error = new Error(`Firebase must be configured for project "${FIREBASE_PROJECT_ID}".`);
-    services.configured = false;
-    services.configurationError = error;
-    services.ready = Promise.resolve(false);
-    return services;
-  }
-  if (typeof config.apiKey !== "string" || !config.apiKey.trim() || typeof config.appId !== "string" || !config.appId.trim()) {
-    const error = new Error("Provide the Firebase web app apiKey and appId for project thursday-cricket.");
-    services.configured = false;
-    services.configurationError = error;
-    services.ready = Promise.resolve(false);
-    return services;
-  }
-  if (typeof loadModules !== "function") {
-    const error = new TypeError("A Firebase modular SDK loader is required.");
-    services.configured = false;
-    services.configurationError = error;
-    services.ready = Promise.resolve(false);
-    return services;
-  }
+    if (Array.isArray(snapshot.reloadPresets) && APP_STATE.currentRole === 'admin') {
+      APP_STATE.reloadPresets = [...snapshot.reloadPresets];
+      await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
+      renderPresetPills();
+    }
 
-  services.configured = true;
-  services.configurationError = null;
-  services.ready = (async () => {
-    const modules = await loadModules();
-    const existingApp = modules.getApps().find((item) => item.name === "[DEFAULT]");
-    services.app = existingApp ?? modules.initializeApp(config);
-    services.auth = modules.getAuth(services.app);
-    services.db = modules.getFirestore(services.app);
-    services.modules = modules;
-    window.addEventListener("online", updateOnlineStatus);
-    window.addEventListener("offline", updateOnlineStatus);
+    if (snapshot.activeTheme) {
+      applyTheme(snapshot.activeTheme);
+    }
+    if (snapshot.preferences) {
+      const preferences = snapshot.preferences;
+      if (preferences.activeTheme) applyTheme(preferences.activeTheme);
+      if (typeof preferences.gradientBlurEnabled === 'boolean') {
+        setGradientBlurEnabled(preferences.gradientBlurEnabled);
+      }
+      if (preferences.dashboardOrder?.metrics && preferences.dashboardOrder?.actions) {
+        APP_STATE.dashboardOrder = preferences.dashboardOrder;
+        applyDashboardOrder(document.getElementById('dashboardGrid'), preferences.dashboardOrder.metrics);
+        applyDashboardOrder(document.getElementById('dashboardActionsGrid'), preferences.dashboardOrder.actions);
+      }
+      if (Array.isArray(preferences.hiddenDashboardCards)) {
+        applyHiddenDashboardCards(preferences.hiddenDashboardCards);
+      }
+      if (['code-asc', 'code-desc', 'name-asc', 'name-desc', 'selling-desc', 'selling-asc', 'cost-desc', 'cost-asc', 'stock-desc', 'stock-asc', 'newest', 'oldest'].includes(preferences.stockSortOrder)) {
+        APP_STATE.stockSortOrder = preferences.stockSortOrder;
+        localStorage.setItem('al_stock_sort_order', preferences.stockSortOrder);
+        const stockSortSelect = document.getElementById('stockSortSelect');
+        if (stockSortSelect) stockSortSelect.value = preferences.stockSortOrder;
+      }
+      if (['code-asc', 'code-desc', 'name-asc', 'name-desc', 'selling-desc', 'selling-asc', 'cost-desc', 'cost-asc', 'stock-desc', 'stock-asc', 'newest', 'oldest'].includes(preferences.catalogSortOrder)) {
+        APP_STATE.catalogSortOrder = preferences.catalogSortOrder;
+        localStorage.setItem('al_catalog_sort_order', preferences.catalogSortOrder);
+        const catalogSortSelect = document.getElementById('catalogSortSelect');
+        if (catalogSortSelect) catalogSortSelect.value = preferences.catalogSortOrder;
+      }
+      preferencesSynced = await saveUserPreferences({
+        activeTheme: APP_STATE.activeTheme,
+        gradientBlurEnabled: APP_STATE.gradientBlurEnabled,
+        dashboardOrder: APP_STATE.dashboardOrder,
+        hiddenDashboardCards: [...APP_STATE.hiddenDashboardCards]
+      });
+    }
 
-    try {
-      await modules.enableMultiTabIndexedDbPersistence(services.db);
-    } catch (error) {
-      if (!["failed-precondition", "unimplemented"].includes(error?.code)) {
-        console.warn("Firestore persistence is unavailable; live cloud sync remains enabled.", error);
+    if (Array.isArray(snapshot.catalog) && APP_STATE.currentRole === 'admin') {
+      let restoredCount = 0;
+      for (const item of snapshot.catalog) {
+        if (!item.code || !item.name) continue;
+        const existing = APP_STATE.inventoryCatalog.find(i => i.code === item.code);
+        const itemData = {
+          code: item.code,
+          name: toTitleCase(item.name),
+          category: item.category || 'General',
+          itemType: item.itemType || 'product',
+          costPrice: Number(item.costPrice) || 0,
+          sellingPrice: Number(item.sellingPrice) || 0,
+          stockQuantity: item.itemType === 'service' ? 0 : (Number(item.stockQuantity) || 0),
+          lowStockThreshold: item.itemType === 'service' ? 0 : (Number(item.lowStockThreshold) || 5),
+          ...(Array.isArray(item.prices) && item.prices.length > 0 ? {
+            prices: item.prices.map(tier => ({
+              name: String(tier.name || ''),
+              costPrice: Number(tier.costPrice) || 0,
+              sellingPrice: Number(tier.sellingPrice) || 0
+            }))
+          } : {}),
+          updatedAt: serverTimestamp()
+        };
+
+        if (existing && existing.id) {
+          await updateDoc(doc(db, 'inventory', existing.id), itemData);
+        } else {
+          itemData.createdAt = serverTimestamp();
+          await addDoc(collection(db, 'inventory'), itemData);
+        }
+        restoredCount++;
       }
     }
+
+    updateBackupStatusDisplay();
+    renderCatalogTable();
+    renderStockTable();
+    updateDashboardMetrics();
+    if (!preferencesSynced) {
+      showToast('Backup applied locally, but personal preferences could not sync to Firestore.', 'error');
+      return false;
+    }
+    showToast(APP_STATE.currentRole === 'admin'
+      ? 'Backup settings restored successfully.'
+      : 'Personal preferences restored. Shared catalog, presets, and rates require an admin.', 'success');
     return true;
-  })().catch((error) => {
-    services.configured = false;
-    services.configurationError = error;
-    throw error;
-  });
-  return services;
-}
-
-function observeFirebaseAuth(onChange, onError) {
-  if (!services.auth || typeof onChange !== "function") {
-    throw new TypeError("Firebase Authentication and an auth-state callback are required.");
-  }
-  return services.modules.onAuthStateChanged(services.auth, onChange, onError);
-}
-
-async function writeFirestore(path, data) {
-  if (!services.db) throw new Error("Firebase Firestore is not configured.");
-  const segments = String(path).split("/").filter(Boolean);
-  if (segments.length < 2 || segments.length % 2 !== 0) {
-    throw new TypeError("Firestore path must identify a document.");
-  }
-  const reference = services.modules.doc(services.db, ...segments);
-  await services.modules.setDoc(reference, { ...data }, { merge: true });
-}
-
-async function readFirestoreCollection(name) {
-  if (!services.db) throw new Error("Firebase Firestore is not configured.");
-  const snapshot = await services.modules.getDocs(services.modules.collection(services.db, String(name)));
-  return snapshot.docs.map((document) => ({ ...document.data(), id: document.id }));
-}
-
-function subscribeFirestoreCollection(name, onRecords, onError, options = {}) {
-  if (!services.db) throw new Error("Firebase Firestore is not configured.");
-  if (typeof onRecords !== "function" || typeof onError !== "function") {
-    throw new TypeError("Firestore snapshot callbacks are required.");
-  }
-  const reference = services.modules.collection(services.db, String(name));
-  const target = options.orderByCreatedAt
-    ? services.modules.query(reference, services.modules.orderBy("createdAt", "desc"))
-    : reference;
-  return services.modules.onSnapshot(
-    target,
-    (snapshot) => onRecords(snapshot.docs.map((document) => ({ ...document.data(), id: document.id }))),
-    onError
-  );
-}
-
-async function signInWithFirebase(email, password) {
-  if (!services.auth) throw new Error("Firebase Authentication is not configured.");
-  const credential = await services.modules.signInWithEmailAndPassword(services.auth, email, password);
-  return credential.user;
-}
-
-async function registerWithFirebase(email, password) {
-  if (!services.auth) throw new Error("Firebase Authentication is not configured.");
-  const credential = await services.modules.createUserWithEmailAndPassword(services.auth, email, password);
-  return credential.user;
-}
-
-async function updateFirebaseProfile(user, profile) {
-  if (!services.auth || !user) throw new Error("A signed-in Firebase user is required.");
-  await services.modules.updateProfile(user, profile);
-}
-
-async function signOutFirebase() {
-  if (services.auth?.currentUser) await services.modules.signOut(services.auth);
-}
-function loadFirebaseModules() {
-  return Promise.resolve({
-    initializeApp,
-    getApps,
-    getAuth,
-    signInWithEmailAndPassword,
-    createUserWithEmailAndPassword,
-    updateProfile,
-    onAuthStateChanged,
-    signOut,
-    getFirestore,
-    collection,
-    doc,
-    setDoc,
-    onSnapshot,
-    query,
-    orderBy,
-    getDocs,
-    enableMultiTabIndexedDbPersistence
-  });
-}
-
-attachRippleEffect();
-const firebase = initFirebase(FIREBASE_CONFIG, loadFirebaseModules);
-const store = createStore(createInitialState());
-const el = (id) => document.getElementById(id);
-let activeFilter = "series";
-let currentTeams = [];
-let viewingInnings = null;
-const LOCAL_USERS_KEY = "tc_users_v1";
-const LOCAL_SESSION_KEY = "tc_session";
-const SYNC_QUEUE_KEY = "tc_sync_queue_v1";
-const FIRESTORE_COLLECTIONS = ["matches", "players", "teams", "users", "customTeams", "teamVotes"];
-const cloudListeners = new Map();
-let stopAuthObserver = null;
-let liveSyncUserId = null;
-let retryTimer = 0;
-let retryInProgress = false;
-let permissionAlertShown = false;
-
-try {
-  store.load();
-} catch (error) {
-  queueMicrotask(() => showError(error, "Saved data could not be loaded"));
-}
-
-function validateForm(form) {
-  if (!form.checkValidity()) throw new TypeError("Complete the required fields using valid values.");
-}
-
-function closeAuthSections() {
-  document.querySelectorAll(".collapsible-content").forEach((section) => {
-    section.classList.remove("is-open");
-    section.inert = true;
-    section.setAttribute("aria-hidden", "true");
-  });
-  document.querySelectorAll(".toggle-link").forEach((button) => {
-    button.classList.remove("active");
-    button.textContent = `▸ ${button.textContent.replace(/^[▸▾]\s*/, "")}`;
-  });
-}
-
-function toggleAuthSection(targetId, clickedButton) {
-  const target = document.getElementById(targetId);
-  if (!target) throw new Error(`Unknown authentication section: ${targetId}`);
-  const wasOpen = target.classList.contains("is-open");
-  closeAuthSections();
-  if (!wasOpen) {
-    target.classList.add("is-open");
-    target.inert = false;
-    target.setAttribute("aria-hidden", "false");
-    clickedButton.classList.add("active");
-    clickedButton.textContent = `▾ ${clickedButton.textContent.replace(/^[▸▾]\s*/, "")}`;
-  }
-}
-
-function updateSelectedPlayer() {
-  const select = el("username-select");
-  if (!select) return;
-  const selected = select.selectedOptions[0];
-  const username = selected?.value;
-  const teamKey = selected?.dataset.team;
-  if (!username || !teamKey) {
-    el("team-badge").hidden = true;
-    setInlineStatus(el("login-status"), "");
-    return;
-  }
-  const team = SQUAD_TEAMS[teamKey];
-  const email = resolveEmail(username, teamKey);
-  el("team-badge").hidden = false;
-  el("team-badge").textContent = `${team.name} · ${findSeedPlayer(username)?.role ?? "Player"}`;
-  el("team-badge").style.setProperty("--badge-accent", team.accent);
-  localStorage.setItem("tc_last_user", username);
-  setInlineStatus(el("login-status"), `${email} · team code auto-filled`);
-}
-
-function getEffectivePassword(teamKey) {
-  const overrides = JSON.parse(localStorage.getItem("tc_team_codes_v1") ?? "{}");
-  return overrides[teamKey] ?? resolvePassword(teamKey);
-}
-
-function readLocalUsers() {
-  const raw = localStorage.getItem(LOCAL_USERS_KEY);
-  if (!raw) return [];
-  const value = JSON.parse(raw);
-  if (!Array.isArray(value)) throw new TypeError("Saved player accounts are invalid.");
-  return value;
-}
-
-function writeLocalUsers(users) {
-  localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
-}
-
-async function passwordDigest(password) {
-  if (!globalThis.crypto?.subtle) throw new Error("This browser does not support secure local sign-in. Open the app in a modern browser.");
-  const bytes = new TextEncoder().encode(password);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-function showError(error, title = "Something needs attention") {
-  console.error(title, error);
-  const message = error instanceof Error ? error.message : String(error);
-  return openGlassModal({
-    title,
-    body: `<p>${escapeHTML(message)}</p>`,
-    actions: [{ id: "ok", label: "Got it", primary: true }]
-  });
-}
-
-function errorCode(error) {
-  return String(error?.code ?? "").split("/").at(-1);
-}
-
-function friendlyAuthError(error) {
-  if (["admin-restricted-operation", "operation-not-allowed"].includes(errorCode(error))) {
-    return new Error("Enable Email/Password in Firebase Console under Authentication → Sign-in method.");
-  }
-  return error;
-}
-
-function isPermissionDenied(error) {
-  return errorCode(error) === "permission-denied";
-}
-
-function handleFirestoreError(error, operation) {
-  if (isPermissionDenied(error)) {
-    if (!permissionAlertShown) {
-      permissionAlertShown = true;
-      void showError(error, "Firestore access denied");
-    }
-    return;
-  }
-  console.warn(`${operation} is unavailable; local data remains available.`, error);
-}
-
-function readSyncQueue() {
-  const queue = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) ?? "[]");
-  if (!Array.isArray(queue)) throw new TypeError("The pending cloud sync queue is invalid.");
-  return queue;
-}
-
-function writeSyncQueue(queue) {
-  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
-}
-
-function queueSyncWrite(path, data) {
-  const queue = readSyncQueue();
-  const existing = queue.find((item) => item.path === path);
-  const next = { path, data, attempts: existing?.attempts ?? 0, queuedAt: Date.now() };
-  writeSyncQueue([...queue.filter((item) => item.path !== path), next]);
-}
-
-function removeQueuedWrite(path) {
-  writeSyncQueue(readSyncQueue().filter((item) => item.path !== path));
-}
-
-function schedulePendingWriteRetry(delay = 15000) {
-  if (retryTimer || !firebase.db || !firebase.auth?.currentUser) return;
-  retryTimer = window.setTimeout(() => {
-    retryTimer = 0;
-    void retryPendingWrites();
-  }, delay);
-}
-
-async function retryPendingWrites() {
-  if (retryInProgress || !firebase.db || !firebase.online || !firebase.auth?.currentUser) return;
-  retryInProgress = true;
-  try {
-    const queue = readSyncQueue();
-    for (const item of queue) {
-      try {
-        await writeFirestore(item.path, item.data);
-        removeQueuedWrite(item.path);
-      } catch (error) {
-        const remaining = readSyncQueue().map((queued) => queued.path === item.path
-          ? { ...queued, attempts: (queued.attempts ?? 0) + 1 }
-          : queued);
-        writeSyncQueue(remaining);
-        handleFirestoreError(error, `Retrying ${item.path}`);
-        break;
-      }
-    }
-  } catch (error) {
-    handleFirestoreError(error, "Cloud sync");
-  } finally {
-    retryInProgress = false;
-    try {
-      const pending = readSyncQueue();
-      if (pending.length) {
-        const attempts = Math.min(...pending.map((item) => item.attempts ?? 0));
-        schedulePendingWriteRetry(Math.min(15000 * (2 ** Math.min(attempts, 4)), 240000));
-      }
-    } catch (error) {
-      showError(error, "Could not read pending cloud changes");
-    }
-  }
-}
-
-async function syncRemote(path, data) {
-  if (!firebase.db) return false;
-  try {
-    if (!firebase.auth?.currentUser) await firebase.ready;
-    if (!firebase.auth?.currentUser) throw new Error("Sign in before syncing data to Firestore.");
-    await writeFirestore(path, data);
-    removeQueuedWrite(path);
-    return true;
-  } catch (error) {
-    try {
-      store.persist();
-      queueSyncWrite(path, data);
-      handleFirestoreError(error, `Writing ${path}`);
-      if (!isPermissionDenied(error)) schedulePendingWriteRetry();
-    } catch (queueError) {
-      showError(queueError, "Could not save pending cloud changes");
-    }
+  } catch (err) {
+    logDebug(`Restore error: ${err.message}`, 'ERROR');
+    showToast(`Restore failed: ${err.message}`, 'error');
     return false;
   }
 }
 
-function mergeLocalArray(key, records, getId = (record) => record.id) {
-  const localRecords = JSON.parse(localStorage.getItem(key) ?? "[]");
-  if (!Array.isArray(localRecords)) throw new TypeError(`Saved ${key} data is invalid.`);
-  const merged = new Map(localRecords.map((record) => [String(getId(record)), record]));
-  for (const record of records) merged.set(String(getId(record)), record);
-  const result = [...merged.values()];
-  localStorage.setItem(key, JSON.stringify(result));
-  return result;
-}
+function initBackupRestoreSystem() {
+  const saveSnapshotBtn = document.getElementById('backupSaveSnapshotBtn');
+  const downloadJsonBtn = document.getElementById('backupDownloadJsonBtn');
+  const restoreSnapshotBtn = document.getElementById('backupRestoreSnapshotBtn');
+  const uploadInput = document.getElementById('backupUploadInput');
+  const restoreDefaultsBtn = document.getElementById('restoreDefaultsBtn');
 
-function handleRemoteTeams(records) {
-  const remoteTeams = records.map((record) => ({ ...(record.team ?? record), id: record.team?.id ?? record.id }))
-    .filter((team) => team.id && team.name);
-  if (!remoteTeams.length) return;
-  store.update((state) => {
-    const teams = new Map(state.teams.map((team) => [team.id, team]));
-    for (const team of remoteTeams) teams.set(team.id, { ...teams.get(team.id), ...team });
-    return { ...state, teams: [...teams.values()] };
-  });
-  store.persist();
-}
-
-function handleRemoteMatches(records) {
-  const remoteMatches = records.map((record) => record.match ?? record).filter((match) => match?.id);
-  store.update((state) => {
-    const matches = new Map(state.matches.map((match) => [match.id, match]));
-    for (const match of remoteMatches) matches.set(match.id, match);
-    return { ...state, matches: [...matches.values()] };
-  });
-  store.persist();
-}
-
-function handleRemotePlayers(records) {
-  const profiles = records.map((record) => record.profile ?? record)
-    .filter((profile) => profile.id && profile.name);
-  const byId = new Map();
-  for (const profile of [...mergeLocalArray("tc_players_v1", profiles), ...profiles]) byId.set(profile.id, profile);
-  const mergedProfiles = [...byId.values()];
-  localStorage.setItem("tc_players", JSON.stringify(mergedProfiles));
-  store.update((state) => {
-    const teams = state.teams.map((team) => {
-      const teamProfiles = mergedProfiles.filter((profile) => profile.teamId === team.id);
-      if (!teamProfiles.length) return team;
-      const roster = new Map((team.roster ?? []).map((player) => [String(player.id ?? player), player]));
-      for (const profile of teamProfiles) roster.set(profile.id, { ...roster.get(profile.id), ...profile });
-      return { ...team, roster: [...roster.values()] };
-    });
-    const currentProfile = mergedProfiles.find((profile) => profile.id === state.currentUser?.id);
-    return {
-      ...state,
-      players: mergedProfiles,
-      teams,
-      currentUser: currentProfile ? { ...state.currentUser, ...currentProfile } : state.currentUser
-    };
-  });
-  store.persist();
-}
-
-function handleRemoteCustomTeams(records) {
-  const customTeams = records.map((record) => record.team ?? record).filter((team) => team.id && team.name);
-  if (!customTeams.length) return;
-  mergeLocalArray("tc_custom_teams_v1", customTeams);
-  store.update((state) => ({ ...state }));
-  store.persist();
-}
-
-function handleRemoteVotes(records) {
-  const votes = mergeRemoteVotes(records);
-  const overrides = JSON.parse(localStorage.getItem("tc_team_codes_v1") ?? "{}");
-  let changed = false;
-  for (const [teamKey, team] of Object.entries(SQUAD_TEAMS)) {
-    const codes = votes.codes.filter((vote) => vote.teamId === team.id);
-    if (!codes.length) continue;
-    const counts = new Map();
-    for (const vote of codes) counts.set(vote.code, (counts.get(vote.code) ?? 0) + 1);
-    const winner = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
-    if (winner && winner[1] > codes.length / 2 && overrides[teamKey] !== winner[0]) {
-      overrides[teamKey] = winner[0];
-      changed = true;
-    }
-  }
-  if (changed) localStorage.setItem("tc_team_codes_v1", JSON.stringify(overrides));
-  store.update((state) => ({ ...state }));
-  store.persist();
-}
-
-function handleRemoteUsers(records) {
-  mergeLocalArray("tc_cloud_users_v1", records);
-  store.update((state) => ({ ...state, users: records }));
-  store.persist();
-}
-
-const CLOUD_HANDLERS = {
-  teams: handleRemoteTeams,
-  matches: handleRemoteMatches,
-  players: handleRemotePlayers,
-  users: handleRemoteUsers,
-  customTeams: handleRemoteCustomTeams,
-  teamVotes: handleRemoteVotes
-};
-
-function stopCloudListeners() {
-  for (const unsubscribe of cloudListeners.values()) unsubscribe();
-  cloudListeners.clear();
-  liveSyncUserId = null;
-}
-
-function startLiveFirestoreSync(authUser) {
-  if (!firebase.db || !authUser || firebase.auth?.currentUser?.uid !== authUser.uid) return;
-  if (liveSyncUserId === authUser.uid && cloudListeners.size) return;
-  stopCloudListeners();
-  liveSyncUserId = authUser.uid;
-  for (const collection of FIRESTORE_COLLECTIONS) {
-    const unsubscribe = subscribeFirestoreCollection(
-      collection,
-      (records) => {
-        try {
-          CLOUD_HANDLERS[collection](records);
-          if (el("sync-status")) el("sync-status").textContent = firebase.online ? "Cloud synced" : "Offline";
-          renderAll();
-        } catch (error) {
-          showError(error, `Could not merge ${collection}`);
-        }
-      },
-      (error) => handleFirestoreError(error, `Listening to ${collection}`),
-      { orderByCreatedAt: collection === "matches" }
-    );
-    cloudListeners.set(collection, unsubscribe);
-  }
-  void syncLocalCollections(authUser).catch((error) => {
-    handleFirestoreError(error, "Cloud sync");
-    setInlineStatus(el("app-status"), "Local data is safe. Cloud sync will retry when available.");
-  });
-}
-
-function makeSeedProfiles() {
-  return SEED_PLAYERS.map((player) => {
-    const team = SQUAD_TEAMS[player.teamKey];
-    return {
-      id: player.username.toLowerCase(),
-      username: player.username,
-      name: player.username,
-      email: resolveEmail(player.username, player.teamKey),
-      role: player.role,
-      tags: [...player.tags],
-      teamId: team.id,
-      updatedAt: new Date().toISOString()
-    };
-  });
-}
-
-async function syncLocalCollections(authUser) {
-  if (!authUser || firebase.auth?.currentUser?.uid !== authUser.uid) return;
-  const [remoteTeams, remoteMatches, remotePlayers] = await Promise.all([
-    readFirestoreCollection("teams"),
-    readFirestoreCollection("matches"),
-    readFirestoreCollection("players")
-  ]);
-
-  const remoteTeamIds = new Set(remoteTeams.map((record) => record.team?.id ?? record.id));
-  for (const team of DEFAULT_TEAMS) {
-    if (!remoteTeamIds.has(team.id)) await syncRemote(`teams/${team.id}`, { team, updatedAt: new Date().toISOString() });
-  }
-
-  const remoteMatchIds = new Set(remoteMatches.map((record) => record.match?.id ?? record.id));
-  for (const match of getMatches()) {
-    if (!remoteMatchIds.has(match.id)) {
-      await syncRemote(`matches/${match.id}`, {
-        match,
-        owner: store.getState().currentUser?.id ?? null,
-        createdAt: match.createdAt ?? new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-    }
-  }
-
-  const rosterProfiles = allKnownTeams().flatMap((team) => (team.roster ?? []).map((player) => {
-    const id = String(player.id ?? player.name ?? player);
-    return {
-      ...player,
-      id,
-      name: player.name ?? id,
-      role: player.role ?? "Player",
-      tags: Array.isArray(player.tags) ? player.tags : [],
-      teamId: team.id
-    };
-  }));
-  const localProfiles = mergeLocalArray("tc_players_v1", [...rosterProfiles, ...makeSeedProfiles(), ...readCustomPlayers()]);
-  const remotePlayerIds = new Set(remotePlayers.map((record) => record.profile?.id ?? record.id));
-  for (const profile of localProfiles) {
-    if (profile.id && !remotePlayerIds.has(profile.id)) {
-      await syncRemote(`players/${profile.id}`, { profile, updatedAt: new Date().toISOString() });
-    }
-  }
-  await syncSessionMetadata();
-}
-
-async function syncSessionMetadata() {
-  const authUser = firebase.auth?.currentUser;
-  if (!authUser) return;
-  const profile = store.getState().currentUser;
-  await syncRemote(`users/${authUser.uid}`, {
-    uid: authUser.uid,
-    userId: profile?.id ?? null,
-    username: profile?.name ?? null,
-    teamId: profile?.teamId ?? null,
-    email: profile?.email ?? authUser.email ?? null,
-    isAnonymous: Boolean(authUser.isAnonymous),
-    lastSeenAt: new Date().toISOString()
-  });
-}
-
-async function bootstrapCloudSync() {
-  try {
-    const initialized = await firebase.ready;
-    if (!initialized || !firebase.auth) {
-      el("sync-status").textContent = "Local";
-      const message = firebase.configurationError?.message
-        ?? "Sign in to enable cloud sync. Local offline storage is active.";
-      setInlineStatus(el("auth-status"), `Local mode · ${message}`);
-      if (firebase.configurationError) {
-        void openGlassModal({
-          title: "Cloud Sync Error",
-          body: `<p>Using local offline storage. ${escapeHTML(message)}</p>`,
-          actions: [{ id: "ok", label: "Continue offline", primary: true }]
-        });
+  restoreDefaultsBtn?.addEventListener('click', async () => {
+    const globalSettingsIncluded = APP_STATE.currentRole === 'admin';
+    const confirmation = globalSettingsIncluded
+      ? 'Restore the default theme, header blur, dashboard layout, sort order, reload presets, and commission rates?'
+      : 'Restore your default theme, header blur, dashboard layout, and sort order?';
+    if (!(await showDeleteConfirm(confirmation))) return;
+    try {
+      applyTheme('modern-slate');
+      setGradientBlurEnabled(true);
+      APP_STATE.stockSortOrder = 'code-asc';
+      APP_STATE.catalogSortOrder = 'code-asc';
+      localStorage.setItem('al_stock_sort_order', 'code-asc');
+      localStorage.setItem('al_catalog_sort_order', 'code-asc');
+      const stockSortSelect = document.getElementById('stockSortSelect');
+      const catalogSortSelect = document.getElementById('catalogSortSelect');
+      if (stockSortSelect) stockSortSelect.value = 'code-asc';
+      if (catalogSortSelect) catalogSortSelect.value = 'code-asc';
+      resetDashboardLayout();
+      if (globalSettingsIncluded) {
+        const defaultRates = { AIRTEL: 6.80, DIALOG: 3.80, MOBITEL: 6.80, HUTCH: 5.00 };
+        const defaultPresets = [50, 100, 200, 500, 1000];
+        APP_STATE.commissionRates = defaultRates;
+        APP_STATE.reloadPresets = defaultPresets;
+        await Promise.all([
+          setDoc(doc(db, 'settings', 'rates'), defaultRates, { merge: true }),
+          setDoc(doc(db, 'settings', 'presets'), { list: defaultPresets }, { merge: true })
+        ]);
+        renderPresetPills();
       }
-      return;
-    }
-
-    stopAuthObserver?.();
-    stopAuthObserver = observeFirebaseAuth((user) => {
-      if (!user) {
-        stopCloudListeners();
-        el("sync-status").textContent = "Local";
-        setInlineStatus(el("auth-status"), "Sign in to enable cloud sync.");
+      const preferencesSynced = await saveUserPreferences({
+        activeTheme: 'modern-slate',
+        gradientBlurEnabled: true,
+        dashboardOrder: APP_STATE.dashboardOrder,
+        hiddenDashboardCards: []
+      });
+      if (!preferencesSynced) {
+        showToast('Defaults applied locally, but preferences could not sync to Firestore.', 'error');
         return;
       }
-      el("sync-status").textContent = firebase.online ? "Connecting…" : "Offline";
-      startLiveFirestoreSync(user);
-    }, (error) => {
-      handleFirestoreError(error, "Firebase authentication");
-      el("sync-status").textContent = "Local";
-      void showError(error, "Cloud authentication failed");
-    });
-  } catch (error) {
-    handleFirestoreError(error, "Initial cloud sync");
-    el("sync-status").textContent = "Local";
-    setInlineStatus(el("auth-status"), "Local mode · cloud connection is unavailable.");
-    setInlineStatus(el("app-status"), "Cloud sync could not start. Local offline storage is active.");
-    if (!isPermissionDenied(error)) {
-      void openGlassModal({
-        title: "Cloud Sync Error",
-        body: `<p>Using local offline storage. ${escapeHTML(error instanceof Error ? error.message : String(error))}</p>`,
-        actions: [{ id: "ok", label: "Continue offline", primary: true }]
-      });
+      renderStockTable();
+      renderCatalogTable();
+      showToast('Default settings restored.', 'success');
+    } catch (error) {
+      showToast(`Could not restore defaults: ${error.message}`, 'error');
     }
-  }
-}
+  });
 
-window.addEventListener("online", () => {
-  if (!firebase.auth && firebase.configurationError) {
-    initFirebase(FIREBASE_CONFIG, loadFirebaseModules);
-    void bootstrapCloudSync();
-    return;
-  }
-  void retryPendingWrites();
-  if (firebase.auth?.currentUser) {
-    void syncLocalCollections(firebase.auth.currentUser).catch((error) => {
-      handleFirestoreError(error, "Cloud sync");
+  if (saveSnapshotBtn) {
+    saveSnapshotBtn.addEventListener('click', () => {
+      const snap = createConfigurationSnapshot();
+      localStorage.setItem(backupSnapshotKey(), JSON.stringify(snap));
+      updateBackupStatusDisplay();
+      showToast(`Snapshot saved to local storage (${snap.catalog.length} items)`, 'success');
     });
   }
-});
 
-function runSafely(handler) {
-  return (event) => {
-    if (event?.type === "submit") event.preventDefault();
-    try {
-      Promise.resolve(handler(event)).catch((error) => showError(error));
-    } catch (error) {
-      showError(error);
-    }
-  };
-}
+  if (downloadJsonBtn) {
+    downloadJsonBtn.addEventListener('click', () => {
+      const snap = createConfigurationSnapshot();
+      const jsonStr = JSON.stringify(snap, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `AL_Communication_Backup_${getTodayDateString()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Downloaded .JSON backup file', 'success');
+    });
+  }
 
-function updateState(updater) {
-  store.update(updater);
-  store.persist();
-}
-
-function getMatches() {
-  return store.getState().matches.filter((match) => match && typeof match === "object");
-}
-
-function getActiveMatch() {
-  const state = store.getState();
-  return state.matches.find((match) => match.id === state.activeMatchId) ?? null;
-}
-
-function allKnownTeams() {
-  const stateTeams = Array.isArray(store.getState().teams) ? store.getState().teams : [];
-  const byId = new Map(DEFAULT_TEAMS.map((team) => [team.id, { ...team, roster: team.roster.map((player) => ({ ...player })) }]));
-  for (const team of stateTeams) {
-    if (team?.id && team?.name) {
-      const known = byId.get(team.id);
-      const roster = new Map();
-      for (const player of [...(known?.roster ?? []), ...(Array.isArray(team.roster) ? team.roster : [])]) {
-        const normalized = normalizePlayer(player);
-        if (!normalized) continue;
-        const duplicateName = [...roster.values()].find((item) => item.name.toLowerCase() === normalized.name.toLowerCase());
-        if (duplicateName) roster.delete(duplicateName.id);
-        roster.set(normalized.id, normalized);
+  if (restoreSnapshotBtn) {
+    restoreSnapshotBtn.addEventListener('click', async () => {
+      const savedRaw = localStorage.getItem(backupSnapshotKey());
+      if (!savedRaw) {
+        showToast('No saved snapshot found in local storage. Save one first or upload a JSON backup file.', 'error');
+        return;
       }
-      byId.set(team.id, { ...known, ...team, roster: [...roster.values()] });
-    }
-  }
-  for (const team of listCustomTeams()) {
-    const prior = byId.get(team.id);
-    const roster = new Map();
-    for (const player of [...(prior?.roster ?? []), ...(team.roster ?? [])]) {
-      const normalized = normalizePlayer(player);
-      if (!normalized) continue;
-      const duplicateName = [...roster.values()].find((item) => item.name.toLowerCase() === normalized.name.toLowerCase());
-      if (duplicateName) roster.delete(duplicateName.id);
-      roster.set(normalized.id, normalized);
-    }
-    byId.set(team.id, { ...prior, ...team, roster: [...roster.values()] });
-  }
-  return [...byId.values()];
-}
 
-function teamById(id) {
-  return currentTeams.find((team) => team.id === id) ?? null;
-}
-
-function normalizePlayer(player) {
-  if (typeof player === "string") return { id: player, name: player, role: "Player" };
-  const id = String(player?.id ?? player?.playerId ?? "");
-  return id ? { ...player, id, name: player.name ?? player.displayName ?? id } : null;
-}
-
-function playersFor(teamId) {
-  const team = teamById(teamId);
-  if (!team) return [];
-  const players = new Map();
-  for (const player of team.roster ?? []) {
-    const normalized = normalizePlayer(player);
-    if (normalized) players.set(normalized.id, normalized);
-  }
-  for (const player of listCustomTeams().flatMap((custom) => custom.id === teamId ? custom.roster : [])) {
-    const normalized = normalizePlayer(player);
-    if (normalized) players.set(normalized.id, normalized);
-  }
-  return [...players.values()];
-}
-
-function fillSelect(select, options, { blankLabel, preferred } = {}) {
-  if (!select) return "";
-  const previous = preferred ?? select.value;
-  select.replaceChildren();
-  if (blankLabel !== undefined) {
-    const blank = document.createElement("option");
-    blank.value = "";
-    blank.textContent = blankLabel;
-    select.append(blank);
-  }
-  for (const option of options) {
-    const item = document.createElement("option");
-    item.value = String(option.value);
-    item.textContent = option.label;
-    select.append(item);
-  }
-  if (options.some((option) => String(option.value) === String(previous))) select.value = String(previous);
-  else if (options.length && blankLabel === undefined) select.value = String(options[0].value);
-  return select.value;
-}
-
-function teamOptions(teams = currentTeams) {
-  return teams.map((team) => ({ value: team.id, label: team.name }));
-}
-
-function addPlayerToTeam(profile) {
-  const teams = allKnownTeams().map((team) => {
-    const roster = (team.roster ?? []).filter((player) =>
-      String(player.id ?? player) !== profile.id &&
-      String(player.name ?? player).toLowerCase() !== profile.name.toLowerCase()
-    );
-    if (team.id !== profile.teamId) return { ...team, roster };
-    return { ...team, roster: [...roster, { id: profile.id, name: profile.name, role: profile.role, tags: profile.tags ?? [] }] };
-  });
-  updateState((state) => ({ ...state, teams }));
-}
-
-function renderTeamOptions() {
-  currentTeams = allKnownTeams();
-  const standard = currentTeams.filter((team) => !team.id.startsWith("custom-"));
-  const custom = currentTeams.filter((team) => team.id.startsWith("custom-"));
-  fillSelect(el("reg-team"), teamOptions(standard));
-  fillSelect(el("profile-team"), teamOptions(currentTeams), { preferred: store.getState().currentUser?.teamId });
-
-  const selectedType = document.querySelector('input[name="team-type"]:checked')?.value ?? "standard";
-  const setupTeams = selectedType === "custom" && custom.length
-    ? [...custom, ...standard]
-    : standard;
-  const setupOptions = teamOptions(setupTeams);
-  fillSelect(el("setup-team-a"), setupOptions);
-  fillSelect(el("setup-team-b"), setupOptions, { preferred: setupOptions.find((option) => option.value !== el("setup-team-a").value)?.value });
-  updateTossOptions();
-  fillSelect(el("vote-team"), teamOptions(currentTeams), { preferred: store.getState().currentUser?.teamId });
-  renderLoginPlayers();
-  renderVoteCandidates();
-  renderCustomTeamList();
-}
-
-function updateTossOptions() {
-  const teams = [teamById(el("setup-team-a").value), teamById(el("setup-team-b").value)].filter(Boolean);
-  const options = teamOptions(teams);
-  fillSelect(el("toss-winner"), options, { preferred: el("toss-winner").value || el("setup-team-a").value });
-}
-
-function updateSetupFormat() {
-  const multiDay = el("match-format").value === "multi-day";
-  el("overs-field").classList.toggle("hidden", multiDay);
-  el("custom-overs-wrap").classList.toggle("hidden", multiDay || el("setup-overs").value !== "custom");
-  el("match-days-field").classList.toggle("hidden", !multiDay);
-  el("max-innings-field").classList.toggle("hidden", !multiDay);
-}
-
-function readCustomPlayers() {
-  const players = JSON.parse(localStorage.getItem("tc_players") ?? "[]");
-  if (!Array.isArray(players)) throw new TypeError("Saved player profiles are invalid.");
-  return players;
-}
-
-function renderLoginPlayers() {
-  const select = el("username-select");
-  if (!select) return;
-  const selected = select.value;
-  for (const group of select.querySelectorAll("optgroup")) {
-    const teamKey = group.querySelector("option")?.dataset.team;
-    const team = SQUAD_TEAMS[teamKey];
-    if (!team) continue;
-    const existing = new Set([...group.querySelectorAll("option")].map((option) => option.value));
-    for (const player of readCustomPlayers().filter((item) => item.teamId === team.id)) {
-      if (existing.has(player.name)) continue;
-      const option = document.createElement("option");
-      option.value = player.name;
-      option.dataset.team = teamKey;
-      option.textContent = player.name;
-      group.append(option);
-    }
-  }
-  if ([...select.options].some((option) => option.value === selected)) select.value = selected;
-}
-
-function renderVoteCandidates() {
-  const teamId = el("vote-team")?.value;
-  const candidates = playersFor(teamId).map((player) => ({ value: player.id, label: player.name }));
-  fillSelect(el("vote-candidate"), candidates, { preferred: store.getState().currentUser?.id });
-}
-
-function renderCustomTeamList() {
-  const teams = listCustomTeams();
-  for (const container of [el("custom-team-list"), el("settings-team-list")]) {
-    if (!container) continue;
-    container.replaceChildren();
-    if (!teams.length) {
-      const message = document.createElement("p");
-      message.className = "muted";
-      message.textContent = "No custom teams yet.";
-      container.append(message);
-      continue;
-    }
-    for (const team of teams) {
-      const row = document.createElement("p");
-      row.className = "team-chip";
-      row.textContent = `${team.tag} · ${team.name} · ${(team.roster ?? []).length} players`;
-      container.append(row);
-    }
-  }
-}
-
-function renderDashboard() {
-  const user = store.getState().currentUser;
-  el("dash-name").textContent = user?.name ?? "Player";
-  const matches = getMatches().slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  const team = teamById(user?.teamId);
-  const squad = team?.roster ?? [];
-  el("dash-team-card").innerHTML = `<p class="eyebrow">YOUR TEAM</p><h3>${escapeHTML(team?.name ?? "Thursday Cricket")}</h3>
-    <p class="muted">${escapeHTML(team?.tag ?? "SQUAD")} · ${squad.length} players</p>
-    <div class="team-chips">${squad.map((player) => `<span class="team-chip">${escapeHTML(player.name ?? player.id ?? player)}</span>`).join("")}</div>`;
-  const active = getActiveMatch();
-  if (active) {
-    const inning = activeInnings(active);
-    el("dash-live").innerHTML = `<p class="eyebrow">LIVE MATCH</p><h3>${escapeHTML(active.teamA.name)} vs ${escapeHTML(active.teamB.name)}</h3>
-      <div class="classic-live-score">${inning?.score ?? 0}/${inning?.wickets ?? 0}</div><p class="muted">Overs ${ballsToOvers(inning?.legalBalls ?? 0)} · ${escapeHTML(active.venue || "Venue not recorded")}</p>`;
-  } else {
-    el("dash-live").innerHTML = `<p class="eyebrow">MATCH CENTER</p><h3>No active match</h3><p class="muted">Create a match to start scoring.</p>`;
-  }
-  const recent = matches.slice(0, 5);
-  el("dash-recent").innerHTML = `<div class="classic-card-heading"><div><p class="eyebrow">SQUAD HISTORY</p><h3>Recent Matches</h3></div><span class="muted">${matches.length} ${matches.length === 1 ? "match" : "matches"}</span></div>
-    ${recent.length ? `<div class="classic-match-list">${recent.map((match) => {
-      const score = match.innings?.map((inning) => `${inning.score}/${inning.wickets}`).join(" · ") || "No score yet";
-      return `<article class="match-item glass"><div><strong>${escapeHTML(match.teamA?.name)} vs ${escapeHTML(match.teamB?.name)}</strong><small>${escapeHTML(new Date(match.createdAt).toLocaleDateString())} · ${escapeHTML(match.result?.winner ?? "In progress")}</small></div>
-        <span class="match-score">${escapeHTML(score)}</span><button class="btn btn-ghost" type="button" data-open-match="${escapeHTML(match.id)}">Open</button></article>`;
-    }).join("")}</div>` : `<p class="empty-state">No matches yet. Set up a game to get started.</p>`}`;
-}
-
-function activeInnings(match) {
-  return match?.innings?.[match.activeInnings] ?? null;
-}
-
-function renderLive() {
-  const match = getActiveMatch();
-  const board = el("scoreboard");
-  const controls = el("scoring-controls");
-  const postMatch = el("post-match");
-  const runButtons = [...document.querySelectorAll(".run-btn")];
-  if (!match) {
-    board.className = "scoreboard classic-scoreboard empty-state";
-    board.innerHTML = "<h3>No active match</h3><p>Start a match from Match Setup to open the score pad.</p>";
-    controls.classList.add("hidden");
-    postMatch.classList.add("hidden");
-    el("innings-tabs").replaceChildren();
-    el("player-rows").innerHTML = `<p class="muted">Player batting lines appear here after the first delivery.</p>`;
-    el("bowler-rows").innerHTML = `<p class="muted">Bowling figures appear here after the first delivery.</p>`;
-    el("over-dots").replaceChildren();
-    el("target-banner").classList.add("hidden");
-    el("multi-innings").classList.add("hidden");
-    el("live-end-innings").disabled = true;
-    el("start-second-innings").disabled = true;
-    runButtons.forEach((button) => { button.disabled = true; });
-    el("swap-strike").disabled = true;
-    return;
-  }
-  controls.classList.remove("hidden");
-  if (!Number.isInteger(viewingInnings) || viewingInnings >= match.innings.length) viewingInnings = match.activeInnings;
-  const innings = match.innings[viewingInnings] ?? activeInnings(match);
-  if (!innings) return;
-  const batting = teamById(innings.battingTeamId)?.name ?? "Batting team";
-  const bowling = teamById(innings.bowlingTeamId)?.name ?? "Bowling team";
-  board.className = "scoreboard classic-scoreboard";
-  board.innerHTML = `<div><p class="eyebrow">${escapeHTML(match.venue || "THURSDAY CRICKET")} · INNINGS ${viewingInnings + 1}</p>
-      <h2>${escapeHTML(batting)} <span class="muted">vs</span> ${escapeHTML(bowling)}</h2></div>
-    <div class="classic-total">${innings.score}<span>/${innings.wickets}</span></div>
-    <div class="classic-score-meta"><span>${match.format === "multi-day" ? "Overs" : "Overs"} <strong>${ballsToOvers(innings.legalBalls)} / ${match.format === "multi-day" ? "Unlimited" : match.overs}</strong></span>
-      <span>Run rate <strong>${innings.legalBalls ? (innings.score / (innings.legalBalls / 6)).toFixed(2) : "0.00"}</strong></span>
-      <span>${match.result ? escapeHTML(match.result.winner) : match.completed ? "Match complete" : innings.closed ? "Innings complete" : "In progress"}</span></div>`;
-
-  const tabs = el("innings-tabs");
-  tabs.replaceChildren(...match.innings.map((item, index) => {
-    const tab = document.createElement("button");
-    tab.type = "button";
-    tab.className = `innings-tab${index === viewingInnings ? " is-active" : ""}`;
-    tab.dataset.viewInnings = String(index);
-    tab.textContent = `Innings ${index + 1} · ${teamById(item.battingTeamId)?.name ?? "Team"} · ${item.score}/${item.wickets}`;
-    return tab;
-  }));
-  const targetBanner = el("target-banner");
-  if (innings.targetType === "lead") {
-    targetBanner.textContent = innings.target > 0
-      ? `${batting} need ${innings.target} to take the lead`
-      : `${batting} are already ahead on aggregate`;
-    targetBanner.classList.remove("hidden");
-  } else if (innings.target !== null && innings.target !== undefined) {
-    targetBanner.textContent = innings.score >= innings.target ? `${batting} reached the target` : `${batting} need ${innings.target - innings.score} to win`;
-    targetBanner.classList.remove("hidden");
-  } else {
-    targetBanner.textContent = `${batting} · first innings`;
-    targetBanner.classList.remove("hidden");
-  }
-
-  const batters = playersFor(innings.battingTeamId).map((player) => ({ value: player.id, label: player.name }));
-  const bowlers = playersFor(innings.bowlingTeamId).map((player) => ({ value: player.id, label: player.name }));
-  fillSelect(el("striker-select"), batters, { blankLabel: "Choose striker", preferred: innings.strikerId });
-  fillSelect(el("non-striker-select"), batters, { blankLabel: "Choose non-striker", preferred: innings.nonStrikerId });
-  fillSelect(el("bowler-select"), bowlers, { blankLabel: "Choose bowler", preferred: innings.bowlerId });
-  const allPlayers = currentTeams.flatMap((team) => playersFor(team.id).map((player) => ({ ...player, teamName: team.name })));
-  fillSelect(el("post-player"), allPlayers.map((player) => ({ value: player.id, label: `${player.name} · ${player.teamName}` })), { blankLabel: "Choose player" });
-  fillSelect(el("post-bowler-player"), allPlayers.map((player) => ({ value: player.id, label: `${player.name} · ${player.teamName}` })), { blankLabel: "Choose bowler" });
-
-  const dismissed = new Set(innings.balls.filter((ball) => ball.wicket).map((ball) => ball.batterId));
-  const playerRows = playersFor(innings.battingTeamId);
-  el("player-rows").innerHTML = playerRows.length ? playerRows.map((player) => {
-    const stats = innings.batsmen[player.id] ?? { runs: 0, balls: 0, fours: 0, sixes: 0 };
-    const striker = innings.strikerId === player.id;
-    const nonStriker = innings.nonStrikerId === player.id;
-    return `<article class="prow${striker ? " is-striker" : ""}${dismissed.has(player.id) ? " is-out" : ""}">
-      <div class="prow-name"><strong>${escapeHTML(player.name)}</strong><small>${striker ? "On strike" : nonStriker ? "At the non-striker's end" : dismissed.has(player.id) ? "Out" : escapeHTML(player.role ?? "")}</small></div>
-      <div class="prow-score"><strong>${stats.runs}</strong><small>${stats.balls} balls · ${stats.fours}×4 · ${stats.sixes}×6</small></div>
-      <div class="prow-actions"><button class="team-chip" type="button" data-set-striker="${escapeHTML(player.id)}" ${innings.closed || match.completed ? "disabled" : ""}>Strike</button>
-      <button class="team-chip" type="button" data-set-non-striker="${escapeHTML(player.id)}" ${innings.closed || match.completed ? "disabled" : ""}>Partner</button></div></article>`;
-  }).join("") : `<p class="muted">No players are assigned to ${escapeHTML(batting)}.</p>`;
-  const bowlRows = playersFor(innings.bowlingTeamId);
-  el("bowler-rows").innerHTML = bowlRows.length ? bowlRows.map((player) => {
-    const stats = innings.bowlers[player.id] ?? { conceded: 0, bowlingBalls: 0, wickets: 0 };
-    return `<article class="prow${innings.bowlerId === player.id ? " is-striker" : ""}">
-      <div class="prow-name"><strong>${escapeHTML(player.name)}</strong><small>${innings.bowlerId === player.id ? "Current bowler" : escapeHTML(player.role ?? "")}</small></div>
-      <div class="prow-score"><strong>${stats.wickets}/${stats.conceded}</strong><small>${ballsToOvers(stats.bowlingBalls)} overs · ${stats.bowlingBalls ? (stats.conceded / (stats.bowlingBalls / 6)).toFixed(1) : "0.0"} econ</small></div>
-      <button class="team-chip" type="button" data-set-bowler="${escapeHTML(player.id)}" ${innings.closed || match.completed ? "disabled" : ""}>Bowl</button></article>`;
-  }).join("") : `<p class="muted">No bowlers are assigned to ${escapeHTML(bowling)}.</p>`;
-
-  const recentBalls = innings.balls.slice(-6);
-  el("over-dots").innerHTML = recentBalls.length ? recentBalls.map((ball) => {
-    const label = ball.wicket ? "W" : ball.extra === "wide" ? "WD" : ball.extra === "no-ball" ? "NB" : String(ball.total);
-    return `<span class="over-dot${ball.wicket ? " wicket" : ""}${ball.total >= 4 ? " boundary" : ""}" aria-label="${escapeHTML(label)}">${escapeHTML(label)}</span>`;
-  }).join("") : `<span class="muted">No balls yet</span>`;
-
-  const active = innings === activeInnings(match);
-  const closed = innings.closed || match.completed || !active;
-  el("live-end-innings").disabled = closed;
-  runButtons.forEach((button) => { button.disabled = closed; });
-  el("undo-ball").disabled = match.completed || !active || !innings.history?.length;
-  el("swap-strike").disabled = closed || !innings.strikerId || !innings.nonStrikerId;
-  const canStartNext = match.innings.length < (match.maxInnings ?? (match.format === "multi-day" ? 4 : 2)) &&
-    active && innings.closed && innings.endReason !== "target" && !match.completed;
-  el("start-second-innings").disabled = !canStartNext;
-  el("start-second-innings").textContent = match.innings.length < (match.maxInnings ?? (match.format === "multi-day" ? 4 : 2))
-    ? `Start innings ${match.innings.length + 1}`
-    : "Maximum innings reached";
-  el("target-display").textContent = innings.targetType === "lead"
-    ? `Runs to take the lead: ${innings.target ?? "—"}`
-    : innings.target !== null
-      ? `Target ${innings.target} · ${innings.score}/${innings.wickets}`
-      : innings.closed ? `Target ${computeTarget(innings)}` : "First innings";
-  el("innings-status").textContent = innings.closed
-    ? `Innings ${viewingInnings + 1} closed${innings.endReason === "all-out" ? " · all out" : innings.endReason === "overs" ? " · overs complete" : innings.endReason === "target" ? " · target reached" : " · declared"}.`
-    : "Select your players, then record each delivery.";
-  el("multi-innings").classList.toggle("hidden", match.innings.length < 2 && match.mode !== "multi-innings");
-  el("multi-innings-summary").textContent = match.innings.length > 1
-    ? `${teamById(activeInnings(match).battingTeamId)?.name ?? "Batting side"} need ${Math.max(0, (activeInnings(match).target ?? 0) - activeInnings(match).score)}${match.format === "multi-day" ? " runs" : ` from ${Math.max(0, match.overs * 6 - activeInnings(match).legalBalls)} balls`}.`
-    : "End innings one to calculate the next innings target.";
-  postMatch.classList.toggle("hidden", match.mode !== "retrospective" && !innings.closed && !match.completed);
-  for (const control of [el("striker-select"), el("non-striker-select"), el("bowler-select")]) control.disabled = closed;
-  el("post-player").disabled = match.completed;
-  el("post-bowler-player").disabled = match.completed;
-  for (const id of ["post-runs", "post-balls", "post-fours", "post-sixes", "post-wickets", "post-bowling-overs", "post-conceded"]) el(id).disabled = match.completed;
-  el("finalize-match").disabled = match.completed;
-}
-
-function chartDataset() {
-  const matches = getMatches();
-  if (activeFilter === "week") return buildThisWeekMatch(matches);
-  if (activeFilter === "last") return buildLastMatch(matches);
-  if (activeFilter.startsWith("match:")) return buildPerMatch(activeFilter.slice(6), matches);
-  return buildSeriesTotals(matches);
-}
-
-function drawBarChart(canvas, values, labelKey, valueKey) {
-  const context = canvas.getContext("2d");
-  if (!context) return;
-  const rect = canvas.getBoundingClientRect();
-  const width = Math.max(240, rect.width);
-  const height = 240;
-  const ratio = window.devicePixelRatio || 1;
-  canvas.width = width * ratio;
-  canvas.height = height * ratio;
-  canvas.style.height = `${height}px`;
-  context.scale(ratio, ratio);
-  context.clearRect(0, 0, width, height);
-  const rows = values.filter((row) => row[valueKey] > 0).sort((a, b) => b[valueKey] - a[valueKey]).slice(0, 6);
-  if (!rows.length) {
-    context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--tc-muted");
-    context.font = "14px system-ui";
-    context.fillText("No scoring data yet", 12, 32);
-    return;
-  }
-  const color = getComputedStyle(document.documentElement).getPropertyValue("--tc-accent").trim() || "#70e1c0";
-  const max = Math.max(...rows.map((row) => row[valueKey]));
-  const left = 10;
-  const labelWidth = Math.min(115, width * .38);
-  const barSpace = width - labelWidth - 35;
-  const rowHeight = Math.min(35, (height - 12) / rows.length);
-  context.font = "12px system-ui";
-  rows.forEach((row, index) => {
-    const y = 12 + index * rowHeight;
-    context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--tc-text");
-    const label = String(row[labelKey]).slice(0, 16);
-    context.fillText(label, left, y + 15, labelWidth - 8);
-    context.fillStyle = "rgba(255,255,255,.09)";
-    context.fillRect(left + labelWidth, y + 3, barSpace, 15);
-    context.fillStyle = color;
-    const barWidth = Math.max(2, (row[valueKey] / max) * barSpace);
-    context.fillRect(left + labelWidth, y + 3, barWidth, 15);
-    context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--tc-muted");
-    context.fillText(String(row[valueKey]), Math.min(width - 28, left + labelWidth + barWidth + 5), y + 15);
-  });
-}
-
-function renderAnalysis() {
-  const matches = getMatches().slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  const select = el("chart-select");
-  const before = select.value || activeFilter;
-  for (const option of [...select.options]) if (option.value.startsWith("match:")) option.remove();
-  const individualOptions = el("individual-match-options");
-  for (const match of matches) {
-    const option = document.createElement("option");
-    option.value = `match:${match.id}`;
-    option.textContent = `${match.teamA?.name ?? "Team A"} vs ${match.teamB?.name ?? "Team B"}`;
-    individualOptions.append(option);
-  }
-  activeFilter = [...select.options].some((option) => option.value === before) ? before : "series";
-  select.value = activeFilter;
-  const data = chartDataset();
-  const teams = data.teams.map((team) => ({ name: team.name, runs: team.runs }));
-  const names = new Map();
-  for (const match of data.matches ?? []) {
-    for (const team of [match.teamA, match.teamB]) {
-      for (const player of team?.roster ?? []) {
-        const id = String(player.id ?? player.playerId ?? player);
-        names.set(id, player.name ?? player.displayName ?? id);
-      }
-    }
-  }
-  const players = data.players.map((player) => ({ name: names.get(player.playerId) ?? player.playerId, runs: player.runs }));
-  drawBarChart(el("team-chart"), teams, "name", "runs");
-  drawBarChart(el("player-chart"), players, "name", "runs");
-  const awards = computeAwards(data);
-  const grid = el("awards-grid");
-  grid.replaceChildren();
-  for (const award of awards) {
-    const card = document.createElement("article");
-    card.className = "award-card";
-    const title = document.createElement("strong");
-    title.textContent = award.title;
-    const player = document.createElement("span");
-    player.textContent = `${award.player} · ${award.value}`;
-    card.append(title, player);
-    grid.append(card);
-  }
-  const history = el("analysis-matches");
-  history.replaceChildren();
-  if (!matches.length) {
-    const empty = document.createElement("p");
-    empty.className = "empty-state";
-    empty.textContent = "Completed and active matches will appear here.";
-    history.append(empty);
-  } else {
-    for (const match of matches) {
-      const item = document.createElement("article");
-      item.className = "match-row";
-      const name = document.createElement("strong");
-      name.textContent = `${match.teamA?.name ?? "Team A"} vs ${match.teamB?.name ?? "Team B"}`;
-      const outcome = document.createElement("small");
-      outcome.textContent = match.result ? `${match.result.winner} · ${match.result.margin}` : "In progress";
-      const open = document.createElement("button");
-      open.type = "button";
-      open.className = "button secondary";
-      open.dataset.openMatch = match.id;
-      open.textContent = "View scorecard";
-      item.append(name, outcome, open);
-      history.append(item);
-    }
-  }
-}
-
-function renderSettings() {
-  const user = store.getState().currentUser;
-  if (!user) return;
-  if (document.activeElement !== el("profile-name")) el("profile-name").value = user.name ?? "";
-  if (document.activeElement !== el("profile-role")) el("profile-role").value = user.role === "All-Rounder" ? "All-rounder" : (user.role ?? "Batter");
-  if (document.activeElement !== el("profile-tags")) el("profile-tags").value = (user.tags ?? []).join(", ");
-  if (user.teamId && teamById(user.teamId)) el("profile-team").value = user.teamId;
-  renderVoteCandidates();
-  for (const card of document.querySelectorAll(".theme-card")) {
-    card.classList.toggle("is-active", card.dataset.theme === document.documentElement.classList.item(0));
-  }
-}
-
-function renderAll() {
-  const state = store.getState();
-  const signedIn = Boolean(state.currentUser);
-  el("auth-screen").classList.toggle("hidden", signedIn);
-  el("main-app").classList.toggle("hidden", !signedIn);
-  renderTeamOptions();
-  if (!signedIn) return;
-  el("whoami").textContent = state.currentUser.name;
-  renderDashboard();
-  renderLive();
-  renderAnalysis();
-  renderSettings();
-  renderRouter(state.currentPage || "dashboard");
-  const theme = localStorage.getItem("tc_theme") || "theme-default-glass-dark";
-  document.documentElement.classList.remove("theme-default-glass-dark", "theme-neon-cyberpunk", "theme-emerald-pitch", "theme-midnight-apex");
-  document.documentElement.classList.add(theme);
-  el("theme-select").value = theme;
-  for (const card of document.querySelectorAll(".theme-card")) card.classList.toggle("is-active", card.dataset.theme === theme);
-  updateSetupFormat();
-}
-
-function persistCurrentMatch(match) {
-  updateState((state) => ({
-    ...state,
-    matches: state.matches.some((item) => item.id === match.id)
-      ? state.matches.map((item) => item.id === match.id ? match : item)
-      : [...state.matches, match]
-  }));
-  const owner = store.getState().currentUser?.id;
-  if (owner) void syncRemote(`matches/${match.id}`, {
-    match, owner, createdAt: match.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString()
-  });
-}
-
-function persistPlayer(profile) {
-  updateState((state) => ({
-    ...state,
-    players: [...(state.players ?? []).filter((player) => player.id !== profile.id), profile]
-  }));
-  void syncRemote(`players/${profile.id}`, { profile, owner: store.getState().currentUser?.id ?? null });
-}
-
-async function persistVote(teamId, vote, isCodeVote = false) {
-  const voterId = String(store.getState().currentUser?.id ?? vote.voterId);
-  if (isCodeVote) {
-    const documentId = `code-${teamId}-${voterId}`;
-    await syncRemote(`teamVotes/${documentId}`, { ...vote, id: documentId, kind: "code", teamId, voterId });
-  } else {
-    const documentId = `captain-${teamId}-${voterId}`;
-    await syncRemote(`teamVotes/${documentId}`, { ...vote, id: documentId, kind: "captain", teamId, voterId });
-  }
-}
-
-async function registerPlayer(event) {
-  event?.preventDefault?.();
-  const name = el("reg-name").value.trim();
-  const team = teamById(el("reg-team").value);
-  const role = el("reg-role").value === "All-Rounder" ? "All-rounder" : el("reg-role").value;
-  if (!name || !team) throw new TypeError("Enter your name and choose a team.");
-  const teamKey = Object.keys(SQUAD_TEAMS).find((key) => SQUAD_TEAMS[key].id === team.id);
-  if (!teamKey) throw new TypeError("New profiles must join one of the standard teams.");
-  const localPart = name.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, ".").replace(/^\.+|\.+$/g, "");
-  if (!localPart) throw new TypeError("Enter a name containing letters or numbers.");
-  const email = `${localPart}@${team.domain}`;
-  const password = getEffectivePassword(teamKey);
-
-  let firebaseUser = null;
-  let firebaseError = null;
-  try { await firebase.ready; } catch (error) { firebaseError = error; }
-  if (firebase.auth) {
-    try {
-      firebaseUser = await registerWithFirebase(email, password);
-    } catch (error) {
-      firebaseError = error;
-    }
-  }
-  if (firebaseUser) {
-    try {
-      await updateFirebaseProfile(firebaseUser, { displayName: name });
-      firebaseError = null;
-    } catch (error) {
-      firebaseError = error;
-    }
-  }
-  const users = readLocalUsers();
-  const existing = users.find((item) => item.email === email);
-  if (existing) throw new Error("A player already uses that name. Sign in with the existing profile.");
-  const id = firebaseUser?.uid ?? `player-${crypto.randomUUID?.() ?? Date.now().toString(36)}`;
-  const profile = { id, name, email, role, teamId: team.id, tags: [] };
-  users.push({ email, profile });
-  writeLocalUsers(users);
-  const localPlayers = readCustomPlayers();
-  localPlayers.push(profile);
-  localStorage.setItem("tc_players", JSON.stringify(localPlayers));
-  updateState((state) => ({ ...state, currentUser: profile, currentPage: "dashboard" }));
-  localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify({ username: name, teamId: team.id, email, ts: Date.now() }));
-  updatePlayerProfile(profile.id, profile);
-  addPlayerToTeam(profile);
-  setInlineStatus(el("app-status"), firebaseUser ? "Player registered and signed in." : "Player registered. This device is using local storage.");
-  closeAuthSections();
-  persistPlayer(profile);
-  await syncSessionMetadata();
-  if (firebaseError && !firebaseUser) setInlineStatus(el("app-status"), "Firebase was unavailable; the player profile is saved on this device.");
-  renderLoginPlayers();
-  el("username-select").value = name;
-  updateSelectedPlayer();
-}
-
-async function loginPlayer(username) {
-  const select = el("username-select");
-  const option = [...select.options].find((item) => item.value === username) ?? select.selectedOptions[0];
-  username = option?.value;
-  const teamKey = option?.dataset.team;
-  if (!username || !teamKey) throw new TypeError("Select your player name before signing in.");
-  const email = resolveEmail(username, teamKey);
-  const password = getEffectivePassword(teamKey);
-  let firebaseUser = null;
-  let firebaseError = null;
-  let createdAccount = false;
-  try { await firebase.ready; } catch (error) { firebaseError = error; }
-  if (firebase.auth) {
-    try {
-      firebaseUser = await signInWithFirebase(email, password);
-    } catch (error) {
-      if (!["user-not-found", "invalid-credential"].includes(errorCode(error))) throw friendlyAuthError(error);
       try {
-        firebaseUser = await registerWithFirebase(email, password);
-        createdAccount = true;
-      } catch (registerError) {
-        throw friendlyAuthError(registerError);
+        const snap = JSON.parse(savedRaw);
+        const confirmMsg = `Restore configuration snapshot saved on ${snap.formattedDate || 'earlier'}?\nThis will restore ${snap.catalog?.length || 0} catalog items, network commissions, and reload presets.`;
+        if (!(await showDeleteConfirm(confirmMsg))) return;
+
+        await applyConfigurationBackup(snap);
+      } catch (e) {
+        showToast(`Failed to parse stored snapshot: ${e.message}`, 'error');
       }
-    }
-    try {
-      await updateFirebaseProfile(firebaseUser, { displayName: username });
-      firebaseError = null;
-    } catch (error) {
-      throw friendlyAuthError(error);
-    }
+    });
   }
-  const users = readLocalUsers();
-  const seed = findSeedPlayer(username);
-  const team = SQUAD_TEAMS[teamKey];
-  let account = users.find((item) => item.email === email);
-  if (!account) {
-    account = {
-      email,
-      profile: {
-        id: firebaseUser?.uid ?? `seed-${username.toLowerCase()}`,
-        name: username,
-        email,
-        role: seed?.role ?? "All-rounder",
-        teamId: team.id,
-        tags: seed?.tags ?? []
-      }
-    };
-    users.push(account);
-    writeLocalUsers(users);
-  }
-  const profile = { ...account.profile, id: firebaseUser?.uid ?? account.profile.id, name: username, email, teamId: team.id };
-  updateState((state) => ({ ...state, currentUser: profile, currentPage: "dashboard" }));
-  localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify({ username, teamId: team.id, email, ts: Date.now() }));
-  closeAuthSections();
-  if (profile.name) addPlayerToTeam(profile);
-  setInlineStatus(el("login-status"), firebaseUser
-    ? `${createdAccount ? "Account created. " : ""}Signed in. Cloud sync is available.`
-    : "Signed in locally. Changes stay on this device.");
-  if (firebaseUser) {
-    persistPlayer(profile);
-    await syncSessionMetadata();
-  }
-  if (firebaseError) {
-    await openGlassModal({
-      title: "Offline sign-in",
-      body: `<p>Firebase sign-in was unavailable, so ${escapeHTML(username)} was signed in locally on this device.</p>`,
-      actions: [{ id: "continue", label: "Continue", primary: true }]
+
+  if (uploadInput) {
+    uploadInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const snap = JSON.parse(evt.target.result);
+          if (!snap.catalog && !snap.commissionRates && !snap.preferences && !snap.reloadPresets) {
+            throw new Error('Unrecognized backup format. No supported settings were found.');
+          }
+
+          if (await showDeleteConfirm(`Restore configuration from "${file.name}" (${snap.catalog?.length || 0} catalog items)?`)) {
+            await applyConfigurationBackup(snap);
+          }
+        } catch (err) {
+          showToast(`Invalid backup file: ${err.message}`, 'error');
+        } finally {
+          uploadInput.value = '';
+        }
+      };
+      reader.readAsText(file);
     });
   }
 }
 
-async function advancedLogin() {
-  const email = el("adv-email").value.trim().toLowerCase();
-  const password = el("adv-password").value;
-  if (!email || !password) throw new TypeError("Enter an advanced email and password.");
-  let firebaseUser = null;
-  let firebaseError = null;
-  try { await firebase.ready; } catch (error) { firebaseError = error; }
-  if (firebase.auth) {
-    try {
-      firebaseUser = await signInWithFirebase(email, password);
-    } catch (error) {
-      firebaseError = error;
-    }
+function initSettingsPanels() {
+
+  const addPresetForm = document.getElementById('addPresetForm');
+  const resetPresetsBtn = document.getElementById('resetPresetsDefaultBtn');
+
+  function renderSettingsPresetsTags() {
+    const list = document.getElementById('settingsPresetsList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    APP_STATE.reloadPresets.sort((a, b) => a - b).forEach(val => {
+      const span = document.createElement('span');
+      span.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border theme-border theme-bg-surface text-xs font-bold font-mono';
+      span.innerHTML = `
+        <span>Rs. ${escapeHTML(val)}</span>
+        <button type="button" class="del-preset-btn min-h-11 min-w-11 text-red-400 hover:text-red-300 ml-1 text-sm font-bold" aria-label="Remove preset Rs. ${escapeHTML(val)}">&times;</button>
+      `;
+      span.querySelector('.del-preset-btn')?.addEventListener('click', async () => {
+        if (APP_STATE.currentRole !== 'admin') {
+          showToast('Only an admin can change reload presets.', 'error');
+          return;
+        }
+        APP_STATE.reloadPresets = APP_STATE.reloadPresets.filter(p => p !== val);
+        await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
+        renderSettingsPresetsTags();
+        renderPresetPills();
+        showToast(`Removed preset Rs. ${val}`, 'info');
+      });
+      list.appendChild(span);
+    });
   }
-  const users = readLocalUsers();
-  const account = users.find((item) => item.email === email);
-  let validLocalCredentials = false;
-  if (account?.passwordHash) {
-    validLocalCredentials = account.passwordHash === await passwordDigest(password);
-  } else if (account?.profile?.teamId) {
-    const teamKey = Object.keys(SQUAD_TEAMS).find((key) => SQUAD_TEAMS[key].id === account.profile.teamId);
-    validLocalCredentials = Boolean(teamKey && password === getEffectivePassword(teamKey));
+
+  renderSettingsPresetsTags();
+
+  if (addPresetForm) {
+    addPresetForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (APP_STATE.currentRole !== 'admin') {
+        showToast('Only an admin can change reload presets.', 'error');
+        return;
+      }
+      const input = document.getElementById('newPresetAmountInput');
+      const val = parseInt(input?.value, 10);
+      if (!val || val < 10) return;
+
+      if (!APP_STATE.reloadPresets.includes(val)) {
+        APP_STATE.reloadPresets.push(val);
+        await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
+        renderSettingsPresetsTags();
+        renderPresetPills();
+        showToast(`Added preset Rs. ${val}`, 'success');
+      }
+      input.value = '';
+    });
   }
-  if (!firebaseUser && !validLocalCredentials) {
-    throw new Error(firebaseError?.message ?? "The advanced email or password is incorrect.");
+
+  if (resetPresetsBtn) {
+    resetPresetsBtn.addEventListener('click', async () => {
+      if (APP_STATE.currentRole !== 'admin') return;
+      APP_STATE.reloadPresets = [50, 100, 200, 500, 1000];
+      await setDoc(doc(db, 'settings', 'presets'), { list: APP_STATE.reloadPresets }, { merge: true });
+      renderSettingsPresetsTags();
+      renderPresetPills();
+      showToast('Reset presets to default', 'info');
+    });
   }
-  const profile = account?.profile ?? {
-    id: firebaseUser.uid,
-    name: email.split("@")[0],
-    email,
-    role: "All-rounder",
-    teamId: currentTeams[0]?.id ?? DEFAULT_TEAMS[0].id,
-    tags: []
-  };
-  updateState((state) => ({ ...state, currentUser: { ...profile, id: firebaseUser?.uid ?? profile.id }, currentPage: "dashboard" }));
-  localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify({ username: profile.name, teamId: profile.teamId, email, ts: Date.now() }));
-  closeAuthSections();
-  if (firebaseUser) {
-    persistPlayer({ ...profile, id: firebaseUser.uid });
-    await syncSessionMetadata();
+
+  const commForm = document.getElementById('commissionsForm');
+  if (commForm) {
+    commForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (APP_STATE.currentRole !== 'admin') {
+        showToast('Only an admin can change commission rates.', 'error');
+        return;
+      }
+      const airtel = parseFloat(document.getElementById('rateAirtelInput')?.value) || 6.80;
+      const dialog = parseFloat(document.getElementById('rateDialogInput')?.value) || 3.80;
+      const mobitel = parseFloat(document.getElementById('rateMobitelInput')?.value) || 6.80;
+      const hutch = parseFloat(document.getElementById('rateHutchInput')?.value) || 5.00;
+
+      APP_STATE.commissionRates = { AIRTEL: airtel, DIALOG: dialog, MOBITEL: mobitel, HUTCH: hutch };
+
+      try {
+        await setDoc(doc(db, 'settings', 'rates'), APP_STATE.commissionRates, { merge: true });
+
+        const bAirtel = document.getElementById('rateBadgeAirtel');
+        const bDialog = document.getElementById('rateBadgeDialog');
+        const bMobitel = document.getElementById('rateBadgeMobitel');
+        const bHutch = document.getElementById('rateBadgeHutch');
+        if (bAirtel) bAirtel.textContent = `${airtel.toFixed(2)}%`;
+        if (bDialog) bDialog.textContent = `${dialog.toFixed(2)}%`;
+        if (bMobitel) bMobitel.textContent = `${mobitel.toFixed(2)}%`;
+        if (bHutch) bHutch.textContent = `${hutch.toFixed(2)}%`;
+        showToast('Commission rates saved', 'success');
+      } catch (err) {
+        showToast(`Save failed: ${err.message}`, 'error');
+      }
+    });
   }
-  if (firebaseError) await showError(new Error("Firebase sign-in failed; the saved local profile was used."), "Offline sign-in");
+
+  const updateEmailForm = document.getElementById('updateEmailForm');
+  if (updateEmailForm) {
+    updateEmailForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const newEmail = document.getElementById('newEmailInput')?.value.trim();
+      if (!newEmail || !auth.currentUser) {
+        showToast('Sign in before updating account details.', 'error');
+        return;
+      }
+      try {
+        await updateEmail(auth.currentUser, newEmail);
+        let profileSynced = true;
+        try {
+          await setDoc(doc(db, 'users', auth.currentUser.uid), {
+            email: newEmail,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        } catch (syncError) {
+          profileSynced = false;
+          logDebug(`Updated email profile sync failed: ${syncError.message}`, 'ERROR');
+        }
+        showToast(profileSynced
+          ? `Email updated to ${newEmail}`
+          : 'Email changed, but the account profile could not be synced.', profileSynced ? 'success' : 'error');
+        const badge = document.getElementById('userEmailBadge');
+        if (badge) badge.textContent = newEmail;
+        APP_STATE.currentUser = auth.currentUser;
+        updateProfileDisplay(auth.currentUser);
+        updateEmailForm.reset();
+      } catch (err) {
+        showToast(`Email update failed: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  const updatePasswordForm = document.getElementById('updatePasswordForm');
+  if (updatePasswordForm) {
+    updatePasswordForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pass = document.getElementById('newPasswordInput')?.value;
+      const confirmPass = document.getElementById('confirmPasswordInput')?.value;
+      if (!auth.currentUser) {
+        showToast('Sign in before updating your password.', 'error');
+        return;
+      }
+      if (!pass || pass.length < 8) {
+        showToast('Password must be at least 8 characters.', 'error');
+        return;
+      }
+      if (pass !== confirmPass) {
+        showToast('Passwords do not match', 'error');
+        return;
+      }
+      try {
+        await updatePassword(auth.currentUser, pass);
+        showToast('Master password updated successfully', 'success');
+        updatePasswordForm.reset();
+      } catch (err) {
+        showToast(`Password update failed: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  const signOutBtn = document.getElementById('signOutBtn');
+  if (signOutBtn) {
+    signOutBtn.addEventListener('click', async () => {
+      try {
+        await signOut(auth);
+        showToast('Signed out of session', 'info');
+      } catch (err) {
+        showToast(`Sign out notice: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  const devToggle = document.getElementById('devConsoleToggle');
+  const devBody = document.getElementById('devConsoleBody');
+  if (devToggle && devBody) {
+    devToggle.addEventListener('click', () => devBody.classList.toggle('hidden'));
+  }
+
+  const dbgTestWrite = document.getElementById('dbgTestWriteBtn');
+  if (dbgTestWrite) {
+    dbgTestWrite.addEventListener('click', async () => {
+      try {
+        await addDoc(collection(db, 'diagnostics'), {
+          test: 'AL Communication v6.1 Cloud Write',
+          timestamp: serverTimestamp()
+        });
+        showToast('Cloud Firestore write test passed!', 'success');
+      } catch (e) {
+        showToast(`Cloud write test failed: ${e.message}`, 'error');
+      }
+    });
+  }
+
+  const dbgClearLogs = document.getElementById('dbgClearLogsBtn');
+  if (dbgClearLogs) {
+    dbgClearLogs.addEventListener('click', () => {
+      APP_STATE.devLogs = [];
+      const terminal = document.getElementById('dbgTerminalLogs');
+      if (terminal) terminal.innerHTML = '<div class="text-emerald-400">[System] Terminal cleared.</div>';
+    });
+  }
 }
 
-async function signOut() {
-  let signOutError;
-  try {
-    await signOutFirebase();
-  } catch (error) {
-    signOutError = error;
+function updateProfileDisplay(user = APP_STATE.currentUser) {
+  const email = document.getElementById('profileAccountEmail');
+  const roleBadge = document.getElementById('profileAccountRole');
+  const createAccountPanel = document.getElementById('createStaffAccountPanel');
+  const usersPanel = document.getElementById('adminUsersPanel');
+  const lastLogin = document.getElementById('profileLastLogin');
+  const isAdmin = APP_STATE.currentRole === 'admin';
+  if (email) email.textContent = user?.email || '';
+  if (roleBadge) {
+    roleBadge.textContent = isAdmin ? 'Admin' : 'Staff / User';
+    roleBadge.className = `inline-flex mt-3 px-2.5 py-1 rounded-full text-xs font-bold border ${
+      isAdmin
+        ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+        : 'text-sky-400 border-sky-500/30 bg-sky-500/10'
+    }`;
   }
-  updateState((state) => ({ ...state, currentUser: null }));
-  localStorage.removeItem(LOCAL_SESSION_KEY);
-  closeAuthSections();
-  el("login-form").reset();
-  updateSelectedPlayer();
-  void syncSessionMetadata();
-  if (signOutError) await showError(signOutError, "Signed out locally");
+  if (createAccountPanel) createAccountPanel.classList.toggle('hidden', !isAdmin);
+  if (usersPanel) usersPanel.classList.toggle('hidden', !isAdmin);
+  const loginTime = APP_STATE.userProfiles.find(profile => profile.id === user?.uid)?.lastLogin;
+  if (lastLogin) lastLogin.textContent = loginTime?.toDate ? loginTime.toDate().toLocaleString() : 'Current session';
+  renderAdminUsers();
 }
 
-function navigate(page) {
-  const pageIds = { dashboard: "dashboard-section", "match-setup": "match-setup-section", "live-scoring": "scoreboard-section", analysis: "analysis-section", settings: "settings-section" };
-  const targetId = pageIds[page] ?? page;
-  if (!document.getElementById(targetId)?.classList.contains("page-section")) throw new TypeError(`Page ${page} is unavailable.`);
-  updateState((state) => ({ ...state, currentPage: page }));
-  renderRouter(page);
-}
-
-async function beginMatch(event) {
-  event.preventDefault();
-  validateForm(event.currentTarget);
-  const a = teamById(el("setup-team-a").value);
-  const b = teamById(el("setup-team-b").value);
-  if (!a || !b) throw new TypeError("Select two teams before starting.");
-  const format = el("match-format").value;
-  const rawOvers = el("setup-overs").value;
-  const overs = format === "multi-day" ? null : rawOvers === "custom" ? Number(el("custom-overs").value) : Number(rawOvers);
-  const selectedMode = document.querySelector('input[name="mode-choice"]:checked')?.value ?? "live";
-  const mode = selectedMode === "post-detailed" ? "multi-innings" : selectedMode;
-  el("setup-mode").value = mode;
-  const match = createMatch({
-    teamA: a, teamB: b, overs, format,
-    days: Number(el("match-days").value),
-    maxInnings: format === "multi-day" ? Number(el("match-max-innings").value) : 2,
-    toss: { winnerId: el("toss-winner").value, decision: el("toss-decision").value },
-    mode
-  });
-  match.venue = el("setup-venue").value.trim();
-  updateState((state) => ({ ...state, matches: [...state.matches, match], activeMatchId: match.id, currentPage: "live-scoring" }));
-  viewingInnings = 0;
-  const note = match.mode === "retrospective" ? "Enter the scorecard in the post-match panel." : "Match is ready. Select players to start scoring.";
-  setInlineStatus(el("app-status"), note);
-  void syncRemote(`matches/${match.id}`, {
-    match,
-    owner: store.getState().currentUser?.id,
-    createdAt: match.createdAt,
-    updatedAt: new Date().toISOString()
-  });
-}
-
-function selectedPlayers() {
-  return {
-    strikerId: el("striker-select").value,
-    nonStrikerId: el("non-striker-select").value || null,
-    bowlerId: el("bowler-select").value
-  };
-}
-
-function savePickerChanges() {
-  const match = getActiveMatch();
-  const innings = activeInnings(match);
-  if (!innings || innings.closed) return;
-  const selected = selectedPlayers();
-  if (selected.strikerId && selected.strikerId === selected.nonStrikerId) {
-    setInlineStatus(el("app-status"), "Striker and non-striker must be different players.", "error");
-    el("non-striker-select").value = "";
+function renderAdminUsers() {
+  const list = document.getElementById('adminUsersList');
+  if (!list || APP_STATE.currentRole !== 'admin') return;
+  list.replaceChildren();
+  if (!APP_STATE.userProfiles.length) {
+    const empty = document.createElement('p');
+    empty.className = 'text-xs theme-text-dim';
+    empty.textContent = 'No account profiles have synced yet.';
+    list.appendChild(empty);
     return;
   }
-  innings.strikerId = selected.strikerId || null;
-  innings.nonStrikerId = selected.nonStrikerId;
-  innings.bowlerId = selected.bowlerId || null;
-  store.persist();
-  el("app-status").textContent = "";
+
+  APP_STATE.userProfiles
+    .slice()
+    .sort((a, b) => String(a.email || '').localeCompare(String(b.email || '')))
+    .forEach(profile => {
+      const row = document.createElement('div');
+      row.className = 'flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border theme-border theme-bg-surface';
+      const identity = document.createElement('div');
+      identity.className = 'min-w-0';
+      const userEmail = document.createElement('div');
+      userEmail.className = 'break-all text-sm font-semibold theme-text-main';
+      userEmail.textContent = profile.email || 'Email unavailable';
+      const role = document.createElement('div');
+      role.className = 'mt-1 text-xs theme-text-dim';
+      role.textContent = profile.role === 'admin' ? 'Admin' : 'Staff / User';
+      identity.append(userEmail, role);
+      row.appendChild(identity);
+
+      if (profile.id !== auth.currentUser?.uid && profile.email?.toLowerCase() !== ADMIN_EMAIL) {
+        const roleButton = document.createElement('button');
+        roleButton.type = 'button';
+        roleButton.className = 'min-h-11 px-3 py-2 rounded-lg text-xs font-bold border theme-border hover:theme-bg-elevated';
+        roleButton.textContent = profile.role === 'admin' ? 'Demote to User' : 'Promote to Admin';
+        roleButton.addEventListener('click', async () => {
+          if (!auth.currentUser || APP_STATE.currentRole !== 'admin') return;
+          const nextRole = profile.role === 'admin' ? 'user' : 'admin';
+          if (!(await showDeleteConfirm(`Set ${profile.email} role to ${nextRole === 'admin' ? 'Admin' : 'Staff / User'}?`))) return;
+          try {
+            await updateDoc(doc(db, 'users', profile.id), {
+              role: nextRole,
+              updatedAt: serverTimestamp()
+            });
+            showToast(`Updated role for ${profile.email}`, 'success');
+          } catch (error) {
+            showToast(`Role update failed: ${error.message}`, 'error');
+          }
+        });
+        row.appendChild(roleButton);
+      }
+      list.appendChild(row);
+    });
 }
 
-function updateScoreLocal(match, { runs = 0, wicket = false, extra = null }) {
-  if (!match || match.id !== store.getState().activeMatchId) throw new Error("Set up a match before recording a ball.");
-  addBall(match, { runs, wicket, extra, ...selectedPlayers() });
-  persistCurrentMatch(match);
-  if (activeInnings(match)?.closed) void maybeOfferFollowOn(match).catch((error) => showError(error));
+function applyRolePermissions() {
+  const isAdmin = APP_STATE.currentRole === 'admin';
+  document.getElementById('catalogItemForm')?.classList.toggle('hidden', !isAdmin);
+  document.getElementById('seedCatalogBtn')?.classList.toggle('hidden', !isAdmin);
+  document.getElementById('commissionsForm')?.classList.toggle('hidden', !isAdmin);
+  document.getElementById('addPresetForm')?.classList.toggle('hidden', !isAdmin);
+  document.getElementById('resetPresetsDefaultBtn')?.classList.toggle('hidden', !isAdmin);
+  document.querySelectorAll('.del-preset-btn').forEach(button => button.classList.toggle('hidden', !isAdmin));
+  renderCatalogTable();
+  renderAdminUsers();
 }
 
-function saveScore({ runs = 0, wicket = false, extra = null }) {
-  updateScoreLocal(getActiveMatch(), { runs, wicket, extra });
-}
+function initProfileControls() {
+  const openButton = document.getElementById('openProfileBtn');
+  const backButton = document.getElementById('profileBackBtn');
+  const resetButton = document.getElementById('profileResetPasswordBtn');
+  const securityButton = document.getElementById('profileSecurityBtn');
+  const layoutButton = document.getElementById('profileResetLayoutBtn');
+  const blurButton = document.getElementById('profileBlurToggleBtn');
+  const themeButton = document.getElementById('profileThemeToggleBtn');
+  const signOutButton = document.getElementById('profileSignOutBtn');
+  const createAccountForm = document.getElementById('createStaffAccountForm');
 
-function applyBall(matchId, inningsIndex, runs) {
-  const match = getActiveMatch();
-  if (!match || match.id !== matchId || match.activeInnings !== inningsIndex) throw new Error("The selected innings is not active.");
-  saveScore({ runs });
-}
-
-function applyWicket(matchId, inningsIndex) {
-  const match = getActiveMatch();
-  if (!match || match.id !== matchId || match.activeInnings !== inningsIndex) throw new Error("The selected innings is not active.");
-  saveScore({ wicket: true });
-}
-
-function undoBall(matchId, inningsIndex) {
-  const match = getActiveMatch();
-  if (!match || match.id !== matchId || match.activeInnings !== inningsIndex) throw new Error("The selected innings is not active.");
-  undoLastBall(match);
-  persistCurrentMatch(match);
-}
-
-async function endCurrentInnings() {
-  const match = getActiveMatch();
-  const innings = activeInnings(match);
-  if (!innings) throw new Error("There is no active innings.");
-  const result = await openGlassModal({
-    title: "End this innings?",
-    body: `<p>${escapeHTML(teamById(innings.battingTeamId)?.name)} finish on <strong>${innings.score}/${innings.wickets}</strong>.</p>`,
-    actions: [{ id: "cancel", label: "Keep scoring" }, { id: "end", label: "End innings", primary: true }]
-  });
-  if (result !== "end") return;
-  endInnings(match);
-  persistCurrentMatch(match);
-  setInlineStatus(el("app-status"), `Innings ${match.activeInnings + 1} declared.`);
-  await maybeOfferFollowOn(match);
-}
-
-function maybeOfferFollowOn(match) {
-  const first = match.innings[0];
-  const second = match.innings[1];
-  if (match.format !== "multi-day" || match.followOnOffered || match.followOnEnforced ||
-      match.innings.length !== 2 || !first || !second || !second.closed ||
-      second.endReason !== "all-out" || first.battingTeamId !== match.teamA.id ||
-      second.battingTeamId !== match.teamB.id) return Promise.resolve();
-  const threshold = match.days === 3 || match.days === 4 ? 150 : 200;
-  const lead = first.score - second.score;
-  if (lead < threshold) return Promise.resolve();
-  match.followOnOffered = true;
-  persistCurrentMatch(match);
-  return openGlassModal({
-    title: "Enforce Follow-On?",
-    body: `<p>Team B must bat again immediately. Team A leads by ${lead} runs; the follow-on threshold is ${threshold}.</p>`,
-    actions: [
-      { id: "no", label: "No, continue normally" },
-      { id: "yes", label: "Enforce follow-on", primary: true }
-    ]
-  }).then((choice) => {
-    if (choice !== "yes") return;
-    match.followOnEnforced = true;
-    startNextInnings(match);
-    viewingInnings = match.activeInnings;
-    persistCurrentMatch(match);
-    setInlineStatus(el("app-status"), "Follow-on enforced. Team B has started innings 3.");
-  });
-}
-
-function startNextMatchInnings() {
-  const match = getActiveMatch();
-  if (!match) throw new Error("There is no active match.");
-  startNextInnings(match);
-  viewingInnings = match.activeInnings;
-  persistCurrentMatch(match);
-  setInlineStatus(el("app-status"), `Innings ${match.activeInnings + 1} is ready${match.innings[match.activeInnings].targetType === "chase" ? `. Target: ${match.innings[match.activeInnings].target}` : "."}`);
-}
-
-function savePostMatchStats(event) {
-  event.preventDefault();
-  validateForm(event.currentTarget);
-  const match = getActiveMatch();
-  if (!match) throw new Error("There is no active match.");
-  const oversInput = Number(el("post-bowling-overs").value);
-  const wholeOvers = Math.floor(oversInput);
-  const decimalBalls = Math.round((oversInput - wholeOvers) * 10);
-  if (decimalBalls > 5) throw new TypeError("Bowling overs must use cricket notation, such as 2.3.");
-  addRetrospectiveStats(match, {
-    playerId: el("post-player").value,
-    bowlerId: el("post-bowler-player").value,
-    runs: Number(el("post-runs").value), balls: Number(el("post-balls").value),
-    fours: Number(el("post-fours").value), sixes: Number(el("post-sixes").value),
-    wickets: Number(el("post-wickets").value), bowlingBalls: wholeOvers * 6 + decimalBalls,
-    conceded: Number(el("post-conceded").value)
-  });
-  persistCurrentMatch(match);
-  setInlineStatus(el("app-status"), "Player scorecard entry saved.");
-  el("post-match-form").reset();
-  if (activeInnings(match)?.closed) void maybeOfferFollowOn(match).catch((error) => showError(error));
-}
-
-async function finishMatch() {
-  const match = getActiveMatch();
-  if (!match) throw new Error("There is no active match.");
-  const result = await openGlassModal({
-    title: "Finish this match?",
-    body: "<p>This will close the active innings and save the match result.</p>",
-    actions: [{ id: "cancel", label: "Cancel" }, { id: "finish", label: "Finish match", primary: true }]
-  });
-  if (result !== "finish") return;
-  const summary = finalizeMatch(match);
-  persistCurrentMatch(match);
-  setInlineStatus(el("app-status"), `${summary.winner} · ${summary.margin} · Player of the Match: ${summary.potm}`);
-}
-
-async function openMatch(matchId) {
-  const match = getMatches().find((item) => item.id === matchId);
-  if (!match) throw new Error("That match is no longer available.");
-  updateState((state) => ({ ...state, activeMatchId: match.id, currentPage: "live-scoring" }));
-}
-
-async function createTeam() {
-  const team = await openCustomTeamBuilder();
-  if (!team) return;
-  const teams = [...allKnownTeams(), team];
-  updateState((state) => ({ ...state, teams }));
-  await syncRemote(`customTeams/${team.id}`, team);
-  setInlineStatus(el("app-status"), `${team.name} is ready for your next match.`);
-}
-
-async function saveProfile(event) {
-  event.preventDefault();
-  validateForm(event.currentTarget);
-  const user = store.getState().currentUser;
-  const profile = updatePlayerProfile(user.id, {
-    name: el("profile-name").value,
-    tags: el("profile-tags").value.split(",").map((tag) => tag.trim()).filter(Boolean),
-    role: el("profile-role").value,
-    teamId: el("profile-team").value
-  });
-  updateState((state) => ({ ...state, currentUser: { ...state.currentUser, ...profile } }));
-  addPlayerToTeam(profile);
-  persistPlayer(profile);
-  await syncRemote(`teams/${profile.teamId}`, { team: teamById(profile.teamId) });
-  await syncSessionMetadata();
-  setInlineStatus(el("app-status"), "Player profile saved.");
-}
-
-async function submitCaptainVote(event) {
-  event.preventDefault();
-  validateForm(event.currentTarget);
-  const user = store.getState().currentUser;
-  const teamId = el("vote-team").value;
-  const vote = castCaptainVote({ voterId: user.id, teamId, candidateId: el("vote-candidate").value });
-  const tally = tallyCaptainVotes(teamId, getVotes().captain[teamId]);
-  const candidateName = playersFor(teamId).find((player) => player.id === tally.winner)?.name ?? tally.winner;
-  el("captain-result").textContent = tally.winner
-    ? `${tally.votes} vote${tally.votes === 1 ? "" : "s"} · majority candidate: ${candidateName}`
-    : `${tally.votes} vote${tally.votes === 1 ? "" : "s"} · no candidate has a majority yet.`;
-  await persistVote(teamId, vote);
-}
-
-async function submitCodeVote(event) {
-  event.preventDefault();
-  validateForm(event.currentTarget);
-  const user = store.getState().currentUser;
-  const teamId = user.teamId ?? "general";
-  const code = el("secret-code").value;
-  const vote = castCodeVote({ voterId: user.id, teamId, code });
-  const votes = getVotes().codes.filter((item) => item.teamId === teamId);
-  const tally = tallyCodeVotes(votes, code);
-  el("code-result").textContent = `${tally.matching} of ${tally.total} votes match this code${tally.majority ? " · majority reached" : ""}.`;
-  if (tally.majority) {
-    const teamKey = Object.keys(SQUAD_TEAMS).find((key) => SQUAD_TEAMS[key].id === teamId);
-    if (teamKey) {
-      const overrides = JSON.parse(localStorage.getItem("tc_team_codes_v1") ?? "{}");
-      overrides[teamKey] = code;
-      localStorage.setItem("tc_team_codes_v1", JSON.stringify(overrides));
+  openButton?.addEventListener('click', () => {
+    if (!auth.currentUser || !APP_STATE.currentUser) {
+      showToast('Sign in to view account details.', 'error');
+      return;
     }
-  }
-  await persistVote(teamId, vote, true);
-  el("code-vote-form").reset();
-}
+    updateProfileDisplay();
+    switchView('profile');
+  });
+  backButton?.addEventListener('click', () => {
+    switchView(APP_STATE.previousView || 'dashboard');
+  });
 
-function changeTheme() {
-  const theme = el("theme-select").value;
-  const validThemes = ["theme-default-glass-dark", "theme-neon-cyberpunk", "theme-emerald-pitch", "theme-midnight-apex"];
-  if (!validThemes.includes(theme)) throw new TypeError("Choose one of the available themes.");
-  document.documentElement.classList.remove(...validThemes);
-  document.documentElement.classList.add(theme);
-  localStorage.setItem("tc_theme", theme);
-}
+  resetButton?.addEventListener('click', async () => {
+    const email = auth.currentUser?.email;
+    if (!email) {
+      showToast('Sign in before requesting a password reset.', 'error');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      showToast(`Password reset link sent to ${email}`, 'success');
+    } catch (error) {
+      showToast(`Password reset failed: ${error.message}`, 'error');
+    }
+  });
 
-function printReport() {
-  const match = getActiveMatch() ?? getMatches().slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
-  if (!match) throw new Error("There is no match report to print.");
-  el("report-root").innerHTML = buildPrintReport(match);
-  el("report-root").classList.remove("hidden");
-  el("report-root").setAttribute("aria-hidden", "false");
-  window.addEventListener("afterprint", () => {
-    el("report-root").classList.add("hidden");
-    el("report-root").setAttribute("aria-hidden", "true");
-  }, { once: true });
-  triggerPrint();
-}
+  securityButton?.addEventListener('click', () => {
+    openSettingsModal();
+    switchSettingsTab('security');
+  });
+  layoutButton?.addEventListener('click', resetDashboardLayout);
+  blurButton?.addEventListener('click', () => setGradientBlurEnabled(!APP_STATE.gradientBlurEnabled, true));
+  themeButton?.addEventListener('click', () => {
+    const nextTheme = APP_STATE.activeTheme === 'emerald-store' ? 'modern-slate' : 'emerald-store';
+    applyTheme(nextTheme);
+    saveUserPreferences({ activeTheme: nextTheme });
+  });
 
-function wireEvents() {
-  el("login-form").addEventListener("submit", runSafely((event) => {
+  signOutButton?.addEventListener('click', async () => {
+    try {
+      await signOut(auth);
+      clearSignedInState();
+      showToast('Signed out of session', 'info');
+    } catch (error) {
+      showToast(`Sign out failed: ${error.message}`, 'error');
+    }
+  });
+
+  createAccountForm?.addEventListener('submit', async event => {
     event.preventDefault();
-    return loginPlayer(el("username-select").value);
-  }));
-  el("username-select").addEventListener("change", runSafely((event) => {
-    updateSelectedPlayer();
-    const username = event.target.value;
-    if (username) return loginPlayer(username);
-  }));
-  document.querySelectorAll(".toggle-link").forEach((button) => {
-    button.addEventListener("click", () => toggleAuthSection(button.dataset.target, button));
+    if (!auth.currentUser || APP_STATE.currentRole !== 'admin') {
+      showToast('Only an authenticated admin can create staff accounts.', 'error');
+      return;
+    }
+    const email = document.getElementById('staffAccountEmail')?.value.trim();
+    const password = document.getElementById('staffAccountPassword')?.value;
+    const confirmPassword = document.getElementById('staffAccountPasswordConfirm')?.value;
+    if (!email || !password || password.length < 8 || password !== confirmPassword) {
+      showToast(password !== confirmPassword ? 'Passwords do not match.' : 'Enter an email and a password of at least 8 characters.', 'error');
+      return;
+    }
+    if (!email.includes('@')) {
+      showToast('Enter an email and a password of at least 8 characters.', 'error');
+      return;
+    }
+
+    let createdUser = null;
+    try {
+      const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      createdUser = credential.user;
+      await setDoc(doc(db, 'users', createdUser.uid), {
+        email,
+        role: 'user',
+        createdAt: serverTimestamp(),
+        lastLogin: serverTimestamp()
+      });
+      createAccountForm.reset();
+      showToast(`Standard user account created for ${email}`, 'success');
+    } catch (error) {
+      showToast(`Account creation failed: ${error.message}`, 'error');
+    } finally {
+      if (createdUser) {
+        try {
+          await signOut(secondaryAuth);
+        } catch (error) {
+          logDebug(`Secondary account sign-out failed: ${error.message}`, 'WARN');
+        }
+      }
+    }
   });
-  el("adv-submit").addEventListener("click", runSafely(advancedLogin));
-  el("reg-submit").addEventListener("click", runSafely(registerPlayer));
-  el("logout-button").addEventListener("click", runSafely(signOut));
-  el("brand-link").addEventListener("click", (event) => {
+}
+
+let loginFailureCount = 0;
+let loginLockedUntil = 0;
+
+function friendlyAuthError(error) {
+  const messages = {
+    'auth/email-already-in-use': 'An account already uses this email address.',
+    'auth/invalid-email': 'Enter a valid email address.',
+    'auth/weak-password': 'Choose a stronger password with at least 8 characters.',
+    'auth/invalid-credential': 'The email or password is incorrect.',
+    'auth/wrong-password': 'The email or password is incorrect.',
+    'auth/user-not-found': 'The email or password is incorrect.',
+    'auth/user-disabled': 'This account has been disabled. Contact the administrator.',
+    'auth/network-request-failed': 'Network error. Check your connection and try again.',
+    'auth/too-many-requests': 'Too many attempts. Wait a little before trying again.'
+  };
+  return messages[error?.code] || error?.message || 'Authentication could not be completed.';
+}
+
+const profileInitializationPromises = new Map();
+
+function initializeUserProfile(user) {
+  if (!auth.currentUser || auth.currentUser.uid !== user.uid) return Promise.resolve();
+  if (profileInitializationPromises.has(user.uid)) return profileInitializationPromises.get(user.uid);
+
+  const initialization = (async () => {
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const profileSnapshot = await getDoc(userRef);
+      const profileData = profileSnapshot.data();
+      const isOwner = user.email?.toLowerCase() === ADMIN_EMAIL;
+      const role = isOwner ? 'admin' : (profileData?.role === 'admin' ? 'admin' : 'user');
+
+      await setDoc(userRef, {
+        email: user.email || auth.currentUser?.email || '',
+        role,
+        ...(!profileSnapshot.exists() ? { createdAt: serverTimestamp() } : {}),
+        lastLogin: serverTimestamp()
+      }, { merge: true });
+
+      if (role !== APP_STATE.currentRole) {
+        APP_STATE.currentRole = role;
+        applyRolePermissions();
+      }
+      return true;
+    } catch (error) {
+      logDebug(`Account profile sync skipped: ${error.message}`, 'WARN');
+      return false;
+    }
+  })();
+  profileInitializationPromises.set(user.uid, initialization);
+  return initialization.finally(() => profileInitializationPromises.delete(user.uid));
+}
+
+function initAuthentication() {
+  const gateScreen = document.getElementById('authGateScreen');
+  const loginScreen = document.getElementById('loginScreen');
+  const appShell = document.getElementById('appShell');
+  const loginForm = document.getElementById('loginForm');
+  const loginAlert = document.getElementById('loginAlert');
+  const togglePassBtn = document.getElementById('togglePasswordBtn');
+  const passInput = document.getElementById('loginPassword');
+  const forgotPassBtn = document.getElementById('forgotPasswordBtn');
+  const resetModal = document.getElementById('passwordResetModal');
+  const closeResetBtn = document.getElementById('closeResetModalBtn');
+  const cancelResetBtn = document.getElementById('cancelResetBtn');
+  const resetForm = document.getElementById('passwordResetForm');
+  const signupModal = document.getElementById('signupModal');
+  const signupForm = document.getElementById('signupForm');
+  const signupAlert = document.getElementById('signupAlert');
+  const showSignupBtn = document.getElementById('showSignupBtn');
+  const closeSignupBtn = document.getElementById('closeSignupBtn');
+
+  showSignupBtn?.addEventListener('click', () => {
+    signupAlert?.classList.add('hidden');
+    signupModal?.classList.remove('hidden');
+  });
+  closeSignupBtn?.addEventListener('click', () => signupModal?.classList.add('hidden'));
+  signupModal?.addEventListener('click', event => {
+    if (event.target === signupModal) signupModal.classList.add('hidden');
+  });
+
+  signupForm?.addEventListener('submit', async event => {
     event.preventDefault();
-    navigate("dashboard");
-  });
-  el("main-nav").addEventListener("click", runSafely((event) => {
-    const tab = event.target.closest("[data-page]");
-    if (tab) navigate(tab.dataset.page);
-  }));
-  el("home-new-match").addEventListener("click", () => navigate("match-setup"));
-  el("home-live-match").addEventListener("click", () => navigate("live-scoring"));
-  el("setup-form").addEventListener("submit", runSafely(beginMatch));
-  el("match-format").addEventListener("change", updateSetupFormat);
-  document.querySelectorAll('input[name="mode-choice"]').forEach((input) => input.addEventListener("change", () => {
-    el("setup-mode").value = input.value === "post-detailed" ? "multi-innings" : input.value;
-    document.querySelectorAll(".mode-option").forEach((option) => option.classList.toggle("is-selected", option.querySelector("input").checked));
-  }));
-  document.querySelectorAll('input[name="team-type"]').forEach((input) => input.addEventListener("change", renderTeamOptions));
-  el("setup-overs").addEventListener("change", updateSetupFormat);
-  el("setup-team-a").addEventListener("change", () => {
-    if (el("setup-team-a").value === el("setup-team-b").value) {
-      const alternate = [...el("setup-team-b").options].find((option) => option.value !== el("setup-team-a").value);
-      if (alternate) el("setup-team-b").value = alternate.value;
-    }
-    updateTossOptions();
-  });
-  el("setup-team-b").addEventListener("change", () => {
-    if (el("setup-team-a").value === el("setup-team-b").value) {
-      const alternate = [...el("setup-team-a").options].find((option) => option.value !== el("setup-team-b").value);
-      if (alternate) el("setup-team-a").value = alternate.value;
-    }
-    updateTossOptions();
-  });
-  el("vote-team").addEventListener("change", renderVoteCandidates);
-  el("scoreboard-section").addEventListener("click", runSafely((event) => {
-    const tab = event.target.closest("[data-view-innings]");
-    if (tab) {
-      viewingInnings = Number(tab.dataset.viewInnings);
-      renderLive();
+    const email = document.getElementById('signupEmail')?.value.trim();
+    const password = document.getElementById('signupPassword')?.value || '';
+    const confirmPassword = document.getElementById('signupPasswordConfirm')?.value || '';
+    if (!email || password.length < 8) {
+      if (signupAlert) {
+        signupAlert.textContent = 'Enter a valid email and a password of at least 8 characters.';
+        signupAlert.className = 'p-3 rounded-xl text-sm bg-red-500/15 border border-red-500/30 text-red-400';
+      }
       return;
     }
-    const striker = event.target.closest("[data-set-striker]");
-    const partner = event.target.closest("[data-set-non-striker]");
-    const bowler = event.target.closest("[data-set-bowler]");
-    if (striker) {
-      el("striker-select").value = striker.dataset.setStriker;
-      if (el("non-striker-select").value === striker.dataset.setStriker) el("non-striker-select").value = "";
-      savePickerChanges();
-      renderAll();
+    if (password !== confirmPassword) {
+      if (signupAlert) {
+        signupAlert.textContent = 'The passwords do not match.';
+        signupAlert.className = 'p-3 rounded-xl text-sm bg-red-500/15 border border-red-500/30 text-red-400';
+      }
       return;
     }
-    if (partner) {
-      el("non-striker-select").value = partner.dataset.setNonStriker;
-      if (el("striker-select").value === partner.dataset.setNonStriker) el("striker-select").value = "";
-      savePickerChanges();
-      renderAll();
+    if (email.toLowerCase() === ADMIN_EMAIL) {
+      if (signupAlert) {
+        signupAlert.textContent = 'The owner account must be provisioned by the administrator.';
+        signupAlert.className = 'p-3 rounded-xl text-sm bg-red-500/15 border border-red-500/30 text-red-400';
+      }
       return;
     }
-    if (bowler) {
-      el("bowler-select").value = bowler.dataset.setBowler;
-      savePickerChanges();
-      renderAll();
-      return;
+
+    let createdUser = null;
+    try {
+      await authPersistenceReady;
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      createdUser = credential.user;
+      await initializeUserProfile(createdUser);
+      signupForm.reset();
+      signupModal?.classList.add('hidden');
+      showToast('Account created. You are now signed in.', 'success');
+      switchView('dashboard');
+    } catch (error) {
+      if (createdUser && auth.currentUser?.uid === createdUser.uid) {
+        try {
+          await signOut(auth);
+        } catch (signOutError) {
+          logDebug(`Sign-up cleanup sign-out failed: ${signOutError.message}`, 'ERROR');
+        }
+      }
+      if (signupAlert) {
+        signupAlert.textContent = friendlyAuthError(error);
+        signupAlert.className = 'p-3 rounded-xl text-sm bg-red-500/15 border border-red-500/30 text-red-400';
+      }
+      showToast(`Sign-up failed: ${friendlyAuthError(error)}`, 'error');
     }
-    const button = event.target.closest("[data-runs],[data-wicket],[data-extra]");
-    if (!button) return;
-    const active = getActiveMatch();
-    if (button.hasAttribute("data-runs")) applyBall(active.id, active.activeInnings, Number(button.dataset.runs));
-    else if (button.hasAttribute("data-wicket")) applyWicket(active.id, active.activeInnings);
-    else saveScore({ extra: button.dataset.extra });
-  }));
-  for (const id of ["striker-select", "non-striker-select", "bowler-select"]) el(id).addEventListener("change", savePickerChanges);
-  el("undo-ball").addEventListener("click", runSafely(() => {
-    const match = getActiveMatch();
-    if (!match) throw new Error("There is no active match.");
-    undoBall(match.id, match.activeInnings);
-  }));
-  el("swap-strike").addEventListener("click", runSafely(() => {
-    const match = getActiveMatch();
-    if (!match) throw new Error("There is no active match.");
-    swapStrike(match);
-    persistCurrentMatch(match);
-  }));
-  el("live-end-innings").addEventListener("click", runSafely(endCurrentInnings));
-  el("start-second-innings").addEventListener("click", runSafely(startNextMatchInnings));
-  el("post-match-form").addEventListener("submit", runSafely(savePostMatchStats));
-  el("finalize-match").addEventListener("click", runSafely(finishMatch));
-  el("chart-select").addEventListener("change", () => {
-    activeFilter = el("chart-select").value;
-    renderAnalysis();
   });
-  el("analysis-matches").addEventListener("click", runSafely((event) => {
-    const button = event.target.closest("[data-open-match]");
-    if (button) return openMatch(button.dataset.openMatch);
-  }));
-  el("dash-recent").addEventListener("click", runSafely((event) => {
-    const button = event.target.closest("[data-open-match]");
-    if (button) return openMatch(button.dataset.openMatch);
-  }));
-  el("captain-vote-form").addEventListener("submit", runSafely(submitCaptainVote));
-  el("code-vote-form").addEventListener("submit", runSafely(submitCodeVote));
-  el("profile-form").addEventListener("submit", runSafely(saveProfile));
-  el("theme-select").addEventListener("change", runSafely(changeTheme));
-  el("theme-customizer").addEventListener("click", runSafely((event) => {
-    const card = event.target.closest("[data-theme]");
-    if (!card) return;
-    el("theme-select").value = card.dataset.theme;
-    changeTheme();
-    renderSettings();
-  }));
-  el("create-team-button").addEventListener("click", runSafely(createTeam));
-  el("settings-create-team").addEventListener("click", runSafely(createTeam));
-  el("print-report").addEventListener("click", runSafely(printReport));
+
+  if (togglePassBtn && passInput) {
+    togglePassBtn.addEventListener('click', () => {
+      passInput.type = passInput.type === 'password' ? 'text' : 'password';
+    });
+  }
+
+  if (forgotPassBtn && resetModal) {
+    forgotPassBtn.addEventListener('click', () => resetModal.classList.remove('hidden'));
+  }
+  if (closeResetBtn && resetModal) {
+    closeResetBtn.addEventListener('click', () => resetModal.classList.add('hidden'));
+  }
+  if (cancelResetBtn && resetModal) {
+    cancelResetBtn.addEventListener('click', () => resetModal.classList.add('hidden'));
+  }
+
+  if (resetForm) {
+    resetForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('resetEmailInput')?.value.trim();
+      if (!email) return;
+      try {
+        await sendPasswordResetEmail(auth, email);
+        showToast(`Password reset link sent to ${email}`, 'success');
+        resetModal?.classList.add('hidden');
+      } catch (err) {
+        showToast(`Reset error: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  authPersistenceReady.then(() => onAuthStateChanged(auth, (user) => {
+    if (gateScreen) gateScreen.classList.add('hidden');
+
+    if (user) {
+      APP_STATE.currentUser = user;
+      APP_STATE.currentRole = user.email?.toLowerCase() === ADMIN_EMAIL ? 'admin' : 'user';
+      if (loginScreen) loginScreen.classList.add('hidden');
+      if (appShell) appShell.classList.remove('hidden');
+
+      const userBadge = document.getElementById('userEmailBadge');
+      if (userBadge) userBadge.textContent = user.email || 'Account';
+      updateProfileDisplay(user);
+      applyRolePermissions();
+
+      logDebug('Persistent session confirmed.');
+      if (cloudSyncUserId !== user.uid) {
+        stopCloudSyncListeners();
+        cloudSyncUserId = user.uid;
+        roleSyncUnsubscribe = onSnapshot(doc(db, 'users', user.uid), snapshot => {
+          if (auth.currentUser?.uid !== user.uid) return;
+          const role = user.email?.toLowerCase() === ADMIN_EMAIL
+            ? 'admin'
+            : snapshot.data()?.role === 'admin' ? 'admin' : 'user';
+          const roleChanged = APP_STATE.currentRole !== role;
+          APP_STATE.currentRole = role;
+          updateProfileDisplay(user);
+          applyRolePermissions();
+          if (roleChanged) initCloudSyncListeners();
+        }, error => {
+          logDebug(`Account role sync failed: ${error.message}`, 'ERROR');
+        });
+        initCloudSyncListeners();
+        void initializeUserProfile(user);
+      }
+    } else {
+      clearSignedInState();
+      stopCloudSyncListeners();
+      if (appShell) appShell.classList.add('hidden');
+      if (loginScreen) loginScreen.classList.remove('hidden');
+      logDebug('Awaiting owner authentication...');
+    }
+  }, error => {
+    if (gateScreen) gateScreen.classList.add('hidden');
+    if (loginScreen) loginScreen.classList.remove('hidden');
+    logDebug(`Authentication state listener failed: ${error.message}`, 'ERROR');
+  })).catch(error => {
+    if (gateScreen) gateScreen.classList.add('hidden');
+    if (loginScreen) loginScreen.classList.remove('hidden');
+    logDebug(`Authentication initialization failed: ${error.message}`, 'ERROR');
+  });
+
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail')?.value.trim();
+      const password = document.getElementById('loginPassword')?.value;
+      const btnText = document.getElementById('loginBtnText');
+      const spinner = document.getElementById('loginBtnSpinner');
+      const submitButton = loginForm.querySelector('button[type="submit"]');
+
+      if (!email || !password) return;
+      const remainingLock = loginLockedUntil - Date.now();
+      if (remainingLock > 0) {
+        const seconds = Math.ceil(remainingLock / 1000);
+        const message = `Too many failed sign-in attempts. Try again in ${seconds} seconds.`;
+        if (loginAlert) {
+          loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-red-500/15 border border-red-500/30 text-red-400 block';
+          loginAlert.textContent = message;
+        }
+        return;
+      }
+
+      if (loginAlert) loginAlert.classList.add('hidden');
+      if (btnText) btnText.textContent = 'Verifying Credentials...';
+      if (spinner) spinner.classList.remove('hidden');
+      if (submitButton) submitButton.disabled = true;
+
+      try {
+        await authPersistenceReady;
+        await signInWithEmailAndPassword(auth, email, password);
+        loginFailureCount = 0;
+        loginLockedUntil = 0;
+        showToast('Login successful. Session established.', 'success');
+      } catch (err) {
+        loginFailureCount += 1;
+        const errorMessage = friendlyAuthError(err);
+        if (loginFailureCount >= 5) {
+          loginLockedUntil = Date.now() + 30000;
+          loginFailureCount = 0;
+        }
+        if (loginAlert) {
+          loginAlert.className = 'mb-4 p-3 rounded-xl text-xs bg-red-500/15 border border-red-500/30 text-red-400 block';
+          loginAlert.textContent = loginLockedUntil
+            ? 'Too many failed sign-in attempts. Sign-in is paused for 30 seconds.'
+            : errorMessage;
+        }
+        showToast(`Login failed: ${errorMessage}`, 'error');
+      } finally {
+        if (btnText) btnText.textContent = 'Sign In to Counter Ledger';
+        if (spinner) spinner.classList.add('hidden');
+        if (submitButton) submitButton.disabled = false;
+      }
+    });
+  }
 }
 
-function initialize() {
-  wireEvents();
-  const lastUser = localStorage.getItem("tc_last_user");
-  if (lastUser && [...el("username-select").options].some((option) => option.value === lastUser)) {
-    el("username-select").value = lastUser;
-  }
-  updateSelectedPlayer();
-  const storedTheme = localStorage.getItem("tc_theme");
-  if (storedTheme && ["theme-default-glass-dark", "theme-neon-cyberpunk", "theme-emerald-pitch", "theme-midnight-apex"].includes(storedTheme)) {
-    document.documentElement.classList.remove("theme-default-glass-dark");
-    document.documentElement.classList.add(storedTheme);
-  }
-  store.subscribe(renderAll);
-  renderAll();
-  if (!firebase.auth) setInlineStatus(el("auth-status"), "Local mode · choose a seeded player to continue.");
+let cloudSyncUnsubscribers = [];
+let cloudSyncUserId = null;
+let roleSyncUnsubscribe = null;
+let dragSaveTimer = null;
+let activeDashboardDrag = null;
+let dashboardPressTimer = null;
+let suppressDashboardClickUntil = 0;
+let dashboardCardNodes = new Map();
+let dashboardCardContainers = new Map();
+let dashboardDeleteMode = false;
+
+function dashboardPreferenceKey(uid = auth.currentUser?.uid) {
+  return uid ? `al_preferences_${uid}` : null;
 }
 
-initialize();
-void bootstrapCloudSync();
+function saveUserPreferences(patch) {
+  if (!patch || typeof patch !== 'object') return Promise.resolve(false);
+  const uid = auth.currentUser?.uid;
+  const key = dashboardPreferenceKey(uid);
+  if (key) {
+    let cached = {};
+    try {
+      cached = JSON.parse(localStorage.getItem(key) || '{}');
+    } catch (error) {
+      logDebug(`Stored preferences could not be read: ${error.message}`, 'WARN');
+    }
+    const updated = { ...cached, ...patch };
+    localStorage.setItem(key, JSON.stringify(updated));
+  }
+  if (!uid) return Promise.resolve(false);
+
+  return setDoc(doc(db, 'user_settings', uid), {
+    ...patch,
+    updatedAt: serverTimestamp()
+  }, { merge: true }).then(() => {
+    if (patch.activeTheme) showToast('Theme updated successfully', 'success');
+    return true;
+  }).catch(error => {
+    logDebug(`Preference sync failed: ${error.message}`, 'ERROR');
+    showToast(`Preference could not be synced: ${error.message}`, 'error');
+    return false;
+  });
+}
+
+function applyDashboardOrder(container, order) {
+  if (!container || !Array.isArray(order)) return;
+  const cards = new Map(
+    [...container.querySelectorAll(':scope > [data-card-id]')]
+      .map(card => [card.dataset.cardId, card])
+  );
+  order.forEach(id => {
+    const card = cards.get(id);
+    if (card) {
+      container.appendChild(card);
+      cards.delete(id);
+    }
+  });
+  cards.forEach(card => container.appendChild(card));
+}
+
+function persistDashboardOrder(immediate = false) {
+  if (dragSaveTimer) clearTimeout(dragSaveTimer);
+  const save = () => {
+    dragSaveTimer = null;
+    const metrics = [...document.querySelectorAll('#dashboardGrid > [data-card-id]')]
+      .map(card => card.dataset.cardId);
+    const actions = [...document.querySelectorAll('#dashboardActionsGrid > [data-card-id]')]
+      .map(card => card.dataset.cardId);
+    APP_STATE.dashboardOrder = { metrics, actions };
+    saveUserPreferences({
+      dashboardOrder: APP_STATE.dashboardOrder,
+      hiddenDashboardCards: [...APP_STATE.hiddenDashboardCards]
+    });
+  };
+  if (immediate) save();
+  else dragSaveTimer = setTimeout(save, 150);
+}
+
+function applyHiddenDashboardCards(cardIds) {
+  if (!Array.isArray(cardIds)) return;
+  const allowedIds = new Set(dashboardCardNodes.keys());
+  const hidden = [...new Set(cardIds.filter(id => typeof id === 'string' && allowedIds.has(id)))];
+  const hiddenSet = new Set(hidden);
+
+  dashboardCardNodes.forEach((card, id) => {
+    if (hiddenSet.has(id)) {
+      card.remove();
+    } else {
+      const container = dashboardCardContainers.get(id);
+      if (container && card.parentElement !== container) container.appendChild(card);
+    }
+  });
+
+  APP_STATE.hiddenDashboardCards = hidden;
+  document.getElementById('dashboardGrid')?.classList.toggle('dashboard-delete-mode', dashboardDeleteMode);
+  document.getElementById('dashboardActionsGrid')?.classList.toggle('dashboard-delete-mode', dashboardDeleteMode);
+}
+
+async function removeDashboardCard(card) {
+  const cardId = card.dataset.cardId;
+  if (!cardId || !dashboardCardNodes.has(cardId) || card.classList.contains('card-removing')) return;
+  const label = card.querySelector('.font-semibold, .font-bold')?.textContent.trim() || cardId;
+  if (!(await showDeleteConfirm(`Remove "${label}" from the dashboard? Reset Dashboard Layout restores removed cards.`))) return;
+
+  card.classList.add('card-removing');
+  await new Promise(resolve => setTimeout(resolve, 160));
+  card.remove();
+  APP_STATE.hiddenDashboardCards = [...new Set([...APP_STATE.hiddenDashboardCards, cardId])];
+  persistDashboardOrder(true);
+  showToast('Dashboard card removed. Reset the layout to restore it.', 'success');
+}
+
+function resetDashboardLayout() {
+  applyHiddenDashboardCards([]);
+  APP_STATE.dashboardOrder = {
+    metrics: [...DEFAULT_DASHBOARD_ORDER.metrics],
+    actions: [...DEFAULT_DASHBOARD_ORDER.actions]
+  };
+  applyDashboardOrder(document.getElementById('dashboardGrid'), APP_STATE.dashboardOrder.metrics);
+  applyDashboardOrder(document.getElementById('dashboardActionsGrid'), APP_STATE.dashboardOrder.actions);
+  persistDashboardOrder(true);
+  showToast('Dashboard layout restored.', 'success');
+}
+
+function initDashboardReordering() {
+  const containers = [
+    document.getElementById('dashboardGrid'),
+    document.getElementById('dashboardActionsGrid')
+  ].filter(Boolean);
+  dashboardCardNodes = new Map();
+  dashboardCardContainers = new Map();
+  containers.forEach(container => {
+    container.querySelectorAll(':scope > [data-card-id]').forEach(card => {
+      dashboardCardNodes.set(card.dataset.cardId, card);
+      dashboardCardContainers.set(card.dataset.cardId, container);
+    });
+  });
+
+  const deleteModeButton = document.getElementById('dashboardEditCardsBtn');
+  deleteModeButton?.addEventListener('click', () => {
+    dashboardDeleteMode = !dashboardDeleteMode;
+    deleteModeButton.setAttribute('aria-pressed', String(dashboardDeleteMode));
+    document.getElementById('dashboardEditIcon')?.classList.toggle('hidden', dashboardDeleteMode);
+    document.getElementById('dashboardEditDoneIcon')?.classList.toggle('hidden', !dashboardDeleteMode);
+    deleteModeButton.title = dashboardDeleteMode
+      ? 'Click a card to remove it, or press Done to exit'
+      : 'Enable dashboard card removal';
+    containers.forEach(container => container.classList.toggle('dashboard-delete-mode', dashboardDeleteMode));
+  });
+
+  const beginDrag = (card, event) => {
+    activeDashboardDrag = { card, container: card.parentElement, pointerId: event.pointerId, moved: false };
+    card.classList.add('is-dragging');
+    card.setPointerCapture?.(event.pointerId);
+  };
+  const finishDrag = () => {
+    if (!activeDashboardDrag) return;
+    activeDashboardDrag.card.classList.remove('is-dragging');
+    const moved = activeDashboardDrag.moved;
+    activeDashboardDrag = null;
+    if (moved) {
+      persistDashboardOrder();
+      suppressDashboardClickUntil = Date.now() + 250;
+    }
+  };
+
+  containers.forEach(container => {
+    container.addEventListener('click', event => {
+      const card = event.target.closest('[data-card-id]');
+      if (!dashboardDeleteMode || !card || card.parentElement !== container) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      void removeDashboardCard(card);
+    }, true);
+    container.addEventListener('contextmenu', event => {
+      const card = event.target.closest('[data-card-id]');
+      if (!card || card.parentElement !== container) return;
+      event.preventDefault();
+      void removeDashboardCard(card);
+    });
+    container.addEventListener('pointerdown', event => {
+      if (dashboardDeleteMode) return;
+      const card = event.target.closest('[data-card-id]');
+      const control = event.target.closest('button,a,input,select,textarea');
+      if (!card || card.parentElement !== container || (control && control !== card)) return;
+      const touchInput = event.pointerType === 'touch';
+      if (touchInput) {
+        dashboardPressTimer = setTimeout(() => beginDrag(card, event), 350);
+      } else if (event.button === 0) {
+        beginDrag(card, event);
+      }
+    });
+    container.addEventListener('pointermove', event => {
+      if (!activeDashboardDrag || activeDashboardDrag.container !== container) return;
+      event.preventDefault();
+      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-card-id]');
+      if (!target || target === activeDashboardDrag.card || target.parentElement !== container) return;
+      const rect = target.getBoundingClientRect();
+      const sourceRect = activeDashboardDrag.card.getBoundingClientRect();
+      const sameRow = Math.abs(rect.top - sourceRect.top) < Math.min(rect.height, sourceRect.height) / 2;
+      const placeAfter = sameRow
+        ? event.clientX > rect.left + rect.width / 2
+        : event.clientY > rect.top + rect.height / 2;
+      container.insertBefore(activeDashboardDrag.card, placeAfter ? target.nextSibling : target);
+      activeDashboardDrag.moved = true;
+    }, { passive: false });
+    container.addEventListener('pointerup', () => {
+      if (dashboardPressTimer) clearTimeout(dashboardPressTimer);
+      dashboardPressTimer = null;
+      finishDrag();
+    });
+    container.addEventListener('pointercancel', () => {
+      if (dashboardPressTimer) clearTimeout(dashboardPressTimer);
+      dashboardPressTimer = null;
+      finishDrag();
+    });
+    container.addEventListener('pointerleave', () => {
+      if (dashboardPressTimer && !activeDashboardDrag) {
+        clearTimeout(dashboardPressTimer);
+        dashboardPressTimer = null;
+      }
+    });
+    container.addEventListener('click', event => {
+      if (Date.now() < suppressDashboardClickUntil) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
+  });
+}
+
+function clearSignedInState() {
+  APP_STATE.currentUser = null;
+  APP_STATE.currentRole = 'user';
+  APP_STATE.userProfiles = [];
+  APP_STATE.todayStationeryTransactions = [];
+  APP_STATE.todayReloadTransactions = [];
+  APP_STATE.masterStationeryRecords = [];
+  APP_STATE.masterReloadRecords = [];
+  APP_STATE.inventoryCatalog = [];
+  APP_STATE.activeView = 'dashboard';
+  document.getElementById('viewProfile')?.classList.add('hidden');
+  document.getElementById('viewDashboard')?.classList.remove('hidden');
+  document.getElementById('signupModal')?.classList.add('hidden');
+  document.getElementById('userEmailBadge')?.replaceChildren();
+  document.getElementById('profileAccountEmail')?.replaceChildren();
+  document.getElementById('profileAccountRole')?.replaceChildren();
+  document.getElementById('adminUsersList')?.replaceChildren();
+  applyRolePermissions();
+}
+
+function stopCloudSyncListeners() {
+  cloudSyncUnsubscribers.forEach(unsubscribe => unsubscribe());
+  cloudSyncUnsubscribers = [];
+  roleSyncUnsubscribe?.();
+  roleSyncUnsubscribe = null;
+  cloudSyncUserId = null;
+}
+
+function initCloudSyncListeners() {
+  cloudSyncUnsubscribers.forEach(unsubscribe => unsubscribe());
+  cloudSyncUnsubscribers = [];
+  const watch = (...args) => cloudSyncUnsubscribers.push(onSnapshot(...args));
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const prefKey = dashboardPreferenceKey(user.uid);
+  if (prefKey) {
+    try {
+      const cached = JSON.parse(localStorage.getItem(prefKey) || '{}');
+      if (cached.activeTheme) applyTheme(cached.activeTheme);
+      if (typeof cached.gradientBlurEnabled === 'boolean') setGradientBlurEnabled(cached.gradientBlurEnabled);
+      if (cached.dashboardOrder) APP_STATE.dashboardOrder = cached.dashboardOrder;
+      applyHiddenDashboardCards(Array.isArray(cached.hiddenDashboardCards) ? cached.hiddenDashboardCards : []);
+      applyDashboardOrder(document.getElementById('dashboardGrid'), APP_STATE.dashboardOrder.metrics);
+      applyDashboardOrder(document.getElementById('dashboardActionsGrid'), APP_STATE.dashboardOrder.actions);
+    } catch (error) {
+      logDebug(`Stored preferences could not be applied: ${error.message}`, 'WARN');
+    }
+  }
+
+  watch(collection(db, 'inventory'), (snapshot) => {
+    const items = [];
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      if (isServiceItem(data)) data.itemType = 'service';
+      items.push({ id: docSnap.id, ...data });
+    });
+    APP_STATE.inventoryCatalog = items;
+    renderStockTable();
+    renderCatalogTable();
+    updateDashboardMetrics();
+    updateBackupStatusDisplay();
+    logDebug(`Inventory catalog updated: ${items.length} records`);
+  }, (err) => {
+    logDebug(`Catalog sync notice: ${err.message}`, 'WARN');
+  });
+
+  const stationeryQuery = APP_STATE.currentRole === 'admin'
+    ? collection(db, 'stationery_transactions')
+    : query(collection(db, 'stationery_transactions'), where('createdBy', '==', user.uid));
+  watch(stationeryQuery, snapshot => {
+    const records = [];
+    snapshot.forEach(docSnap => records.push({ id: docSnap.id, ...docSnap.data() }));
+    APP_STATE.masterStationeryRecords = records;
+    APP_STATE.todayStationeryTransactions = records.filter(record => record.date === getTodayDateString());
+    APP_STATE.todayStationeryTransactions.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+    renderRecentStationeryFeed();
+    applyMasterLogFilters();
+    updateDashboardMetrics();
+  }, (err) => {
+    logDebug(`Stationery sync notice: ${err.message}`, 'WARN');
+  });
+
+  const reloadQuery = APP_STATE.currentRole === 'admin'
+    ? collection(db, 'reload_transactions')
+    : query(collection(db, 'reload_transactions'), where('createdBy', '==', user.uid));
+  watch(reloadQuery, snapshot => {
+    const records = [];
+    snapshot.forEach(docSnap => records.push({ id: docSnap.id, ...docSnap.data() }));
+    APP_STATE.masterReloadRecords = records;
+    APP_STATE.todayReloadTransactions = records.filter(record => record.date === getTodayDateString());
+    APP_STATE.todayReloadTransactions.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+    renderRecentReloadsFeed();
+    applyMasterLogFilters();
+    updateDashboardMetrics();
+  }, (err) => {
+    logDebug(`Reloads sync notice: ${err.message}`, 'WARN');
+  });
+
+  watch(doc(db, 'settings', 'rates'), (docSnap) => {
+    if (docSnap.exists()) {
+      APP_STATE.commissionRates = { ...APP_STATE.commissionRates, ...docSnap.data() };
+      const bA = document.getElementById('rateBadgeAirtel');
+      const bD = document.getElementById('rateBadgeDialog');
+      const bM = document.getElementById('rateBadgeMobitel');
+      const bH = document.getElementById('rateBadgeHutch');
+      if (bA) bA.textContent = `${(APP_STATE.commissionRates.AIRTEL || 6.8).toFixed(2)}%`;
+      if (bD) bD.textContent = `${(APP_STATE.commissionRates.DIALOG || 3.8).toFixed(2)}%`;
+      if (bM) bM.textContent = `${(APP_STATE.commissionRates.MOBITEL || 6.8).toFixed(2)}%`;
+      if (bH) bH.textContent = `${(APP_STATE.commissionRates.HUTCH || 5.0).toFixed(2)}%`;
+      updateReloadCommissionPreview();
+    }
+  });
+
+  watch(doc(db, 'settings', 'presets'), (docSnap) => {
+    if (docSnap.exists() && Array.isArray(docSnap.data()?.list)) {
+      APP_STATE.reloadPresets = docSnap.data().list;
+      renderPresetPills();
+    }
+  });
+
+  watch(doc(db, 'user_settings', user.uid), snapshot => {
+    if (!snapshot.exists()) return;
+    const preferences = snapshot.data();
+    const localKey = dashboardPreferenceKey(user.uid);
+    if (localKey) localStorage.setItem(localKey, JSON.stringify(preferences));
+    if (preferences.activeTheme) applyTheme(preferences.activeTheme);
+    if (typeof preferences.gradientBlurEnabled === 'boolean') setGradientBlurEnabled(preferences.gradientBlurEnabled);
+    if (preferences.dashboardOrder?.metrics && preferences.dashboardOrder?.actions) {
+      APP_STATE.dashboardOrder = preferences.dashboardOrder;
+      applyDashboardOrder(document.getElementById('dashboardGrid'), preferences.dashboardOrder.metrics);
+      applyDashboardOrder(document.getElementById('dashboardActionsGrid'), preferences.dashboardOrder.actions);
+    }
+    if (Array.isArray(preferences.hiddenDashboardCards)) {
+      applyHiddenDashboardCards(preferences.hiddenDashboardCards);
+    }
+  }, error => logDebug(`User preferences sync failed: ${error.message}`, 'ERROR'));
+
+  if (APP_STATE.currentRole === 'admin') {
+    watch(collection(db, 'users'), snapshot => {
+      APP_STATE.userProfiles = snapshot.docs.map(userDoc => ({ id: userDoc.id, ...userDoc.data() }));
+      updateProfileDisplay();
+    }, error => logDebug(`Account list sync failed: ${error.message}`, 'ERROR'));
+  } else {
+    APP_STATE.userProfiles = [];
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  logDebug('AL Communication System Initializing (V6.1 High-Contrast Modern Default UI)...', 'INFO');
+
+  initThemeSystem();
+  startLiveClock();
+  initNavigation();
+  initDashboardReordering();
+  initGlobalSearch();
+  initStationeryPOS();
+  initMobileReloads();
+  initStockInventory();
+  initMasterLogs();
+  initSettingsCatalog();
+  initSettingsPanels();
+  initBackupRestoreSystem();
+  initProfileControls();
+  initAuthentication();
+
+  logDebug('AL Communication System v6.1 Ready.', 'SUCCESS');
+});
