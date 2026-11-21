@@ -1,213 +1,43 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
+    
+    // Helper function to check if the user is authenticated
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwnerAccount() {
-      return signedIn() && request.auth.token.email == 'lasasdias11@gmail.com';
+    // 1. Teams Collection (White Tigers, Black Panthers, etc.)
+    match /teams/{teamId} {
+      allow read, write: if isSignedIn();
     }
 
-    function isAdmin() {
-      return isOwnerAccount() ||
-        (signedIn() &&
-          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    // 2. Matches Collection (Live scoring, scorecards, innings)
+    match /matches/{matchId} {
+      allow read, write: if isSignedIn();
     }
 
-    function nonNegative(value) {
-      return value is number && value >= 0;
+    // 3. Players Collection (Player profiles, tags, stats)
+    match /players/{playerId} {
+      allow read, write: if isSignedIn();
     }
 
-    function validUserProfile(data) {
-      return data.keys().hasOnly(['email', 'role', 'createdAt', 'updatedAt', 'lastLogin']) &&
-        data.email is string &&
-        data.role in ['admin', 'user'] &&
-        (!('createdAt' in data) || data.createdAt is timestamp) &&
-        (!('updatedAt' in data) || data.updatedAt is timestamp) &&
-        (!('lastLogin' in data) || data.lastLogin is timestamp);
+    // 4. Custom Teams Collection (Dynamic teams created in-app)
+    match /customTeams/{teamId} {
+      allow read, write: if isSignedIn();
     }
 
-    function validInventory(data) {
-      return data.keys().hasOnly([
-          'code', 'name', 'category', 'itemType', 'type', 'isServiceOrBill',
-          'sellingPrice', 'costPrice', 'stockQuantity', 'lowStockThreshold',
-          'prices', 'createdAt', 'updatedAt'
-        ]) &&
-        data.code is string && data.code.size() > 0 &&
-        data.name is string && data.name.size() > 0 &&
-        data.category is string &&
-        data.itemType in ['product', 'bill', 'service'] &&
-        (!('type' in data) || data.type is string) &&
-        (!('isServiceOrBill' in data) || data.isServiceOrBill is bool) &&
-        nonNegative(data.sellingPrice) &&
-        nonNegative(data.costPrice) &&
-        nonNegative(data.stockQuantity) &&
-        nonNegative(data.lowStockThreshold) &&
-        (!('prices' in data) || (data.prices is list && data.prices.size() <= 5));
+    // 5. Team Votes Collection (Captain elections, secret code changes)
+    match /teamVotes/{voteId} {
+      allow read, write: if isSignedIn();
     }
 
-    function validStationeryTransaction(data) {
-      return data.keys().hasOnly([
-          'date', 'time', 'createdBy', 'itemCode', 'itemName', 'inventoryId',
-          'category', 'itemType', 'type', 'isServiceOrBill', 'costPrice',
-          'sellingPrice', 'unitProfit', 'profit', 'quantity', 'totalAmount',
-          'priceTier', 'variantLabel', 'timestamp', 'updatedAt'
-        ]) &&
-        data.createdBy is string &&
-        data.itemCode is string &&
-        data.itemName is string &&
-        data.category is string &&
-        data.itemType in ['product', 'bill', 'service'] &&
-        (!('type' in data) || data.type is string) &&
-        (!('isServiceOrBill' in data) || data.isServiceOrBill is bool) &&
-        nonNegative(data.costPrice) &&
-        nonNegative(data.sellingPrice) &&
-        data.unitProfit is number &&
-        data.profit is number &&
-        data.quantity is number && data.quantity > 0 &&
-        nonNegative(data.totalAmount) &&
-        data.date is string &&
-        (!('priceTier' in data) || data.priceTier is string) &&
-        (!('variantLabel' in data) || data.variantLabel is string) &&
-        (!('time' in data) || data.time is string) &&
-        (!('inventoryId' in data) || data.inventoryId is string) &&
-        (!('timestamp' in data) || data.timestamp is timestamp) &&
-        (!('updatedAt' in data) || data.updatedAt is timestamp);
-    }
-
-    function validReloadTransaction(data) {
-      return data.keys().hasOnly([
-          'date', 'time', 'createdBy', 'operator', 'phone', 'amount',
-          'commissionRate', 'commissionAmount', 'timestamp', 'updatedAt'
-        ]) &&
-        data.createdBy is string &&
-        data.operator in ['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH'] &&
-        data.phone is string &&
-        nonNegative(data.amount) && data.amount > 0 &&
-        nonNegative(data.commissionRate) &&
-        nonNegative(data.commissionAmount) &&
-        data.date is string &&
-        (!('time' in data) || data.time is string) &&
-        (!('timestamp' in data) || data.timestamp is timestamp) &&
-        (!('updatedAt' in data) || data.updatedAt is timestamp);
-    }
-
+    // 6. Users Collection (Session metadata)
     match /users/{userId} {
-      allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
-      allow create: if (isAdmin() &&
-          validUserProfile(request.resource.data)) ||
-        (request.auth != null &&
-          request.auth.uid == userId &&
-          validUserProfile(request.resource.data) &&
-          request.resource.data.email == request.auth.token.email &&
-          request.resource.data.role == (isOwnerAccount() ? 'admin' : 'user'));
-      allow update: if isAdmin() && validUserProfile(request.resource.data) ||
-        (request.auth != null && request.auth.uid == userId &&
-          validUserProfile(request.resource.data) &&
-          (('role' in resource.data &&
-            request.resource.data.role == resource.data.role) ||
-           (!('role' in resource.data) &&
-            request.resource.data.role == (isOwnerAccount() ? 'admin' : 'user'))) &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['email', 'role', 'lastLogin', 'updatedAt']));
-      allow delete: if isAdmin() && userId != request.auth.uid;
+      allow read, write: if isSignedIn();
     }
 
-    match /inventory/{itemId} {
-      allow read: if signedIn();
-      allow create: if isAdmin() && validInventory(request.resource.data);
-      allow update: if isAdmin() && validInventory(request.resource.data) ||
-        (signedIn() &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['stockQuantity', 'updatedAt']) &&
-          nonNegative(request.resource.data.stockQuantity) &&
-          (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp));
-      allow delete: if isAdmin();
-    }
-
-    match /stationery_transactions/{transactionId} {
-      allow read: if signedIn() &&
-        (isAdmin() || resource.data.createdBy == request.auth.uid);
-      allow create: if signedIn() &&
-        request.resource.data.createdBy == request.auth.uid &&
-        validStationeryTransaction(request.resource.data);
-      allow update: if isAdmin() && validStationeryTransaction(request.resource.data);
-      allow delete: if signedIn() &&
-        (isAdmin() || resource.data.createdBy == request.auth.uid);
-    }
-
-    match /reload_transactions/{reloadId} {
-      allow read: if signedIn() &&
-        (isAdmin() || resource.data.createdBy == request.auth.uid);
-      allow create: if signedIn() &&
-        request.resource.data.createdBy == request.auth.uid &&
-        validReloadTransaction(request.resource.data);
-      allow update: if isAdmin() && validReloadTransaction(request.resource.data);
-      allow delete: if signedIn() &&
-        (isAdmin() || resource.data.createdBy == request.auth.uid);
-    }
-
-    match /settings/{settingDoc} {
-      allow read: if signedIn();
-      allow create, update: if isAdmin() &&
-        ((settingDoc == 'rates' &&
-          request.resource.data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH']) &&
-          nonNegative(request.resource.data.AIRTEL) &&
-          nonNegative(request.resource.data.DIALOG) &&
-          nonNegative(request.resource.data.MOBITEL) &&
-          nonNegative(request.resource.data.HUTCH)) ||
-         (settingDoc == 'presets' &&
-          request.resource.data.keys().hasOnly(['list']) &&
-          request.resource.data.list is list));
-      allow delete: if isAdmin();
-    }
-
-    match /user_settings/{userId} {
-      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
-      allow create, update: if signedIn() &&
-        request.auth.uid == userId &&
-        request.resource.data.keys().hasOnly([
-          'activeTheme', 'gradientBlurEnabled', 'dashboardOrder',
-          'hiddenDashboardCards', 'inventorySort', 'catalogSort',
-          'stockSortOrder', 'catalogSortOrder', 'updatedAt'
-        ]) &&
-        (!('activeTheme' in request.resource.data) ||
-          request.resource.data.activeTheme in ['modern-slate', 'emerald-store', 'sapphire-blue', 'warm-amber']) &&
-        (!('gradientBlurEnabled' in request.resource.data) ||
-          request.resource.data.gradientBlurEnabled is bool) &&
-        (!('dashboardOrder' in request.resource.data) ||
-          (request.resource.data.dashboardOrder is map &&
-           request.resource.data.dashboardOrder.keys().hasOnly(['metrics', 'actions']) &&
-           request.resource.data.dashboardOrder.metrics is list &&
-           request.resource.data.dashboardOrder.actions is list)) &&
-        (!('hiddenDashboardCards' in request.resource.data) ||
-          request.resource.data.hiddenDashboardCards is list) &&
-        (!('inventorySort' in request.resource.data) ||
-          request.resource.data.inventorySort is string) &&
-        (!('catalogSort' in request.resource.data) ||
-          request.resource.data.catalogSort is string) &&
-        (!('stockSortOrder' in request.resource.data) ||
-          request.resource.data.stockSortOrder is string) &&
-        (!('catalogSortOrder' in request.resource.data) ||
-          request.resource.data.catalogSortOrder is string) &&
-        (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
-      allow delete: if signedIn() && request.auth.uid == userId;
-    }
-
-    match /diagnostics/{diagId} {
-      allow read: if signedIn();
-      allow create: if signedIn() &&
-        request.resource.data.test is string &&
-        request.resource.data.timestamp is timestamp;
-    }
-
-    match /system_health/{healthDoc} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
-    }
-
+    // 7. Deny all other access by default
     match /{document=**} {
       allow read, write: if false;
     }
