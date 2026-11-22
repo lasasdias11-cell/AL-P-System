@@ -73,6 +73,7 @@ export const APP_STATE = {
   selectedCatalogItem: null,
   posSelectedTierName: null,
   posSelectedCostPrice: null,
+  posSelectedTierStock: null,
   selectedOperator: 'DIALOG',
   stockSortOrder: localStorage.getItem('al_stock_sort_order') || 'code-asc',
   catalogSortOrder: localStorage.getItem('al_catalog_sort_order') || 'code-asc',
@@ -302,8 +303,18 @@ async function removeTransaction(type, transactionRecord) {
         if (!Number.isFinite(quantity) || quantity <= 0) {
           throw new Error('The transaction has an invalid quantity; the transaction was not deleted.');
         }
+        const itemData = inventorySnapshot.data();
+        let updatedPrices = itemData.prices;
+        if (data.priceTier && Array.isArray(itemData.prices)) {
+          updatedPrices = itemData.prices.map(t =>
+            t.name === data.priceTier
+              ? { ...t, stockQuantity: (Number(t.stockQuantity) || 0) + quantity }
+              : t
+          );
+        }
         firestoreTransaction.update(inventoryRef, {
           stockQuantity: increment(quantity),
+          ...(updatedPrices ? { prices: updatedPrices } : {}),
           updatedAt: serverTimestamp()
         });
         restored = true;
@@ -1923,6 +1934,7 @@ function selectCatalogItemForPOS(item) {
     const firstTier = item.prices[0];
     APP_STATE.posSelectedTierName = firstTier.name;
     APP_STATE.posSelectedCostPrice = firstTier.costPrice;
+    APP_STATE.posSelectedTierStock = firstTier.stockQuantity !== undefined ? Number(firstTier.stockQuantity) || 0 : null;
     if (tierBadge) {
       tierBadge.textContent = `${firstTier.name} (${formatLKR(firstTier.sellingPrice)})`;
       tierBadge.classList.remove('hidden');
@@ -1935,6 +1947,7 @@ function selectCatalogItemForPOS(item) {
     const effectiveSelling = singleTier ? singleTier.sellingPrice : item.sellingPrice;
     APP_STATE.posSelectedTierName = singleTier ? singleTier.name : null;
     APP_STATE.posSelectedCostPrice = effectiveCost || 0;
+    APP_STATE.posSelectedTierStock = singleTier && singleTier.stockQuantity !== undefined ? Number(singleTier.stockQuantity) || 0 : null;
     if (tierBadge) {
       if (singleTier) {
         tierBadge.textContent = singleTier.name;
@@ -2010,6 +2023,7 @@ export function openPriceSelectorModal(item) {
     const marginClass = margin >= 0 ? 'text-sky-400' : 'text-red-400';
     const marginSign = margin >= 0 ? '+' : '';
     const isAdminViewer = APP_STATE.currentRole === 'admin';
+    const tierStock = tier.stockQuantity !== undefined ? Number(tier.stockQuantity) || 0 : null;
 
     card.innerHTML = `
       <div class="flex items-center justify-between mb-1.5">
@@ -2019,6 +2033,7 @@ export function openPriceSelectorModal(item) {
       <div class="text-lg font-mono font-bold text-emerald-400 mb-1">
         ${formatLKR(tier.sellingPrice)}
       </div>
+      ${tierStock !== null ? `<div class="text-[10px] text-sky-400 font-bold mt-1">Stock: ${tierStock}</div>` : ''}
       ${isAdminViewer ? `
       <div class="flex items-center justify-between text-[11px] theme-text-dim border-t theme-border pt-1.5 mt-1 font-mono">
         <span>Cost: <span class="text-amber-400 font-bold">${formatLKR(tier.costPrice)}</span></span>
@@ -2026,10 +2041,15 @@ export function openPriceSelectorModal(item) {
       </div>` : ''}
     `;
     card.setAttribute('aria-pressed', String(isSelected));
+    if (tierStock !== null && tierStock <= 0) {
+      card.disabled = true;
+      card.classList.add('opacity-50', 'cursor-not-allowed');
+    }
 
     card.addEventListener('click', () => {
       APP_STATE.posSelectedTierName = tier.name;
       APP_STATE.posSelectedCostPrice = tier.costPrice;
+      APP_STATE.posSelectedTierStock = tier.stockQuantity !== undefined ? Number(tier.stockQuantity) || 0 : null;
 
       const priceInput = document.getElementById('posSellingPrice');
       if (priceInput) {
@@ -2083,6 +2103,7 @@ function initStationeryPOS() {
         APP_STATE.selectedCatalogItem = null;
         APP_STATE.posSelectedTierName = null;
         APP_STATE.posSelectedCostPrice = null;
+        APP_STATE.posSelectedTierStock = null;
         const codeBadge = document.getElementById('posItemBadge');
         const stockBadge = document.getElementById('posStockStatusBadge');
         const tierBadge = document.getElementById('posSelectedTierBadge');
@@ -2188,6 +2209,7 @@ function initStationeryPOS() {
       const item = APP_STATE.selectedCatalogItem;
       APP_STATE.posSelectedTierName = null;
       APP_STATE.posSelectedCostPrice = item ? roundCurrency(item.costPrice || 0) : null;
+      APP_STATE.posSelectedTierStock = null;
       const priceField = document.getElementById('posSellingPrice');
       if (item && priceField) priceField.value = Number(item.sellingPrice || 0).toFixed(2);
       document.getElementById('posSelectedTierBadge')?.classList.add('hidden');
@@ -2248,9 +2270,13 @@ function initStationeryPOS() {
         return;
       }
 
-      if (!isService && matchedItem && Number(matchedItem.stockQuantity || 0) < quantity) {
-        showToast(`Insufficient stock for "${matchedItem.name}". Available: ${matchedItem.stockQuantity || 0}.`, 'error');
-        return;
+      if (!isService && matchedItem) {
+        const tierTracked = APP_STATE.posSelectedTierName && APP_STATE.posSelectedTierStock !== null && APP_STATE.posSelectedTierStock !== undefined;
+        const availableStock = tierTracked ? APP_STATE.posSelectedTierStock : Number(matchedItem.stockQuantity || 0);
+        if (availableStock < quantity) {
+          showToast(`Insufficient stock${tierTracked ? ' for this tier' : ''}. Available: ${availableStock}.`, 'error');
+          return;
+        }
       }
 
       const transactionPayload = {
@@ -2285,8 +2311,18 @@ function initStationeryPOS() {
             if (availableStock < quantity) {
               throw new Error(`Insufficient stock. Only ${availableStock} units are currently available.`);
             }
+            const itemData = inventorySnapshot.data();
+            let updatedPrices = itemData.prices;
+            if (APP_STATE.posSelectedTierName && Array.isArray(itemData.prices)) {
+              updatedPrices = itemData.prices.map(t =>
+                t.name === APP_STATE.posSelectedTierName
+                  ? { ...t, stockQuantity: Math.max(0, (Number(t.stockQuantity) || 0) - quantity) }
+                  : t
+              );
+            }
             firestoreTransaction.update(itemDocRef, {
               stockQuantity: increment(-quantity),
+              ...(updatedPrices ? { prices: updatedPrices } : {}),
               updatedAt: serverTimestamp()
             });
             firestoreTransaction.set(transactionRef, transactionPayload);
@@ -2307,6 +2343,7 @@ function initStationeryPOS() {
         APP_STATE.selectedCatalogItem = null;
         APP_STATE.posSelectedTierName = null;
         APP_STATE.posSelectedCostPrice = null;
+        APP_STATE.posSelectedTierStock = null;
         const codeBadge = document.getElementById('posItemBadge');
         const stockBadge = document.getElementById('posStockStatusBadge');
         const tierBadge = document.getElementById('posSelectedTierBadge');
@@ -2631,6 +2668,9 @@ function addCatalogPriceTierRow(tierData = { name: '', costPrice: '', sellingPri
     <div>
       <input type="number" step="0.01" min="0" placeholder="Selling [Rs.]" value="${tierData.sellingPrice !== undefined && tierData.sellingPrice !== '' ? Number(tierData.sellingPrice).toFixed(2) : ''}" class="form-input text-xs font-mono font-bold text-emerald-400 tier-selling-input" required>
     </div>
+    <div>
+      <input type="number" min="0" placeholder="Stock" value="${tierData.stockQuantity !== undefined ? tierData.stockQuantity : ''}" class="form-input text-xs font-mono tier-stock-input" required>
+    </div>
     <div class="tier-remove-col">
       <button type="button" class="tier-remove-btn min-h-9 px-2.5 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-xs font-bold transition font-rounded" title="Remove price tier">✕</button>
     </div>
@@ -2792,6 +2832,7 @@ function initSettingsCatalog() {
         const tName = row.querySelector('.tier-name-input')?.value.trim();
         const tCostRaw = row.querySelector('.tier-cost-input')?.value;
         const tSellingRaw = row.querySelector('.tier-selling-input')?.value;
+        const tStock = Math.max(0, parseInt(row.querySelector('.tier-stock-input')?.value, 10) || 0);
         const tCost = roundCurrency(tCostRaw || 0);
         const tSelling = roundCurrency(tSellingRaw || 0);
         if (!tName) {
@@ -2799,7 +2840,7 @@ function initSettingsCatalog() {
         } else if (tCostRaw === '' || tSellingRaw === '' || !Number.isFinite(tCost) || !Number.isFinite(tSelling) || tCost < 0 || tSelling < 0) {
           tierError = `Price tier "${tName}" needs valid non-negative selling and getting prices.`;
         } else {
-          tiersList.push({ name: tName, costPrice: tCost, sellingPrice: tSelling });
+          tiersList.push({ name: tName, costPrice: tCost, sellingPrice: tSelling, stockQuantity: tStock });
         }
       });
       if (tierError) {
@@ -2824,6 +2865,9 @@ function initSettingsCatalog() {
           itemPayload.prices = tiersList;
           itemPayload.sellingPrice = tiersList[0].sellingPrice;
           itemPayload.costPrice = tiersList[0].costPrice;
+          if (tiersList.length > 1) {
+            itemPayload.stockQuantity = tiersList.reduce((sum, t) => sum + (Number(t.stockQuantity) || 0), 0);
+          }
         }
 
         if (editDocId) {
