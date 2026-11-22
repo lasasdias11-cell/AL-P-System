@@ -2730,22 +2730,16 @@ function renderRecentReloadsFeed() {
 function syncCatalogItemTypeMode() {
   const checked = document.querySelector('input[name="catalogItemType"]:checked')?.value || 'product';
   const isTiered = checked === 'tiered';
-  const isService = checked === 'service';
-  const ids = ['catalogCodeField', 'catalogNameField', 'catalogCategoryField', 'catalogSellingPriceField', 'catalogCostPriceContainer', 'catalogStockQtyContainer', 'catalogThresholdContainer'];
-  ids.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.classList.toggle('hidden', isTiered);
-  });
-  const commonField = document.getElementById('catalogCommonNameField');
-  if (commonField) commonField.classList.toggle('hidden', !isTiered);
+  const stdFields = document.getElementById('catalogStandardFields');
+  const tieredFields = document.getElementById('catalogTieredFields');
+  if (stdFields) stdFields.classList.toggle('hidden', isTiered);
+  if (tieredFields) tieredFields.classList.toggle('hidden', !isTiered);
   const commonInput = document.getElementById('catalogCommonName');
   if (commonInput) commonInput.required = isTiered;
   ['catalogCode', 'catalogName', 'catalogCostPrice', 'catalogSellingPrice', 'catalogStockQuantity', 'catalogLowStockThreshold'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.required = !isTiered;
   });
-  const tiersSection = document.getElementById('catalogMultiPriceSection');
-  if (tiersSection) tiersSection.classList.toggle('hidden', !isTiered);
 }
 
 function addCatalogPriceTierRow(tierData = {}) {
