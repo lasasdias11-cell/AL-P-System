@@ -48,7 +48,15 @@ if (!localStorage.getItem('al_sort_v2')) {
   localStorage.setItem('al_sort_v2', '1');
 }
 
-export const APP_STATE = {
+export function debounce(fn, wait = 250) {
+  let timer = null;
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+
+const APP_STATE = {
   currentUser: null,
   currentRole: 'user',
   activeView: 'dashboard',
@@ -1288,10 +1296,10 @@ function initMasterLogs() {
 
   const searchInput = document.getElementById('logSearchFilter');
   if (searchInput) {
-    searchInput.addEventListener('input', () => {
+    searchInput.addEventListener('input', debounce(() => {
       APP_STATE.logSearchQuery = searchInput.value.trim().toLowerCase();
       applyMasterLogFilters();
-    });
+    }, 250));
   }
 
   const pdfBtn = document.getElementById('downloadPdfReportBtn');
@@ -1834,7 +1842,70 @@ export function renderStockTable() {
     return;
   }
 
+  const stockFragment = document.createDocumentFragment();
   items.forEach(item => {
+    if (item.itemType === 'tiered' && Array.isArray(item.prices) && item.prices.length > 0) {
+      const tiers = item.prices;
+      const totalStock = tiers.reduce((s, t) => s + (Number(t.stockQuantity) || 0), 0);
+      const prices = tiers.map(t => Number(t.sellingPrice) || 0);
+      const minSell = Math.min(...prices), maxSell = Math.max(...prices);
+      const priceLabel = minSell === maxSell ? formatLKR(minSell) : `${formatLKR(minSell)} - ${formatLKR(maxSell)}`;
+      const parentTr = document.createElement('tr');
+      parentTr.className = 'hover:theme-bg-subtle transition cursor-pointer';
+      parentTr.innerHTML = `
+        <td class="py-3 px-3 sm:px-4 font-mono font-bold text-xs theme-text-main"><span class="tier-chevron inline-block mr-1.5 transition-transform">&#9654;</span>${escapeHTML(item.code)}</td>
+        <td class="py-3 px-3 sm:px-4"><div class="font-bold text-xs theme-text-main">${escapeHTML(toTitleCase(item.name))}</div><div class="text-[11px] theme-text-dim">${escapeHTML(item.category || 'General')}</div></td>
+        <td class="py-3 px-3 sm:px-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">${tiers.length} Tiers</span></td>
+        <td class="py-3 px-3 sm:px-4 text-right font-mono font-bold text-xs theme-text-main currency-lkr">${priceLabel}</td>
+        <td class="py-3 px-3 sm:px-4 text-center"><span class="badge-stock-in px-2.5 py-1 rounded-full text-xs font-bold">${totalStock} in stock</span></td>
+        <td class="py-3 px-3 sm:px-4 text-center"></td>`;
+      const subRows = [];
+      tiers.forEach(tier => {
+        const subTr = document.createElement('tr');
+        subTr.className = 'tier-subrow hidden theme-bg-subtle/40';
+        const tStock = Number(tier.stockQuantity) || 0;
+        const tLow = Number(tier.lowStockThreshold) || (item.lowStockThreshold || 5);
+        const badge = tStock <= 0 ? '<span class="badge-stock-out px-2.5 py-1 rounded-full text-xs font-bold">Out of Stock (0)</span>'
+          : tStock <= tLow ? `<span class="badge-stock-low px-2.5 py-1 rounded-full text-xs font-bold">${tStock} Left (Low)</span>`
+          : `<span class="badge-stock-in px-2.5 py-1 rounded-full text-xs font-bold">${tStock} in stock</span>`;
+        subTr.innerHTML = `
+          <td class="py-2 px-3 sm:px-4 pl-8 font-mono font-bold text-[11px] theme-text-muted">${escapeHTML(tier.code || item.code)}</td>
+          <td class="py-2 px-3 sm:px-4"><div class="font-bold text-[11px] theme-text-main">${escapeHTML(toTitleCase(tier.itemName || tier.name || item.name))}</div><div class="text-[10px] theme-text-dim">Tier: ${escapeHTML(tier.name || 'Default')}</div></td>
+          <td class="py-2 px-3 sm:px-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">Tier</span></td>
+          <td class="py-2 px-3 sm:px-4 text-right font-mono font-bold text-[11px] theme-text-main currency-lkr">${formatLKR(tier.sellingPrice)}</td>
+          <td class="py-2 px-3 sm:px-4 text-center">${badge}</td>
+          <td class="py-2 px-3 sm:px-4 text-center"><button type="button" class="quick-pos-btn tier-pos-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-500/15 text-sky-400 hover:bg-sky-500 hover:text-white transition">Sell at POS</button></td>`;
+        const b = subTr.querySelector('.tier-pos-btn');
+        if (b) b.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          switchView('stationery');
+          selectCatalogItemForPOS({
+            ...item,
+            code: tier.code || item.code,
+            name: tier.itemName || tier.name || item.name,
+            itemType: 'tiered',
+            sellingPrice: tier.sellingPrice,
+            costPrice: tier.costPrice,
+            stockQuantity: tStock,
+            lowStockThreshold: tLow,
+            prices: [{ name: tier.name || 'Default', code: tier.code || item.code, itemName: tier.itemName || tier.name || item.name, costPrice: tier.costPrice, sellingPrice: tier.sellingPrice, stockQuantity: tStock, lowStockThreshold: tLow }]
+          });
+        });
+        subRows.push(subTr);
+      });
+      parentTr.addEventListener('click', () => {
+        const open = parentTr.dataset.open === 'true';
+        parentTr.dataset.open = String(!open);
+        const c = parentTr.querySelector('.tier-chevron');
+        if (c) c.style.transform = open ? '' : 'rotate(90deg)';
+        subRows.forEach(sr => sr.classList.toggle('hidden', open));
+      });
+      tbody.appendChild(parentTr);
+      subRows.forEach(sr => tbody.appendChild(sr));
+      return;
+    }
+
+    const isTieredLegacy = item.itemType === 'tiered';
     const tr = document.createElement('tr');
     tr.className = 'hover:theme-bg-subtle transition';
 
@@ -1842,7 +1913,9 @@ export function renderStockTable() {
 
     let typeCol = isService
       ? `<span class="badge-service-bill px-2 py-0.5 rounded text-[10px] font-bold">Service / Bill</span>`
-      : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">Physical</span>`;
+      : isTieredLegacy
+        ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">Tiered (Legacy)</span>`
+        : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">Physical</span>`;
 
     let stockCol = '';
     if (isService) {
@@ -1882,8 +1955,9 @@ export function renderStockTable() {
       });
     }
 
-    tbody.appendChild(tr);
+    stockFragment.appendChild(tr);
   });
+  tbody.appendChild(stockFragment);
 }
 
 function selectCatalogItemForPOS(item) {
@@ -2096,7 +2170,7 @@ function initStationeryPOS() {
       }
     });
 
-    itemInput.addEventListener('input', () => {
+    const posSearchHandler = debounce(() => {
       const q = itemInput.value.trim().toLowerCase();
       if (!q) {
         if (autocompleteList) autocompleteList.classList.add('hidden');
@@ -2149,7 +2223,8 @@ function initStationeryPOS() {
       } else if (autocompleteList) {
         autocompleteList.classList.add('hidden');
       }
-    });
+    }, 150);
+    itemInput.addEventListener('input', posSearchHandler);
   }
 
   const decBtn = document.getElementById('posQtyDecBtn');
@@ -2652,49 +2727,56 @@ function renderRecentReloadsFeed() {
   });
 }
 
-function addCatalogPriceTierRow(tierData = { name: '', costPrice: '', sellingPrice: '' }) {
+function syncCatalogItemTypeMode() {
+  const checked = document.querySelector('input[name="catalogItemType"]:checked')?.value || 'product';
+  const isTiered = checked === 'tiered';
+  const isService = checked === 'service';
+  const ids = ['catalogCodeField', 'catalogNameField', 'catalogCategoryField', 'catalogSellingPriceField', 'catalogCostPriceContainer', 'catalogStockQtyContainer', 'catalogThresholdContainer'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', isTiered);
+  });
+  const commonField = document.getElementById('catalogCommonNameField');
+  if (commonField) commonField.classList.toggle('hidden', !isTiered);
+  const commonInput = document.getElementById('catalogCommonName');
+  if (commonInput) commonInput.required = isTiered;
+  ['catalogCode', 'catalogName', 'catalogCostPrice', 'catalogSellingPrice', 'catalogStockQuantity', 'catalogLowStockThreshold'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.required = !isTiered;
+  });
+  const tiersSection = document.getElementById('catalogMultiPriceSection');
+  if (tiersSection) tiersSection.classList.toggle('hidden', !isTiered);
+}
+
+function addCatalogPriceTierRow(tierData = {}) {
   const container = document.getElementById('catalogPriceTiersList');
   if (!container) return;
-
   const row = document.createElement('div');
-  row.className = 'catalog-price-tier-row';
+  row.className = 'catalog-price-tier-row space-y-1.5 p-2 rounded-lg border theme-border theme-bg-subtle';
   row.innerHTML = `
-    <div>
-      <input type="text" placeholder="Tier Name (e.g. Wholesale, Bulk)" value="${escapeHTML(tierData.name || '')}" class="form-input text-xs font-rounded tier-name-input" required>
-    </div>
-    <div>
-      <input type="number" step="0.01" min="0" placeholder="Cost [Rs.]" value="${tierData.costPrice !== undefined && tierData.costPrice !== '' ? Number(tierData.costPrice).toFixed(2) : ''}" class="form-input text-xs font-mono font-bold text-amber-400 tier-cost-input" required>
-    </div>
-    <div>
-      <input type="number" step="0.01" min="0" placeholder="Selling [Rs.]" value="${tierData.sellingPrice !== undefined && tierData.sellingPrice !== '' ? Number(tierData.sellingPrice).toFixed(2) : ''}" class="form-input text-xs font-mono font-bold text-emerald-400 tier-selling-input" required>
-    </div>
-    <div>
-      <input type="number" min="0" placeholder="Stock" value="${tierData.stockQuantity !== undefined ? tierData.stockQuantity : ''}" class="form-input text-xs font-mono tier-stock-input" required>
-    </div>
-    <div class="tier-remove-col">
-      <button type="button" class="tier-remove-btn min-h-9 px-2.5 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-xs font-bold transition font-rounded" title="Remove price tier">✕</button>
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5">
+      <div><input type="text" placeholder="Tier Name" value="${escapeHTML(tierData.name || '')}" class="form-input text-xs font-rounded tier-name-input" required></div>
+      <div><input type="text" placeholder="Item Code" value="${escapeHTML(tierData.code || '')}" class="form-input text-xs font-mono tier-code-input"></div>
+      <div><input type="text" placeholder="Item Name" value="${escapeHTML(tierData.itemName || '')}" class="form-input text-xs font-rounded tier-itemname-input"></div>
+      <div><input type="number" step="0.01" min="0" placeholder="Cost [Rs.]" value="${tierData.costPrice !== undefined && tierData.costPrice !== '' ? Number(tierData.costPrice).toFixed(2) : ''}" class="form-input text-xs font-mono font-bold text-amber-400 tier-cost-input" required></div>
+      <div><input type="number" step="0.01" min="0" placeholder="Selling [Rs.]" value="${tierData.sellingPrice !== undefined && tierData.sellingPrice !== '' ? Number(tierData.sellingPrice).toFixed(2) : ''}" class="form-input text-xs font-mono font-bold text-emerald-400 tier-selling-input" required></div>
+      <div><input type="number" min="0" placeholder="Stock" value="${tierData.stockQuantity !== undefined ? tierData.stockQuantity : ''}" class="form-input text-xs font-mono tier-stock-input" required></div>
+      <div class="flex items-center gap-1">
+        <input type="number" min="0" placeholder="Low Stock" value="${tierData.lowStockThreshold !== undefined ? tierData.lowStockThreshold : ''}" class="form-input text-xs font-mono tier-lowstock-input flex-1">
+        <button type="button" class="tier-remove-btn min-h-9 px-2 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-xs font-bold transition font-rounded" title="Remove tier">✕</button>
+      </div>
     </div>
   `;
-
-  row.querySelector('.tier-remove-btn').addEventListener('click', () => {
-    row.remove();
-    updateCatalogTierRemoveButtons();
-  });
-
+  row.querySelector('.tier-remove-btn').addEventListener('click', () => { row.remove(); updateCatalogTierRemoveButtons(); });
   container.appendChild(row);
   updateCatalogTierRemoveButtons();
 }
 
 function updateCatalogTierRemoveButtons() {
   const rows = document.querySelectorAll('#catalogPriceTiersList .catalog-price-tier-row');
-  rows.forEach(tierRow => {
-    const btn = tierRow.querySelector('.tier-remove-btn');
-    if (!btn) return;
-    const isLast = rows.length <= 1;
-    btn.disabled = isLast;
-    btn.classList.toggle('opacity-40', isLast);
-    btn.classList.toggle('cursor-not-allowed', isLast);
-    btn.title = isLast ? 'At least one price tier is required' : 'Remove price tier';
+  rows.forEach(r => {
+    const btn = r.querySelector('.tier-remove-btn');
+    if (btn) btn.disabled = rows.length <= 1;
   });
 }
 
@@ -2714,7 +2796,6 @@ function initSettingsCatalog() {
   const searchInput = document.getElementById('catalogSearchInput');
   const sortSelect = document.getElementById('catalogSortSelect');
   const seedBtn = document.getElementById('seedCatalogBtn');
-  const addPriceTierBtn = document.getElementById('addPriceTierBtn');
 
   const stockQtyContainer = document.getElementById('catalogStockQtyContainer');
   const thresholdContainer = document.getElementById('catalogThresholdContainer');
@@ -2756,20 +2837,19 @@ function initSettingsCatalog() {
   }
 
   if (itemTypeRadios) {
-    itemTypeRadios.forEach(radio => radio.addEventListener('change', handleItemTypeChange));
+    itemTypeRadios.forEach(radio => radio.addEventListener('change', () => { handleItemTypeChange(); syncCatalogItemTypeMode(); }));
+    syncCatalogItemTypeMode();
   }
 
+  const addPriceTierBtn = document.getElementById('addPriceTierBtn');
   if (addPriceTierBtn) {
     addPriceTierBtn.addEventListener('click', () => {
-      const currentCost = costPriceInput ? costPriceInput.value : '';
-      const currentSelling = sellingPriceInput ? sellingPriceInput.value : '';
-      const existingCount = document.querySelectorAll('.catalog-price-tier-row').length;
-      if (existingCount >= 5) {
+      if (document.querySelectorAll('.catalog-price-tier-row').length >= 5) {
         showToast('Maximum of 5 price tiers per item.', 'error');
         return;
       }
-      const defaultName = existingCount === 0 ? 'Wholesale' : existingCount === 1 ? 'Special / Bulk' : `Tier ${existingCount + 1}`;
-      addCatalogPriceTierRow({ name: defaultName, costPrice: currentCost, sellingPrice: currentSelling });
+      const n = document.querySelectorAll('.catalog-price-tier-row').length;
+      addCatalogPriceTierRow({ name: n === 0 ? 'Default' : `Tier ${n + 1}` });
     });
   }
 
@@ -2785,8 +2865,7 @@ function initSettingsCatalog() {
     const productRadio = form.querySelector('input[name="catalogItemType"][value="product"]');
     if (productRadio) productRadio.checked = true;
     handleItemTypeChange();
-    const tiersContainer = document.getElementById('catalogPriceTiersList');
-    if (tiersContainer) tiersContainer.innerHTML = '';
+    syncCatalogItemTypeMode();
     if (formTitle) formTitle.textContent = 'Add New Catalog Item / Service';
     if (saveBtn) saveBtn.textContent = 'Save Item to Catalog';
     if (resetBtn) resetBtn.classList.add('hidden');
@@ -2801,18 +2880,29 @@ function initSettingsCatalog() {
         showToast('Only an admin can edit the master catalog.', 'error');
         return;
       }
-      const code = codeInput.value.trim().toUpperCase();
-      const rawName = nameInput.value.trim();
-      const name = toTitleCase(rawName);
-      const category = categoryInput ? categoryInput.value.trim() || 'General' : 'General';
-      const isService = form.querySelector('input[name="catalogItemType"]:checked')?.value === 'service';
-      const itemType = isService ? 'service' : 'product';
-
-      const costPrice = roundCurrency(costPriceInput.value);
-      const sellingPrice = roundCurrency(sellingPriceInput.value);
-      const stockQuantity = isService ? 0 : Math.max(0, parseInt(stockInput.value, 10) || 0);
-      const lowStockThreshold = isService ? 0 : Math.max(0, parseInt(thresholdInput.value, 10) || 5);
+      const itemTypeRaw = form.querySelector('input[name="catalogItemType"]:checked')?.value || 'product';
+      const isService = itemTypeRaw === 'service';
+      const isTiered = itemTypeRaw === 'tiered';
+      let code = codeInput.value.trim().toUpperCase();
+      let name = toTitleCase(nameInput.value.trim());
+      let category = categoryInput ? categoryInput.value.trim() || 'General' : 'General';
+      let itemType = isService ? 'service' : 'product';
+      let costPrice = roundCurrency(costPriceInput.value);
+      let sellingPrice = roundCurrency(sellingPriceInput.value);
+      let stockQuantity = isService ? 0 : Math.max(0, parseInt(stockInput.value, 10) || 0);
+      let lowStockThreshold = isService ? 0 : Math.max(0, parseInt(thresholdInput.value, 10) || 5);
       const editDocId = docIdInput.value;
+
+      if (isTiered) {
+        const commonName = toTitleCase((document.getElementById('catalogCommonName')?.value || '').trim());
+        if (!commonName) {
+          showToast('Please provide the Common Item Name for the tiered item.', 'error');
+          return;
+        }
+        name = commonName;
+        code = editDocId ? code : `T-${commonName.replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase() || 'ITEM'}-${Date.now().toString(36).toUpperCase()}`;
+        itemType = 'tiered';
+      }
 
       if (!code || !name) {
         showToast('Please provide both item code and name', 'error');
@@ -2826,30 +2916,31 @@ function initSettingsCatalog() {
       }
 
       const tiersList = [];
-      const tierRows = document.querySelectorAll('.catalog-price-tier-row');
       let tierError = '';
-      tierRows.forEach(row => {
+      document.querySelectorAll('.catalog-price-tier-row').forEach(row => {
         const tName = row.querySelector('.tier-name-input')?.value.trim();
+        const tCode = (row.querySelector('.tier-code-input')?.value || '').trim().toUpperCase();
+        const tItemName = toTitleCase((row.querySelector('.tier-itemname-input')?.value || '').trim());
         const tCostRaw = row.querySelector('.tier-cost-input')?.value;
         const tSellingRaw = row.querySelector('.tier-selling-input')?.value;
         const tStock = Math.max(0, parseInt(row.querySelector('.tier-stock-input')?.value, 10) || 0);
+        const tLowStock = Math.max(0, parseInt(row.querySelector('.tier-lowstock-input')?.value, 10) || 0);
         const tCost = roundCurrency(tCostRaw || 0);
         const tSelling = roundCurrency(tSellingRaw || 0);
         if (!tName) {
-          tierError = 'Every price tier needs a label (e.g. Retail, Wholesale).';
+          tierError = 'Every price tier needs a label.';
         } else if (tCostRaw === '' || tSellingRaw === '' || !Number.isFinite(tCost) || !Number.isFinite(tSelling) || tCost < 0 || tSelling < 0) {
-          tierError = `Price tier "${tName}" needs valid non-negative selling and getting prices.`;
+          tierError = `Price tier "${tName}" needs valid non-negative prices.`;
+        } else if (isTiered && (!tCode || !tItemName)) {
+          tierError = `Tier "${tName}" needs both an Item Code and Item Name.`;
         } else {
-          tiersList.push({ name: tName, costPrice: tCost, sellingPrice: tSelling, stockQuantity: tStock });
+          tiersList.push({ name: tName, code: tCode, itemName: tItemName, costPrice: tCost, sellingPrice: tSelling, stockQuantity: tStock, lowStockThreshold: tLowStock });
         }
       });
-      if (tierError) {
-        showToast(tierError, 'error');
-        return;
-      }
+      if (tierError) { showToast(tierError, 'error'); return; }
+      if (isTiered && tiersList.length === 0) { showToast('A Multi-Price Tiers item needs at least one tier.', 'error'); return; }
 
-      try {
-        const itemPayload = {
+      const itemPayload = {
           code,
           name,
           category,
@@ -2861,15 +2952,14 @@ function initSettingsCatalog() {
           updatedAt: serverTimestamp()
         };
 
-        if (tiersList.length > 0) {
-          itemPayload.prices = tiersList;
-          itemPayload.sellingPrice = tiersList[0].sellingPrice;
-          itemPayload.costPrice = tiersList[0].costPrice;
-          if (tiersList.length > 1) {
-            itemPayload.stockQuantity = tiersList.reduce((sum, t) => sum + (Number(t.stockQuantity) || 0), 0);
-          }
-        }
+      if (tiersList.length > 0) {
+        itemPayload.prices = tiersList;
+        itemPayload.sellingPrice = tiersList[0].sellingPrice;
+        itemPayload.costPrice = tiersList[0].costPrice;
+        itemPayload.stockQuantity = tiersList.reduce((sum, t) => sum + (Number(t.stockQuantity) || 0), 0);
+      }
 
+      try {
         if (editDocId) {
           await updateDoc(doc(db, 'inventory', editDocId), itemPayload);
           showToast(`Updated: ${name}`, 'success');
@@ -2885,7 +2975,7 @@ function initSettingsCatalog() {
     });
   }
 
-  if (searchInput) searchInput.addEventListener('input', renderCatalogTable);
+  if (searchInput) searchInput.addEventListener('input', debounce(renderCatalogTable, 250));
 
   if (sortSelect) {
     sortSelect.value = APP_STATE.catalogSortOrder;
@@ -2958,6 +3048,7 @@ export function renderCatalogTable() {
     return;
   }
 
+  const catalogFragment = document.createDocumentFragment();
   filtered.forEach(item => {
     const tr = document.createElement('tr');
     tr.className = 'hover:theme-bg-subtle transition';
@@ -3010,19 +3101,19 @@ export function renderCatalogTable() {
         document.getElementById('catalogStockQuantity').value = item.stockQuantity || 0;
         document.getElementById('catalogLowStockThreshold').value = item.lowStockThreshold || 5;
 
-        const tiersContainer = document.getElementById('catalogPriceTiersList');
-        if (tiersContainer) {
-          tiersContainer.innerHTML = '';
-          if (Array.isArray(item.prices) && item.prices.length > 0) {
-            item.prices.forEach(tier => addCatalogPriceTierRow(tier));
-          }
-        }
-
         const isServ = item.itemType === 'service';
-        const typeRadio = document.querySelector(`input[name="catalogItemType"][value="${isServ ? 'service' : 'product'}"]`);
+        const isTieredItem = item.itemType === 'tiered';
+        const typeRadio = document.querySelector(`input[name="catalogItemType"][value="${isTieredItem ? 'tiered' : (isServ ? 'service' : 'product')}"]`);
         if (typeRadio) {
           typeRadio.checked = true;
           typeRadio.dispatchEvent(new Event('change'));
+          const commonNameEl = document.getElementById('catalogCommonName');
+          if (commonNameEl) commonNameEl.value = isTieredItem ? (item.name || '') : '';
+          const tiersEl = document.getElementById('catalogPriceTiersList');
+          if (tiersEl) {
+            tiersEl.innerHTML = '';
+            if (Array.isArray(item.prices)) item.prices.forEach(t => addCatalogPriceTierRow(t));
+          }
         }
 
         document.getElementById('catalogFormTitle').textContent = `Edit Catalog Item: ${item.code}`;
@@ -3049,8 +3140,9 @@ export function renderCatalogTable() {
       });
     }
 
-    tbody.appendChild(tr);
+    catalogFragment.appendChild(tr);
   });
+  tbody.appendChild(catalogFragment);
 }
 
 function updateBackupStatusDisplay() {

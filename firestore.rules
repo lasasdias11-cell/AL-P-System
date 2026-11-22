@@ -38,7 +38,7 @@ service cloud.firestore {
         data.code is string && data.code.size() > 0 &&
         data.name is string && data.name.size() > 0 &&
         data.category is string &&
-        data.itemType in ['product', 'bill', 'service'] &&
+        data.itemType in ['product', 'bill', 'service', 'tiered'] &&
         (!('type' in data) || data.type is string) &&
         (!('isServiceOrBill' in data) || data.isServiceOrBill is bool) &&
         nonNegative(data.sellingPrice) &&
@@ -59,7 +59,7 @@ service cloud.firestore {
         data.itemCode is string &&
         data.itemName is string &&
         data.category is string &&
-        data.itemType in ['product', 'bill', 'service'] &&
+        data.itemType in ['product', 'bill', 'service', 'tiered'] &&
         (!('type' in data) || data.type is string) &&
         (!('isServiceOrBill' in data) || data.isServiceOrBill is bool) &&
         nonNegative(data.costPrice) &&
