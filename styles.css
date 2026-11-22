@@ -1775,3 +1775,36 @@ body { font-size: clamp(0.875rem, 1vw, 1rem); line-height: 1.5; }
 @media (prefers-reduced-motion: reduce) {
   .app-view:not(.hidden), .app-view:not(.hidden) > *, .modal-backdrop, .modal-content { animation: none; }
 }
+
+.pos-form-card {
+  position: relative;
+  z-index: 50;
+  overflow: visible !important;
+}
+
+.recent-feed-card {
+  position: relative;
+  z-index: 10;
+}
+#posAutocompleteList {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  margin-top: 4px;
+  z-index: 9999;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+
+.header-logo {
+    height: 36px;
+    width: auto;
+    object-fit: contain;
+    border-radius: 6px;
+}
+@media (max-width: 639px) {
+    .header-logo { height: 40px; }
+}
