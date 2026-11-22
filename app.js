@@ -849,9 +849,18 @@ function initGlobalSearch() {
       .slice(0, 5);
 
     const matchedCatalog = APP_STATE.inventoryCatalog.filter(item => {
-      return (item.code || '').toLowerCase().includes(q) ||
-             (item.name || '').toLowerCase().includes(q) ||
-             (item.category || '').toLowerCase().includes(q);
+      const parentMatch = (item.code || '').toLowerCase().includes(q) ||
+                          (item.name || '').toLowerCase().includes(q) ||
+                          (item.category || '').toLowerCase().includes(q);
+      if (parentMatch) return true;
+      if (item.itemType === 'tiered' && Array.isArray(item.prices)) {
+        return item.prices.some(tier =>
+          (tier.code || '').toLowerCase().includes(q) ||
+          (tier.itemName || '').toLowerCase().includes(q) ||
+          (tier.name || '').toLowerCase().includes(q)
+        );
+      }
+      return false;
     }).slice(0, 5);
 
     const combinedReloads = [...APP_STATE.todayReloadTransactions, ...APP_STATE.masterReloadRecords];
@@ -1811,10 +1820,19 @@ export function renderStockTable() {
   let items = APP_STATE.inventoryCatalog.filter(item => {
 
     if (queryStr) {
-      const match = (item.code || '').toLowerCase().includes(queryStr) ||
-                    (item.name || '').toLowerCase().includes(queryStr) ||
-                    (item.category || '').toLowerCase().includes(queryStr);
-      if (!match) return false;
+      const parentMatch = (item.code || '').toLowerCase().includes(queryStr) ||
+                          (item.name || '').toLowerCase().includes(queryStr) ||
+                          (item.category || '').toLowerCase().includes(queryStr);
+      if (parentMatch) { /* matched */ } else if (item.itemType === 'tiered' && Array.isArray(item.prices)) {
+        const tierMatch = item.prices.some(tier =>
+          (tier.code || '').toLowerCase().includes(queryStr) ||
+          (tier.itemName || '').toLowerCase().includes(queryStr) ||
+          (tier.name || '').toLowerCase().includes(queryStr)
+        );
+        if (!tierMatch) return false;
+      } else {
+        return false;
+      }
     }
 
     if (APP_STATE.stockFilter === 'LOW') {
@@ -2190,7 +2208,16 @@ function initStationeryPOS() {
       }
 
       const matches = APP_STATE.inventoryCatalog.filter(i => {
-        return (i.code || '').toLowerCase().includes(q) || (i.name || '').toLowerCase().includes(q);
+        const parentMatch = (i.code || '').toLowerCase().includes(q) || (i.name || '').toLowerCase().includes(q);
+        if (parentMatch) return true;
+        if (i.itemType === 'tiered' && Array.isArray(i.prices)) {
+          return i.prices.some(tier =>
+            (tier.code || '').toLowerCase().includes(q) ||
+            (tier.itemName || '').toLowerCase().includes(q) ||
+            (tier.name || '').toLowerCase().includes(q)
+          );
+        }
+        return false;
       }).slice(0, 6);
 
       if (matches.length > 0 && autocompleteList) {
