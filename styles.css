@@ -1356,23 +1356,29 @@ header.search-active .search-expand-box {
 
 .catalog-price-tier-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr auto;
-  gap: 0.5rem;
+  grid-template-columns: 1.5fr 1fr 2fr 1fr 1fr 0.8fr 0.8fr auto;
+  gap: 8px;
   align-items: center;
+  margin-bottom: 8px;
+  width: 100%;
   padding: 0.5rem;
   border-radius: 0.625rem;
   background-color: var(--surface-bg);
   border: 1px solid var(--border-color);
 }
 
-@media (max-width: 640px) {
+.catalog-price-tier-row input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
   .catalog-price-tier-row {
     grid-template-columns: 1fr 1fr;
   }
   .catalog-price-tier-row .tier-remove-col {
     grid-column: span 2;
-    display: flex;
-    justify-content: flex-end;
+    justify-self: end;
   }
 }
 

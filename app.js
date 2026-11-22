@@ -2748,18 +2748,14 @@ function addCatalogPriceTierRow(tierData = {}) {
   const row = document.createElement('div');
   row.className = 'catalog-price-tier-row space-y-1.5 p-2 rounded-lg border theme-border theme-bg-subtle';
   row.innerHTML = `
-    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5">
-      <div><input type="text" placeholder="Tier Name" value="${escapeHTML(tierData.name || '')}" class="form-input text-xs font-rounded tier-name-input" required></div>
-      <div><input type="text" placeholder="Item Code" value="${escapeHTML(tierData.code || '')}" class="form-input text-xs font-mono tier-code-input"></div>
-      <div><input type="text" placeholder="Item Name" value="${escapeHTML(tierData.itemName || '')}" class="form-input text-xs font-rounded tier-itemname-input"></div>
-      <div><input type="number" step="0.01" min="0" placeholder="Cost [Rs.]" value="${tierData.costPrice !== undefined && tierData.costPrice !== '' ? Number(tierData.costPrice).toFixed(2) : ''}" class="form-input text-xs font-mono font-bold text-amber-400 tier-cost-input" required></div>
-      <div><input type="number" step="0.01" min="0" placeholder="Selling [Rs.]" value="${tierData.sellingPrice !== undefined && tierData.sellingPrice !== '' ? Number(tierData.sellingPrice).toFixed(2) : ''}" class="form-input text-xs font-mono font-bold text-emerald-400 tier-selling-input" required></div>
-      <div><input type="number" min="0" placeholder="Stock" value="${tierData.stockQuantity !== undefined ? tierData.stockQuantity : ''}" class="form-input text-xs font-mono tier-stock-input" required></div>
-      <div class="flex items-center gap-1">
-        <input type="number" min="0" placeholder="Low Stock" value="${tierData.lowStockThreshold !== undefined ? tierData.lowStockThreshold : ''}" class="form-input text-xs font-mono tier-lowstock-input flex-1">
-        <button type="button" class="tier-remove-btn min-h-9 px-2 py-1 rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-xs font-bold transition font-rounded" title="Remove tier">✕</button>
-      </div>
-    </div>
+    <div><input type="text" placeholder="Tier Name" value="${escapeHTML(tierData.name || '')}" class="form-input text-xs font-rounded tier-name-input" required></div>
+    <div><input type="text" placeholder="Code" value="${escapeHTML(tierData.code || '')}" class="form-input text-xs font-mono tier-code-input"></div>
+    <div><input type="text" placeholder="Item Name" value="${escapeHTML(tierData.itemName || '')}" class="form-input text-xs font-rounded tier-itemname-input"></div>
+    <div><input type="number" step="0.01" min="0" placeholder="Cost" value="${tierData.costPrice !== undefined && tierData.costPrice !== '' ? Number(tierData.costPrice).toFixed(2) : ''}" class="form-input text-xs font-mono font-bold text-amber-400 tier-cost-input" required></div>
+    <div><input type="number" step="0.01" min="0" placeholder="Sell" value="${tierData.sellingPrice !== undefined && tierData.sellingPrice !== '' ? Number(tierData.sellingPrice).toFixed(2) : ''}" class="form-input text-xs font-mono font-bold text-emerald-400 tier-selling-input" required></div>
+    <div><input type="number" min="0" placeholder="Qty" value="${tierData.stockQuantity !== undefined ? tierData.stockQuantity : ''}" class="form-input text-xs font-mono tier-stock-input" required></div>
+    <div><input type="number" min="0" placeholder="Low" value="${tierData.lowStockThreshold !== undefined ? tierData.lowStockThreshold : ''}" class="form-input text-xs font-mono tier-lowstock-input"></div>
+    <div class="tier-remove-col"><button type="button" class="tier-remove-btn rounded bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-white text-xs font-bold transition font-rounded" style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;" title="Remove tier">&#10005;</button></div>
   `;
   row.querySelector('.tier-remove-btn').addEventListener('click', () => { row.remove(); updateCatalogTierRemoveButtons(); });
   container.appendChild(row);
