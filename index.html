@@ -995,6 +995,14 @@
             </div>
 
           </div>
+
+          <div id="reloadBalancesCard" class="log-paired-card border theme-border cursor-pointer hover:theme-bg-elevated transition" role="button" tabindex="0" aria-label="View reload app balances">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider theme-text-muted font-rounded">Reload App Balances</span>
+              <span class="text-[10px] theme-text-dim">Click to view details and update</span>
+            </div>
+            <div id="reloadBalancesGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+          </div>
         </div>
 
         <div class="p-4 sm:p-5 rounded-2xl theme-bg-surface theme-border border theme-shadow space-y-3">
@@ -1848,6 +1856,22 @@
         <button type="button" id="deleteConfirmCancelBtn" class="flex-1 min-h-11 px-4 py-2.5 rounded-xl border theme-border theme-text-main font-semibold">Cancel</button>
         <button type="button" id="deleteConfirmOkBtn" class="flex-1 min-h-11 px-4 py-2.5 rounded-xl bg-red-500 text-white font-bold">Delete</button>
       </div>
+    </div>
+  </div>
+
+  <div id="reloadBalancesModal" class="hidden fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="reloadBalancesTitle">
+    <div class="modal-content w-full max-w-md rounded-t-2xl sm:rounded-2xl theme-bg-surface theme-border border theme-shadow p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 id="reloadBalancesTitle" class="text-base font-bold theme-text-main font-rounded">Reload App Balances</h3>
+          <p class="text-[11px] theme-text-dim">Deducted by cost (Amount - Commission) on each reload.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" id="reloadBalancesEditBtn" class="min-h-9 px-3 py-1.5 rounded-lg text-xs font-bold border theme-border theme-text-main hover:theme-bg-elevated transition">Edit</button>
+          <button type="button" id="reloadBalancesCloseBtn" class="min-h-9 min-w-9 rounded-lg text-theme-text-dim hover:theme-text-main hover:theme-bg-elevated transition text-lg leading-none" aria-label="Close">&#10005;</button>
+        </div>
+      </div>
+      <div id="reloadBalancesModalBody" class="grid grid-cols-2 gap-2"></div>
     </div>
   </div>
 
