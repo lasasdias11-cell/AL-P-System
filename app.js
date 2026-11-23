@@ -332,6 +332,21 @@ async function removeTransaction(type, transactionRecord) {
       }
     }
 
+    if (type === 'RELOAD') {
+      const operator = String(data.operator || '').toUpperCase();
+      if (['DIALOG', 'MOBITEL', 'AIRTEL', 'HUTCH'].includes(operator)) {
+        const balRef = doc(db, 'settings', 'reload_app_balances');
+        const balSnap = await firestoreTransaction.get(balRef);
+        const currentBalance = balSnap.exists() ? (Number(balSnap.data()?.[operator]) || 0) : 0;
+        const storedCost = Number(data.cost);
+        const costToRestore = Number.isFinite(storedCost) && storedCost > 0
+          ? storedCost
+          : Math.max(0, Number(((Number(data.amount || data.totalAmount || 0)) - (Number(data.commissionAmount ?? data.commission ?? data.profit ?? 0))).toFixed(2)));
+        const restoredBalance = Number((currentBalance + costToRestore).toFixed(2));
+        firestoreTransaction.set(balRef, { [operator]: restoredBalance, updatedAt: serverTimestamp() }, { merge: true });
+      }
+    }
+
     firestoreTransaction.delete(transactionRef);
     return restored;
   });
