@@ -80,7 +80,8 @@ service cloud.firestore {
     function validReloadTransaction(data) {
       return data.keys().hasOnly([
           'date', 'time', 'createdBy', 'operator', 'phone', 'amount',
-          'commissionRate', 'commissionAmount', 'timestamp', 'updatedAt'
+          'commissionRate', 'commissionAmount', 'profit', 'cost',
+          'timestamp', 'updatedAt'
         ]) &&
         data.createdBy is string &&
         data.operator in ['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH'] &&
@@ -88,6 +89,8 @@ service cloud.firestore {
         nonNegative(data.amount) && data.amount > 0 &&
         nonNegative(data.commissionRate) &&
         nonNegative(data.commissionAmount) &&
+        (!('profit' in data) || nonNegative(data.profit)) &&
+        (!('cost' in data) || nonNegative(data.cost)) &&
         data.date is string &&
         (!('time' in data) || data.time is string) &&
         (!('timestamp' in data) || data.timestamp is timestamp) &&
@@ -153,7 +156,8 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create, update: if isAdmin() &&
         ((settingDoc == 'rates' &&
-          request.resource.data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH']) &&
+          request.resource.data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH', 'updatedAt']) &&
+          (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp) &&
           nonNegative(request.resource.data.AIRTEL) &&
           nonNegative(request.resource.data.DIALOG) &&
           nonNegative(request.resource.data.MOBITEL) &&
@@ -162,14 +166,16 @@ service cloud.firestore {
           request.resource.data.keys().hasOnly(['list']) &&
           request.resource.data.list is list) ||
          (settingDoc == 'reload_app_balances' &&
-          request.resource.data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH']) &&
+          request.resource.data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH', 'updatedAt']) &&
+          (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp) &&
           nonNegative(request.resource.data.AIRTEL) &&
           nonNegative(request.resource.data.DIALOG) &&
           nonNegative(request.resource.data.MOBITEL) &&
           nonNegative(request.resource.data.HUTCH)));
       allow create: if settingDoc == 'reload_app_balances' &&
         signedIn() &&
-        request.resource.data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH']) &&
+        request.resource.data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH', 'updatedAt']) &&
+        (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp) &&
         nonNegative(request.resource.data.AIRTEL) &&
         nonNegative(request.resource.data.DIALOG) &&
         nonNegative(request.resource.data.MOBITEL) &&
@@ -177,7 +183,8 @@ service cloud.firestore {
       allow update: if settingDoc == 'reload_app_balances' &&
         signedIn() &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH']) &&
+          .hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH', 'updatedAt']) &&
+        (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp) &&
         (!('AIRTEL' in request.resource.data) || nonNegative(request.resource.data.AIRTEL)) &&
         (!('DIALOG' in request.resource.data) || nonNegative(request.resource.data.DIALOG)) &&
         (!('MOBITEL' in request.resource.data) || nonNegative(request.resource.data.MOBITEL)) &&

@@ -2669,7 +2669,11 @@ function initMobileReloads() {
       e.preventDefault();
       const phone = phoneInput ? phoneInput.value.trim() : '';
       const amount = roundCurrency(amountInput ? amountInput.value : 0);
-      const operator = APP_STATE.selectedOperator;
+      const operator = String(APP_STATE.selectedOperator || 'DIALOG').toUpperCase();
+      if (!['DIALOG', 'MOBITEL', 'AIRTEL', 'HUTCH'].includes(operator)) {
+        showToast('Please select a valid network operator.', 'error');
+        return;
+      }
       const rate = APP_STATE.commissionRates[operator] || 0;
       const commissionAmount = roundCurrency((amount * rate) / 100);
 
@@ -2678,6 +2682,7 @@ function initMobileReloads() {
         return;
       }
 
+      const cost = Math.max(0, roundCurrency(amount - commissionAmount));
       const payload = {
         date: getTodayDateString(),
         time: getCurrentTimeString(),
@@ -2687,18 +2692,22 @@ function initMobileReloads() {
         amount,
         commissionRate: rate,
         commissionAmount,
+        profit: commissionAmount,
+        cost,
         timestamp: serverTimestamp()
       };
 
-      const cost = roundCurrency(amount - commissionAmount);
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
       try {
         await runTransaction(db, async (firestoreTransaction) => {
           const balRef = doc(db, 'settings', 'reload_app_balances');
+          const txRef = doc(collection(db, 'reload_transactions'));
           const balSnap = await firestoreTransaction.get(balRef);
-          const balances = { DIALOG: 0, MOBITEL: 0, AIRTEL: 0, HUTCH: 0, ...(balSnap.exists() ? balSnap.data() : {}) };
-          balances[operator] = roundCurrency((Number(balances[operator]) || 0) - cost);
-          firestoreTransaction.set(balRef, balances, { merge: true });
-          firestoreTransaction.set(doc(collection(db, 'reload_transactions')), payload);
+          const currentBalance = balSnap.exists() ? (Number(balSnap.data()?.[operator]) || 0) : 0;
+          const updatedBalance = roundCurrency(currentBalance - cost);
+          firestoreTransaction.set(balRef, { [operator]: updatedBalance, updatedAt: serverTimestamp() }, { merge: true });
+          firestoreTransaction.set(txRef, payload);
         });
         showToast(`Recorded ${operator} reload of ${formatLKR(amount)} (${formatSignedLKR(commissionAmount)} commission)`, 'success');
         form.reset();
@@ -2708,6 +2717,8 @@ function initMobileReloads() {
       } catch (err) {
         logDebug(`Error recording reload: ${err.message}`, 'ERROR');
         showToast(`Failed to log reload: ${err.message}`, 'error');
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
       }
     });
   }
