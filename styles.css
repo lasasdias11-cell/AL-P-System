@@ -1814,3 +1814,18 @@ body { font-size: clamp(0.875rem, 1vw, 1rem); line-height: 1.5; }
 @media (max-width: 639px) {
     .header-logo { height: 40px; }
 }
+
+
+#mainHeader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 50;
+  transform: translateZ(0);
+}
+
+#appShell {
+  padding-top: 4.25rem;
+}

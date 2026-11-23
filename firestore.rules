@@ -167,6 +167,13 @@ service cloud.firestore {
           nonNegative(request.resource.data.DIALOG) &&
           nonNegative(request.resource.data.MOBITEL) &&
           nonNegative(request.resource.data.HUTCH)));
+      allow create: if settingDoc == 'reload_app_balances' &&
+        signedIn() &&
+        request.resource.data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH']) &&
+        nonNegative(request.resource.data.AIRTEL) &&
+        nonNegative(request.resource.data.DIALOG) &&
+        nonNegative(request.resource.data.MOBITEL) &&
+        nonNegative(request.resource.data.HUTCH);
       allow update: if settingDoc == 'reload_app_balances' &&
         signedIn() &&
         request.resource.data.diff(resource.data).affectedKeys()
