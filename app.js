@@ -83,7 +83,6 @@ const APP_STATE = {
   posSelectedCostPrice: null,
   posSelectedTierStock: null,
   selectedOperator: 'DIALOG',
-  reloadAppBalances: { DIALOG: 0, MOBITEL: 0, AIRTEL: 0, HUTCH: 0 },
   stockSortOrder: localStorage.getItem('al_stock_sort_order') || 'code-asc',
   catalogSortOrder: localStorage.getItem('al_catalog_sort_order') || 'code-asc',
   stockFilter: 'ALL',
@@ -329,21 +328,6 @@ async function removeTransaction(type, transactionRecord) {
         restored = true;
       } else if (data.inventoryId) {
         throw new Error('The original inventory item is missing; the transaction was not deleted.');
-      }
-    }
-
-    if (type === 'RELOAD') {
-      const operator = String(data.operator || '').toUpperCase();
-      if (['DIALOG', 'MOBITEL', 'AIRTEL', 'HUTCH'].includes(operator)) {
-        const balRef = doc(db, 'settings', 'reload_app_balances');
-        const balSnap = await firestoreTransaction.get(balRef);
-        const currentBalance = balSnap.exists() ? (Number(balSnap.data()?.[operator]) || 0) : 0;
-        const storedCost = Number(data.cost);
-        const costToRestore = Number.isFinite(storedCost) && storedCost > 0
-          ? storedCost
-          : Math.max(0, Number(((Number(data.amount || data.totalAmount || 0)) - (Number(data.commissionAmount ?? data.commission ?? data.profit ?? 0))).toFixed(2)));
-        const restoredBalance = Number((currentBalance + costToRestore).toFixed(2));
-        firestoreTransaction.set(balRef, { [operator]: restoredBalance, updatedAt: serverTimestamp() }, { merge: true });
       }
     }
 
@@ -2697,7 +2681,6 @@ function initMobileReloads() {
         return;
       }
 
-      const cost = Math.max(0, roundCurrency(amount - commissionAmount));
       const payload = {
         date: getTodayDateString(),
         time: getCurrentTimeString(),
@@ -2707,23 +2690,11 @@ function initMobileReloads() {
         amount,
         commissionRate: rate,
         commissionAmount,
-        profit: commissionAmount,
-        cost,
         timestamp: serverTimestamp()
       };
 
-      const submitBtn = form.querySelector('button[type="submit"]');
-      if (submitBtn) submitBtn.disabled = true;
       try {
-        await runTransaction(db, async (firestoreTransaction) => {
-          const balRef = doc(db, 'settings', 'reload_app_balances');
-          const txRef = doc(collection(db, 'reload_transactions'));
-          const balSnap = await firestoreTransaction.get(balRef);
-          const currentBalance = balSnap.exists() ? (Number(balSnap.data()?.[operator]) || 0) : 0;
-          const updatedBalance = roundCurrency(currentBalance - cost);
-          firestoreTransaction.set(balRef, { [operator]: updatedBalance, updatedAt: serverTimestamp() }, { merge: true });
-          firestoreTransaction.set(txRef, payload);
-        });
+        await addDoc(collection(db, 'reload_transactions'), payload);
         showToast(`Recorded ${operator} reload of ${formatLKR(amount)} (${formatSignedLKR(commissionAmount)} commission)`, 'success');
         form.reset();
         if (detectedBadge) detectedBadge.classList.add('hidden');
@@ -2732,79 +2703,9 @@ function initMobileReloads() {
       } catch (err) {
         logDebug(`Error recording reload: ${err.message}`, 'ERROR');
         showToast(`Failed to log reload: ${err.message}`, 'error');
-      } finally {
-        if (submitBtn) submitBtn.disabled = false;
       }
     });
   }
-}
-
-let isReloadBalancesEditing = false;
-const RELOAD_PROVIDERS = ['DIALOG', 'MOBITEL', 'AIRTEL', 'HUTCH'];
-
-function renderReloadBalancesGrid(container, editable) {
-  if (!container) return;
-  container.innerHTML = '';
-  RELOAD_PROVIDERS.forEach(op => {
-    const bal = Number(APP_STATE.reloadAppBalances[op]) || 0;
-    const cell = document.createElement('div');
-    cell.className = 'p-2.5 rounded-xl theme-bg-subtle border theme-border text-center';
-    if (editable) {
-      cell.innerHTML = `
-        <div class="text-[10px] font-bold uppercase tracking-wider theme-text-muted mb-1">${op}</div>
-        <input type="number" step="0.01" min="0" value="${bal}" data-balance-op="${op}" class="form-input text-xs font-mono font-bold text-center w-full">
-      `;
-    } else {
-      cell.innerHTML = `
-        <div class="text-[10px] font-bold uppercase tracking-wider theme-text-muted">${op}</div>
-        <div class="text-sm font-extrabold font-mono mt-0.5 ${bal < 0 ? 'text-red-400' : 'theme-text-main'} currency-lkr">${formatLKR(bal)}</div>
-      `;
-    }
-    container.appendChild(cell);
-  });
-}
-
-function initReloadBalancesUI() {
-  const card = document.getElementById('reloadBalancesCard');
-  const modal = document.getElementById('reloadBalancesModal');
-  const editBtn = document.getElementById('reloadBalancesEditBtn');
-  const closeBtn = document.getElementById('reloadBalancesCloseBtn');
-  if (!card || !modal) return;
-
-  const openModal = () => { modal.classList.remove('hidden'); renderReloadBalancesGrid(document.getElementById('reloadBalancesModalBody'), isReloadBalancesEditing); };
-  const closeModal = () => { modal.classList.add('hidden'); isReloadBalancesEditing = false; if (editBtn) editBtn.textContent = 'Edit'; renderReloadBalancesGrid(document.getElementById('reloadBalancesModalBody'), false); };
-
-  card.addEventListener('click', openModal);
-  card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openModal(); } });
-  closeBtn?.addEventListener('click', closeModal);
-  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-
-  editBtn?.addEventListener('click', async () => {
-    if (!isReloadBalancesEditing) {
-      isReloadBalancesEditing = true;
-      editBtn.textContent = 'Save';
-      renderReloadBalancesGrid(document.getElementById('reloadBalancesModalBody'), true);
-      return;
-    }
-    const inputs = modal.querySelectorAll('input[data-balance-op]');
-    const updated = {};
-    let valid = true;
-    inputs.forEach(inp => {
-      const v = roundCurrency(inp.value);
-      if (!Number.isFinite(v) || v < 0) { valid = false; inp.classList.add('border-red-500'); }
-      else { inp.classList.remove('border-red-500'); updated[inp.dataset.balanceOp] = v; }
-    });
-    if (!valid) { showToast('Enter valid non-negative balances.', 'error'); return; }
-    try {
-      await setDoc(doc(db, 'settings', 'reload_app_balances'), updated, { merge: true });
-      isReloadBalancesEditing = false;
-      editBtn.textContent = 'Edit';
-      renderReloadBalancesGrid(document.getElementById('reloadBalancesModalBody'), false);
-      showToast('Reload app balances updated', 'success');
-    } catch (err) {
-      showToast(`Failed to update balances: ${err.message}`, 'error');
-    }
-  });
 }
 
 function renderRecentReloadsFeed() {
@@ -4599,14 +4500,6 @@ function initCloudSyncListeners() {
     }
   });
 
-  watch(doc(db, 'settings', 'reload_app_balances'), (docSnap) => {
-    if (docSnap.exists()) {
-      APP_STATE.reloadAppBalances = { DIALOG: 0, MOBITEL: 0, AIRTEL: 0, HUTCH: 0, ...docSnap.data() };
-    }
-    renderReloadBalancesGrid(document.getElementById('reloadBalancesGrid'), false);
-    renderReloadBalancesGrid(document.getElementById('reloadBalancesModalBody'), isReloadBalancesEditing);
-  });
-  initReloadBalancesUI();
 
   watch(doc(db, 'user_settings', user.uid), snapshot => {
     if (!snapshot.exists()) return;

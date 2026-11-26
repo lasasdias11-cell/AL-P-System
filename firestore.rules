@@ -164,31 +164,7 @@ service cloud.firestore {
           nonNegative(request.resource.data.HUTCH)) ||
          (settingDoc == 'presets' &&
           request.resource.data.keys().hasOnly(['list']) &&
-          request.resource.data.list is list) ||
-         (settingDoc == 'reload_app_balances' &&
-          request.resource.data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH', 'updatedAt']) &&
-          (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp) &&
-          nonNegative(request.resource.data.AIRTEL) &&
-          nonNegative(request.resource.data.DIALOG) &&
-          nonNegative(request.resource.data.MOBITEL) &&
-          nonNegative(request.resource.data.HUTCH)));
-      allow create: if settingDoc == 'reload_app_balances' &&
-        signedIn() &&
-        request.resource.data.keys().hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH', 'updatedAt']) &&
-        (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp) &&
-        nonNegative(request.resource.data.AIRTEL) &&
-        nonNegative(request.resource.data.DIALOG) &&
-        nonNegative(request.resource.data.MOBITEL) &&
-        nonNegative(request.resource.data.HUTCH);
-      allow update: if settingDoc == 'reload_app_balances' &&
-        signedIn() &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['AIRTEL', 'DIALOG', 'MOBITEL', 'HUTCH', 'updatedAt']) &&
-        (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp) &&
-        (!('AIRTEL' in request.resource.data) || nonNegative(request.resource.data.AIRTEL)) &&
-        (!('DIALOG' in request.resource.data) || nonNegative(request.resource.data.DIALOG)) &&
-        (!('MOBITEL' in request.resource.data) || nonNegative(request.resource.data.MOBITEL)) &&
-        (!('HUTCH' in request.resource.data) || nonNegative(request.resource.data.HUTCH));
+          request.resource.data.list is list));
       allow delete: if isAdmin();
     }
 
