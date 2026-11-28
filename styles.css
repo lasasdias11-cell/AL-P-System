@@ -1644,9 +1644,15 @@ nav.fixed.bottom-0::-webkit-scrollbar { display: none; }
 
 body.light-theme .glass,
 body.light-theme .dash-card,
-body.light-theme .modal-content {
-  background: linear-gradient(135deg, rgba(255,255,255,0.55), rgba(255,255,255,0.35));
-  box-shadow: 0 12px 32px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.5);
+body.light-theme .modal-content,
+[data-theme="emerald-store"] .glass,
+[data-theme="emerald-store"] .dash-card,
+[data-theme="emerald-store"] .modal-content {
+  background: linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,255,255,0.58));
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(15,23,42,0.12);
+  box-shadow: 0 12px 32px rgba(15,23,42,0.10), inset 0 1px 0 rgba(255,255,255,0.9);
 }
 
 @supports not (backdrop-filter: blur(1px)) {
@@ -1854,4 +1860,13 @@ body.light-theme .preset-pill.active *,
 body.light-theme .op-select-btn *,
 body.light-theme .theme-choice-card * {
   color: inherit;
+}
+
+
+[data-theme="emerald-store"] #mainHeader.theme-header,
+body.light-theme #mainHeader.theme-header {
+  background: rgba(255,255,255,0.72);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  border-bottom: 1px solid rgba(15,23,42,0.10);
 }
