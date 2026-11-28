@@ -51,6 +51,13 @@
   --z-modal: 60;
   --z-toast: 70;
   --accent-glow: rgba(96, 165, 250, 0.35);
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --card-bg: var(--bg-surface);
+  --card-hover-bg: var(--bg-surface-elevated);
+  --surface-bg: var(--bg-surface-subtle);
 }
 
 [data-theme="emerald-store"], body.light-theme {
@@ -151,6 +158,7 @@ body {
   color: var(--text-main);
   line-height: 1.5;
   min-height: 100vh;
+  min-height: 100dvh;
   font-family: var(--font-base);
   width: 100%;
   overflow-x: hidden;
@@ -161,6 +169,20 @@ main,
 .header-inner {
   min-width: 0;
   max-width: 100%;
+}
+
+#appShell > main {
+  padding-bottom: calc(1rem + var(--sab));
+  padding-left: max(0.75rem, var(--sal));
+  padding-right: max(0.75rem, var(--sar));
+}
+
+@media (min-width: 640px) {
+  #appShell > main {
+    padding-bottom: calc(1.5rem + var(--sab));
+    padding-left: max(1.5rem, var(--sal));
+    padding-right: max(1.5rem, var(--sar));
+  }
 }
 
 button {
@@ -290,10 +312,10 @@ header.sticky {
 
 .mobile-menu-drawer {
   position: fixed;
-  top: 4.25rem;
-  right: max(0.75rem, env(safe-area-inset-right));
+  top: calc(4.25rem + var(--sat));
+  right: max(0.75rem, var(--sar));
   z-index: 60;
-  width: min(19rem, calc(100vw - 1.5rem));
+  width: min(19rem, calc(100vw - 1.5rem - var(--sal) - var(--sar)));
 }
 
 .mobile-menu-panel {
@@ -449,9 +471,9 @@ header.search-active .search-expand-box {
 @media (max-width: 640px) {
   .global-search-results {
     position: fixed;
-    top: 4.5rem;
-    left: 0.75rem;
-    right: 0.75rem;
+    top: calc(4.5rem + var(--sat));
+    left: max(0.75rem, var(--sal));
+    right: max(0.75rem, var(--sar));
     width: auto;
     max-width: none;
     min-width: 0;
@@ -800,14 +822,14 @@ header.search-active .search-expand-box {
 @media (max-width: 639px) {
   .modal-backdrop {
     align-items: stretch;
-    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) !important;
+    padding: var(--sat) var(--sar) var(--sab) var(--sal) !important;
     overflow-y: auto;
   }
 
   .modal-content {
     width: 100%;
     max-width: none;
-    min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    min-height: calc(100dvh - var(--sat) - var(--sab));
     border-radius: 0;
   }
 
@@ -1149,7 +1171,15 @@ header.search-active .search-expand-box {
 }
 
 .safe-bottom {
-  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  padding-bottom: max(0.5rem, var(--sab));
+  padding-left: max(0.5rem, var(--sal));
+  padding-right: max(0.5rem, var(--sar));
+}
+
+@media (max-width: 1279px) {
+  body.theme-bg-app {
+    padding-bottom: calc(5.75rem + var(--sab));
+  }
 }
 
 .autocomplete-container {
@@ -1259,30 +1289,7 @@ header.search-active .search-expand-box {
 
 @media (min-width: 768px) and (max-width: 1279px) {
   body.theme-bg-app {
-    padding-bottom: 5rem;
-  }
-
-  @media (min-width: 1280px) and (max-width: 1535px) {
-    .header-inner {
-      gap: 0.5rem;
-    }
-
-    .nav-group nav {
-      gap: 0;
-    }
-
-    .nav-group .nav-tab-btn,
-    .nav-group .nav-settings-btn {
-      padding-left: 0.5rem;
-      padding-right: 0.5rem;
-      font-size: 0.75rem;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .card-removing {
-      transition-duration: 0.01ms;
-    }
+    padding-bottom: calc(5.75rem + var(--sab));
   }
 
   .clock-group {
@@ -1291,15 +1298,15 @@ header.search-active .search-expand-box {
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
-  main {
-    padding-left: 1rem;
-    padding-right: 1rem;
+  #appShell > main {
+    padding-left: max(1rem, var(--sal));
+    padding-right: max(1rem, var(--sar));
   }
 }
 
-@media (min-width: 1024px) {
-  body {
-    padding-bottom: 0;
+@media (min-width: 1280px) {
+  body.theme-bg-app {
+    padding-bottom: var(--sab);
   }
 }
 
@@ -1589,16 +1596,17 @@ nav.fixed.bottom-0::-webkit-scrollbar { display: none; }
   #editStationeryModal > div,
   #passwordResetModal > div {
     position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
+    bottom: var(--sab) !important;
+    left: var(--sal) !important;
+    right: var(--sar) !important;
     top: auto !important;
     border-radius: 1.5rem 1.5rem 0 0 !important;
-    max-height: 90vh;
+    max-height: calc(90dvh - var(--sat) - var(--sab));
+    min-height: 0 !important;
     overflow-y: auto;
     margin: 0 !important;
     max-width: 100% !important;
-    width: 100% !important;
+    width: auto !important;
   }
 }
 
@@ -1613,14 +1621,15 @@ nav.fixed.bottom-0::-webkit-scrollbar { display: none; }
 @media (max-width: 639px) {
   #deleteConfirmModal > div {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    bottom: var(--sab);
+    left: var(--sal);
+    right: var(--sar);
     top: auto;
     border-radius: 1.5rem 1.5rem 0 0;
-    max-height: 80vh;
+    max-height: calc(80dvh - var(--sat) - var(--sab));
+    min-height: 0 !important;
     max-width: 100%;
-    width: 100%;
+    width: auto;
   }
 }
 
@@ -1726,7 +1735,7 @@ body { font-size: clamp(0.875rem, 1vw, 1rem); line-height: 1.5; }
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  padding-bottom: calc(8px + var(--sab));
 }
 .mobile-bottom-nav::-webkit-scrollbar, .mobile-nav-bar::-webkit-scrollbar { display: none; }
 .mobile-bottom-nav > *, .mobile-nav-bar > * {
@@ -1741,7 +1750,6 @@ body { font-size: clamp(0.875rem, 1vw, 1rem); line-height: 1.5; }
   .nav-tab-btn:hover, .preset-pill:hover, .price-tier-card:hover,
   .settings-tab-btn:hover {
     box-shadow: none;
-    border-color: inherit;
   }
 }
 
@@ -1830,43 +1838,271 @@ body { font-size: clamp(0.875rem, 1vw, 1rem); line-height: 1.5; }
   width: 100%;
   z-index: 50;
   transform: translateZ(0);
+  padding-top: calc(0.625rem + var(--sat));
+  padding-left: max(0.75rem, var(--sal));
+  padding-right: max(0.75rem, var(--sar));
+}
+
+@media (min-width: 640px) {
+  #mainHeader {
+    padding-left: max(1.5rem, var(--sal));
+    padding-right: max(1.5rem, var(--sar));
+  }
 }
 
 #appShell {
-  padding-top: 4.25rem;
+  padding-top: calc(4.25rem + var(--sat));
 }
 
+#authGateScreen,
+#loginScreen {
+  padding: max(1rem, var(--sat)) max(1rem, var(--sar)) max(1rem, var(--sab)) max(1rem, var(--sal));
+}
 
-body.light-theme .nav-tab-btn.active,
+#toastContainer {
+  bottom: calc(5rem + var(--sab));
+  right: max(1rem, var(--sar));
+}
+
+@media (min-width: 1280px) {
+  #toastContainer {
+    bottom: calc(1.5rem + var(--sab));
+  }
+}
+
+/* ===== LIGHT MODE HEADER, GLASSMORPHISM & HIGH-CONTRAST CARDS ===== */
+[data-theme="emerald-store"] body,
+body.light-theme {
+  background-image:
+    radial-gradient(620px 380px at 10% 0%, rgba(56, 189, 248, 0.12), transparent 65%),
+    radial-gradient(580px 380px at 92% 18%, rgba(16, 185, 129, 0.10), transparent 65%);
+  background-attachment: fixed;
+}
+
 [data-theme="emerald-store"] .nav-tab-btn.active,
+[data-theme="emerald-store"] .nav-tab-btn.active:hover,
+[data-theme="emerald-store"] .nav-settings-btn.active,
+body.light-theme .nav-tab-btn.active,
+body.light-theme .nav-tab-btn.active:hover,
+body.light-theme .nav-settings-btn.active {
+  color: #0f172a !important;
+  background-color: rgba(241, 245, 249, 0.96);
+  border-color: rgba(15, 23, 42, 0.16);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="emerald-store"] .mobile-nav-btn.active,
+[data-theme="emerald-store"] .mobile-menu-nav-btn.active,
 body.light-theme .mobile-nav-btn.active,
-[data-theme="emerald-store"] .mobile-nav-btn.active {
+body.light-theme .mobile-menu-nav-btn.active {
   color: #0f172a !important;
 }
 
+[data-theme="emerald-store"] .mobile-menu-nav-btn.active,
+body.light-theme .mobile-menu-nav-btn.active {
+  background-color: var(--bg-surface-elevated);
+  font-weight: 700;
+}
 
-body.light-theme .preset-pill.active,
-body.light-theme .settings-tab-btn.active,
-body.light-theme .op-select-btn,
-body.light-theme .theme-choice-card,
-body.light-theme .quick-pos-btn,
-body.light-theme .tier-pos-btn,
+[data-theme="emerald-store"] .mobile-nav-btn.active svg,
+body.light-theme .mobile-nav-btn.active svg {
+  stroke: #0f172a !important;
+}
+
+[data-theme="emerald-store"][data-gradient-blur="on"] #mainHeader.theme-header,
+html[data-theme="emerald-store"][data-gradient-blur="on"] #mainHeader.theme-header,
+body.light-theme #mainHeader.theme-header {
+  background-color: rgba(255, 255, 255, 0.76);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.10);
+}
+
+[data-theme="emerald-store"][data-gradient-blur="off"] #mainHeader.theme-header,
+html[data-theme="emerald-store"][data-gradient-blur="off"] #mainHeader.theme-header {
+  background-color: #ffffff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+[data-theme="emerald-store"] nav.fixed.bottom-0.theme-header,
+body.light-theme nav.fixed.bottom-0.theme-header {
+  background-color: rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  border-top: 1px solid rgba(15, 23, 42, 0.10);
+}
+
+[data-theme="emerald-store"] .glass,
+[data-theme="emerald-store"] .dash-card,
+[data-theme="emerald-store"] .quick-action-btn,
+[data-theme="emerald-store"] .log-paired-card,
+[data-theme="emerald-store"] .price-tier-card,
+[data-theme="emerald-store"] .theme-choice-card,
+body.light-theme .glass,
+body.light-theme .dash-card,
 body.light-theme .quick-action-btn,
-body.light-theme .log-date-btn.active {
+body.light-theme .log-paired-card,
+body.light-theme .price-tier-card,
+body.light-theme .theme-choice-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.68));
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.92);
   color: #0f172a;
 }
 
-body.light-theme .preset-pill.active *,
-body.light-theme .op-select-btn *,
-body.light-theme .theme-choice-card * {
-  color: inherit;
+[data-theme="emerald-store"] .modal-backdrop,
+body.light-theme .modal-backdrop {
+  background-color: rgba(15, 23, 42, 0.42);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 
+[data-theme="emerald-store"] .modal-content,
+body.light-theme .modal-content {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.90));
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+}
 
-[data-theme="emerald-store"] #mainHeader.theme-header,
-body.light-theme #mainHeader.theme-header {
-  background: rgba(255,255,255,0.72);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
-  backdrop-filter: blur(16px) saturate(160%);
-  border-bottom: 1px solid rgba(15,23,42,0.10);
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-theme="emerald-store"] .glass,
+  [data-theme="emerald-store"] .dash-card,
+  [data-theme="emerald-store"] .quick-action-btn,
+  [data-theme="emerald-store"] .log-paired-card,
+  [data-theme="emerald-store"] .price-tier-card,
+  [data-theme="emerald-store"] .theme-choice-card,
+  [data-theme="emerald-store"] .modal-content,
+  body.light-theme .glass,
+  body.light-theme .dash-card,
+  body.light-theme .quick-action-btn,
+  body.light-theme .log-paired-card,
+  body.light-theme .price-tier-card,
+  body.light-theme .theme-choice-card,
+  body.light-theme .modal-content {
+    background: #ffffff;
+  }
+}
+
+[data-theme="emerald-store"] .dash-card:hover,
+[data-theme="emerald-store"] .dash-card:active,
+[data-theme="emerald-store"] .quick-action-btn:hover,
+[data-theme="emerald-store"] .quick-action-btn:active,
+[data-theme="emerald-store"] .price-tier-card:hover,
+[data-theme="emerald-store"] .price-tier-card.selected,
+[data-theme="emerald-store"] .theme-choice-card:hover,
+[data-theme="emerald-store"] .op-select-btn:hover,
+[data-theme="emerald-store"] .op-select-btn:active,
+body.light-theme .dash-card:hover,
+body.light-theme .dash-card:active,
+body.light-theme .quick-action-btn:hover,
+body.light-theme .quick-action-btn:active,
+body.light-theme .price-tier-card:hover,
+body.light-theme .price-tier-card.selected,
+body.light-theme .theme-choice-card:hover,
+body.light-theme .op-select-btn:hover,
+body.light-theme .op-select-btn:active {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.92));
+  border-color: var(--accent);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.10), 0 0 0 2px rgba(5, 150, 105, 0.16);
+  color: #0f172a;
+}
+
+[data-theme="emerald-store"] .btn:hover,
+[data-theme="emerald-store"] .btn:focus-visible,
+[data-theme="emerald-store"] .btn-action:hover,
+[data-theme="emerald-store"] .btn-action:focus-visible,
+[data-theme="emerald-store"] .nav-tab-btn:hover,
+[data-theme="emerald-store"] .nav-tab-btn:focus-visible,
+[data-theme="emerald-store"] .preset-pill:hover,
+[data-theme="emerald-store"] .preset-pill:focus-visible,
+[data-theme="emerald-store"] .settings-tab-btn:hover,
+[data-theme="emerald-store"] .settings-tab-btn:focus-visible,
+[data-theme="emerald-store"] .tap-target:hover,
+[data-theme="emerald-store"] .tap-target:focus-visible,
+body.light-theme .btn:hover,
+body.light-theme .btn:focus-visible,
+body.light-theme .btn-action:hover,
+body.light-theme .btn-action:focus-visible,
+body.light-theme .nav-tab-btn:hover,
+body.light-theme .nav-tab-btn:focus-visible,
+body.light-theme .preset-pill:hover,
+body.light-theme .preset-pill:focus-visible,
+body.light-theme .settings-tab-btn:hover,
+body.light-theme .settings-tab-btn:focus-visible,
+body.light-theme .tap-target:hover,
+body.light-theme .tap-target:focus-visible {
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.10), 0 0 0 2px rgba(5, 150, 105, 0.16);
+  border-color: var(--accent);
+}
+
+[data-theme="emerald-store"] .op-select-btn,
+[data-theme="emerald-store"] .preset-pill.active,
+[data-theme="emerald-store"] .quick-pos-btn,
+[data-theme="emerald-store"] .tier-pos-btn,
+[data-theme="emerald-store"] .log-date-btn.active,
+[data-theme="emerald-store"] .stock-filter-btn.active,
+body.light-theme .op-select-btn,
+body.light-theme .preset-pill.active,
+body.light-theme .quick-pos-btn,
+body.light-theme .tier-pos-btn,
+body.light-theme .log-date-btn.active,
+body.light-theme .stock-filter-btn.active {
+  color: #0f172a;
+}
+
+[data-theme="emerald-store"] .op-select-btn,
+body.light-theme .op-select-btn {
+  background-color: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme="emerald-store"] .op-select-btn.theme-bg-elevated,
+body.light-theme .op-select-btn.theme-bg-elevated {
+  background-color: #ecfdf5;
+  border-color: var(--accent);
+}
+
+[data-theme="emerald-store"] .op-select-btn .text-red-400,
+body.light-theme .op-select-btn .text-red-400 { color: #dc2626; }
+[data-theme="emerald-store"] .op-select-btn .text-orange-400,
+body.light-theme .op-select-btn .text-orange-400 { color: #c2410c; }
+[data-theme="emerald-store"] .op-select-btn .text-blue-400,
+body.light-theme .op-select-btn .text-blue-400 { color: #1d4ed8; }
+[data-theme="emerald-store"] .op-select-btn .text-amber-300,
+body.light-theme .op-select-btn .text-amber-300 { color: #b45309; }
+
+[data-theme="emerald-store"] .text-sky-300,
+[data-theme="emerald-store"] .text-sky-400,
+body.light-theme .text-sky-300,
+body.light-theme .text-sky-400 {
+  color: #0369a1;
+}
+
+[data-theme="emerald-store"] .text-amber-300,
+[data-theme="emerald-store"] .text-amber-400,
+body.light-theme .text-amber-300,
+body.light-theme .text-amber-400 {
+  color: #b45309;
+}
+
+[data-theme="emerald-store"] .text-emerald-400,
+body.light-theme .text-emerald-400 {
+  color: #047857;
+}
+
+[data-theme="emerald-store"] .text-blue-300,
+body.light-theme .text-blue-300 {
+  color: #1d4ed8;
+}
+
+[data-theme="emerald-store"] .settings-tab-btn.active,
+body.light-theme .settings-tab-btn.active {
+  background-color: var(--accent) !important;
+  color: #ffffff !important;
+  border-color: var(--accent) !important;
 }

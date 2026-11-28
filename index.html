@@ -34,6 +34,23 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
   <link rel="stylesheet" href="./styles.css">
+  <script>
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem('al_theme_preference');
+        var allowed = ['modern-slate', 'emerald-store', 'sapphire-blue', 'warm-amber'];
+        if (allowed.indexOf(savedTheme) !== -1) {
+          document.documentElement.setAttribute('data-theme', savedTheme);
+          if (savedTheme === 'emerald-store') {
+            var icon = document.querySelector('link[rel="icon"]');
+            if (icon) icon.setAttribute('href', 'images/logo-b.png');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#f8fafc');
+          }
+        }
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body class="theme-bg-app theme-text-main antialiased selection:bg-sky-500 selection:text-white pb-24 md:pb-6 relative overflow-x-hidden min-h-screen">
 
@@ -1854,6 +1871,18 @@
 
   <div id="toastContainer" class="fixed bottom-20 md:bottom-6 right-4 z-[90] flex flex-col gap-2 pointer-events-none max-w-sm font-rounded"></div>
 
+  <script>
+    (function () {
+      try {
+        if (document.documentElement.getAttribute('data-theme') === 'emerald-store') {
+          document.body.classList.add('light-theme');
+          document.querySelectorAll('img[src*="logo.png"], img.brand-logo-img').forEach(function (img) {
+            img.setAttribute('src', './images/logo-b.png');
+          });
+        }
+      } catch (e) {}
+    })();
+  </script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

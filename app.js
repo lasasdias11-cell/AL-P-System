@@ -395,10 +395,31 @@ export function applyTheme(themeName) {
     document.body.classList.remove('light-theme');
   }
 
-  const logoSrc = themeName === 'emerald-store' ? './images/logo-b.png' : './images/logo.png';
-  document.querySelectorAll('img[src*="logo.png"], img[src*="logo-b.png"]').forEach(img => {
-    if (!img.src.endsWith(logoSrc.split('/').pop())) img.src = logoSrc;
+  const isLightTheme = themeName === 'emerald-store';
+  const logoFile = isLightTheme ? 'logo-b.png' : 'logo.png';
+  const logoSrc = `./images/${logoFile}`;
+  document.querySelectorAll('img[src*="logo.png"], img[src*="logo-b.png"], img.brand-logo-img').forEach(img => {
+    const currentSrc = img.getAttribute('src') || '';
+    if (!currentSrc.endsWith(logoFile)) {
+      img.setAttribute('src', logoSrc);
+    }
+    img.style.display = '';
+    img.classList.remove('hidden');
   });
+
+  const favicon = document.querySelector('link[rel="icon"]');
+  if (favicon) favicon.setAttribute('href', `images/${logoFile}`);
+
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) {
+    const metaColors = {
+      'modern-slate': '#0b1120',
+      'emerald-store': '#f8fafc',
+      'sapphire-blue': '#060d1f',
+      'warm-amber': '#18120c'
+    };
+    themeMeta.setAttribute('content', metaColors[themeName] || '#0b1120');
+  }
 
   const sunIcon = document.getElementById('themeToggleIconSun');
   const moonIcon = document.getElementById('themeToggleIconMoon');
@@ -536,18 +557,21 @@ export function switchView(viewName) {
 
   document.querySelectorAll('.nav-tab-btn').forEach(btn => {
     if (btn.getAttribute('data-view') === viewName) {
-      btn.className = 'nav-tab-btn active px-3.5 py-1.5 rounded-lg transition';
+      btn.className = 'nav-tab-btn active px-3.5 py-1.5 rounded-lg transition font-rounded';
     } else {
-      btn.className = 'nav-tab-btn px-3.5 py-1.5 rounded-lg theme-text-muted hover:theme-text-main transition';
+      btn.className = 'nav-tab-btn px-3.5 py-1.5 rounded-lg theme-text-muted hover:theme-text-main transition font-rounded';
     }
   });
 
   document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
     if (btn.getAttribute('data-view') === viewName) {
-      btn.className = 'mobile-nav-btn active flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-accent';
+      btn.className = 'mobile-nav-btn active flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-accent font-rounded';
     } else {
-      btn.className = 'mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted';
+      btn.className = 'mobile-nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-xs font-semibold theme-text-muted font-rounded';
     }
+  });
+  document.querySelectorAll('.mobile-menu-nav-btn[data-view]').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-view') === viewName);
   });
   document.getElementById('openProfileBtn')?.classList.toggle('active', viewName === 'profile');
   document.getElementById('mobileMenuDrawer')?.classList.add('hidden');
