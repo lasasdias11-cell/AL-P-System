@@ -1837,3 +1837,21 @@ body.light-theme .mobile-nav-btn.active,
 [data-theme="emerald-store"] .mobile-nav-btn.active {
   color: #0f172a !important;
 }
+
+
+body.light-theme .preset-pill.active,
+body.light-theme .settings-tab-btn.active,
+body.light-theme .op-select-btn,
+body.light-theme .theme-choice-card,
+body.light-theme .quick-pos-btn,
+body.light-theme .tier-pos-btn,
+body.light-theme .quick-action-btn,
+body.light-theme .log-date-btn.active {
+  color: #0f172a;
+}
+
+body.light-theme .preset-pill.active *,
+body.light-theme .op-select-btn *,
+body.light-theme .theme-choice-card * {
+  color: inherit;
+}
