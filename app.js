@@ -395,6 +395,11 @@ export function applyTheme(themeName) {
     document.body.classList.remove('light-theme');
   }
 
+  const logoSrc = themeName === 'emerald-store' ? './images/logo-b.png' : './images/logo.png';
+  document.querySelectorAll('img[src*="logo.png"], img[src*="logo-b.png"]').forEach(img => {
+    if (!img.src.endsWith(logoSrc.split('/').pop())) img.src = logoSrc;
+  });
+
   const sunIcon = document.getElementById('themeToggleIconSun');
   const moonIcon = document.getElementById('themeToggleIconMoon');
   if (sunIcon && moonIcon) {

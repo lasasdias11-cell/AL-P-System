@@ -1829,3 +1829,11 @@ body { font-size: clamp(0.875rem, 1vw, 1rem); line-height: 1.5; }
 #appShell {
   padding-top: 4.25rem;
 }
+
+
+body.light-theme .nav-tab-btn.active,
+[data-theme="emerald-store"] .nav-tab-btn.active,
+body.light-theme .mobile-nav-btn.active,
+[data-theme="emerald-store"] .mobile-nav-btn.active {
+  color: #0f172a !important;
+}
